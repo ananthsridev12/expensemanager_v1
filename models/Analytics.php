@@ -136,4 +136,48 @@ SQL;
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    public function getIncomeByCategory(string $startDate, string $endDate): array
+    {
+        $sql = <<<SQL
+SELECT
+    COALESCE(c.name, 'Uncategorized') AS category_name,
+    COALESCE(SUM(t.amount), 0) AS total_amount
+FROM transactions t
+LEFT JOIN categories c ON c.id = t.category_id
+WHERE t.transaction_date BETWEEN :start_date AND :end_date
+  AND t.transaction_type = 'income'
+GROUP BY c.id, c.name
+ORDER BY total_amount DESC
+SQL;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            ':start_date' => $startDate,
+            ':end_date' => $endDate,
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getMonthlyIncomeVsExpense(int $months = 12): array
+    {
+        $months = max(1, min(24, $months));
+        $start = date('Y-m-01', strtotime('-' . ($months - 1) . ' months'));
+        $end = date('Y-m-t');
+
+        $sql = <<<SQL
+SELECT
+    DATE_FORMAT(t.transaction_date, '%Y-%m') AS period,
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END), 0) AS income,
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense
+FROM transactions t
+WHERE t.transaction_date BETWEEN :start_date AND :end_date
+GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m')
+ORDER BY period ASC
+SQL;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':start_date' => $start, ':end_date' => $end]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

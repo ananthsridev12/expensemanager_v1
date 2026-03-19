@@ -29,7 +29,8 @@ class AnalyticsController extends BaseController
         $earningsSummary = $this->analyticsModel->getEarningsSummary($startDate, $endDate);
         $earningsBySubcategory = $this->analyticsModel->getEarningsBySubcategory($startDate, $endDate);
         $expensesByCategory = $this->analyticsModel->getExpensesByCategory($startDate, $endDate);
-        $monthlyEarnings = $this->analyticsModel->getMonthlyEarningsTrend(12);
+        $incomeByCategory = $this->analyticsModel->getIncomeByCategory($startDate, $endDate);
+        $monthlyTrend = $this->analyticsModel->getMonthlyIncomeVsExpense(12);
 
         return $this->render('analytics/index.php', [
             'startDate' => $startDate,
@@ -38,7 +39,8 @@ class AnalyticsController extends BaseController
             'earningsSummary' => $earningsSummary,
             'earningsBySubcategory' => $earningsBySubcategory,
             'expensesByCategory' => $expensesByCategory,
-            'monthlyEarnings' => $monthlyEarnings,
+            'incomeByCategory' => $incomeByCategory,
+            'monthlyTrend' => $monthlyTrend,
         ]);
     }
 

@@ -245,6 +245,7 @@ table tbody tr:last-child td { border-bottom: none; }
     .module-form { grid-template-columns: 1fr; }
     table th, table td { padding: 0.58rem 0.65rem; font-size: 0.82rem; }
     .module-panel { padding: 1rem; }
+    .charts-2col { grid-template-columns: 1fr !important; }
 }
 
 @media (max-width: 400px) {
