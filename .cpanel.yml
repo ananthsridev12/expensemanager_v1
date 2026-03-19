@@ -2,4 +2,11 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home1/de2shrnx/personalfin.easi7.in/
-    - /bin/rsync -av --exclude='.git' --exclude='.cpanel.yml' --exclude='db/' --exclude='error_log' --exclude='config/database.override.php' --exclude='config/pin.override.php' . $DEPLOYPATH
+    - /bin/cp -R autoload.php helpers.php index.php $DEPLOYPATH
+    - /bin/cp -R .htaccess 404.html $DEPLOYPATH
+    - /bin/cp -R controllers/ $DEPLOYPATH
+    - /bin/cp -R models/ $DEPLOYPATH
+    - /bin/cp -R views/ $DEPLOYPATH
+    - /bin/cp -R public/ $DEPLOYPATH
+    - /bin/cp -R api/ $DEPLOYPATH
+    - /bin/cp config/database.php config/pin.php $DEPLOYPATH/config/
