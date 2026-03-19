@@ -181,6 +181,76 @@ SQL;
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getDrilldown(array $filters): array
+    {
+        $startDate       = $filters['start_date'] ?? date('Y-m-01');
+        $endDate         = $filters['end_date']   ?? date('Y-m-d');
+        $txType          = $filters['tx_type']    ?? '';
+        $categoryId      = !empty($filters['category_id'])       ? (int) $filters['category_id']       : null;
+        $subcategoryId   = !empty($filters['subcategory_id'])    ? (int) $filters['subcategory_id']     : null;
+        $purchaseSourceId = !empty($filters['purchase_source_id']) ? (int) $filters['purchase_source_id'] : null;
+
+        $where   = ['t.transaction_date BETWEEN :start_date AND :end_date'];
+        $params  = [':start_date' => $startDate, ':end_date' => $endDate];
+
+        if (in_array($txType, ['income', 'expense'], true)) {
+            $where[] = 't.transaction_type = :tx_type';
+            $params[':tx_type'] = $txType;
+        } else {
+            $where[] = "t.transaction_type IN ('income','expense')";
+        }
+
+        if ($categoryId !== null) {
+            $where[] = 't.category_id = :category_id';
+            $params[':category_id'] = $categoryId;
+        }
+
+        if ($subcategoryId !== null) {
+            $where[] = 't.subcategory_id = :subcategory_id';
+            $params[':subcategory_id'] = $subcategoryId;
+        }
+
+        if ($purchaseSourceId !== null) {
+            $where[] = 't.purchase_source_id = :purchase_source_id';
+            $params[':purchase_source_id'] = $purchaseSourceId;
+        }
+
+        $whereClause = implode(' AND ', $where);
+
+        // Summary
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(t.amount),0) AS total, COUNT(*) AS tx_count FROM transactions t WHERE {$whereClause}");
+        $stmt->execute($params);
+        $summary = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'tx_count' => 0];
+
+        // By category
+        $stmt = $this->db->prepare("SELECT COALESCE(c.name,'Uncategorized') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN categories c ON c.id = t.category_id WHERE {$whereClause} GROUP BY c.id, c.name ORDER BY total DESC");
+        $stmt->execute($params);
+        $byCategory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // By subcategory
+        $stmt = $this->db->prepare("SELECT COALESCE(sc.name,'Unspecified') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN subcategories sc ON sc.id = t.subcategory_id WHERE {$whereClause} GROUP BY sc.id, sc.name ORDER BY total DESC");
+        $stmt->execute($params);
+        $bySubcategory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // By purchase source
+        $stmt = $this->db->prepare("SELECT COALESCE(ps.name,'Unknown') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN purchase_sources ps ON ps.id = t.purchase_source_id WHERE {$whereClause} AND t.purchase_source_id IS NOT NULL GROUP BY ps.id, ps.name ORDER BY total DESC");
+        $stmt->execute($params);
+        $bySource = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Transaction list (latest 100)
+        $stmt = $this->db->prepare("SELECT t.transaction_date, t.transaction_type, t.amount, COALESCE(c.name,'Uncategorized') AS category_name, COALESCE(sc.name,'') AS subcategory_name, COALESCE(ps.name,'') AS source_name, t.notes FROM transactions t LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN subcategories sc ON sc.id = t.subcategory_id LEFT JOIN purchase_sources ps ON ps.id = t.purchase_source_id WHERE {$whereClause} ORDER BY t.transaction_date DESC, t.id DESC LIMIT 100");
+        $stmt->execute($params);
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'summary'        => $summary,
+            'by_category'    => $byCategory,
+            'by_subcategory' => $bySubcategory,
+            'by_source'      => $bySource,
+            'transactions'   => $transactions,
+        ];
+    }
+
     public function getThisMonthVsLastMonth(): array
     {
         $thisStart  = date('Y-m-01');

@@ -10,6 +10,10 @@ $incomeByCategory = $incomeByCategory ?? [];
 $monthlyTrend = $monthlyTrend ?? [];
 $accountWiseExpense = $accountWiseExpense ?? [];
 $dayOfWeekSpend = $dayOfWeekSpend ?? [];
+$drilldown = $drilldown ?? [];
+$drilldownFilters = $drilldownFilters ?? [];
+$categoriesWithSubs = $categoriesWithSubs ?? [];
+$purchaseSources = $purchaseSources ?? [];
 
 $netCashflow = (float) ($summary['net_cashflow'] ?? 0);
 $netClass = $netCashflow >= 0 ? 'card--green' : 'card--red';
@@ -23,10 +27,10 @@ include __DIR__ . '/../partials/nav.php';
         <h1>Analytics</h1>
     </header>
 
-    <!-- Filter -->
+    <!-- Drilldown filter -->
     <section class="module-panel">
-        <h2>Filter period</h2>
-        <form method="get" class="module-form">
+        <h2>Drill-down analysis</h2>
+        <form method="get" class="module-form" id="drilldown-form">
             <input type="hidden" name="module" value="analytics">
             <label>
                 Start date
@@ -36,9 +40,196 @@ include __DIR__ . '/../partials/nav.php';
                 End date
                 <input type="date" name="end_date" value="<?= htmlspecialchars($endDate) ?>">
             </label>
+            <label>
+                Type
+                <select name="tx_type">
+                    <option value="">All (income + expense)</option>
+                    <option value="expense" <?= ($drilldownFilters['tx_type'] ?? '') === 'expense' ? 'selected' : '' ?>>Expense only</option>
+                    <option value="income"  <?= ($drilldownFilters['tx_type'] ?? '') === 'income'  ? 'selected' : '' ?>>Income only</option>
+                </select>
+            </label>
+            <label>
+                Category
+                <select name="category_id" id="dd-category">
+                    <option value="">All categories</option>
+                    <?php foreach ($categoriesWithSubs as $cat): ?>
+                        <option value="<?= (int)$cat['id'] ?>" <?= (string)($drilldownFilters['category_id'] ?? '') === (string)$cat['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($cat['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>
+                Subcategory
+                <select name="subcategory_id" id="dd-subcategory">
+                    <option value="">All subcategories</option>
+                    <?php foreach ($categoriesWithSubs as $cat): ?>
+                        <?php foreach (($cat['subcategories'] ?? []) as $sub): ?>
+                            <option value="<?= (int)$sub['id'] ?>"
+                                data-parent="<?= (int)$cat['id'] ?>"
+                                <?= (string)($drilldownFilters['subcategory_id'] ?? '') === (string)$sub['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($sub['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>
+                Purchased from
+                <select name="purchase_source_id">
+                    <option value="">All sources</option>
+                    <?php foreach ($purchaseSources as $src): ?>
+                        <option value="<?= (int)$src['id'] ?>" <?= (string)($drilldownFilters['purchase_source_id'] ?? '') === (string)$src['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($src['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
             <button type="submit">Apply</button>
+            <a class="secondary" href="?module=analytics">Reset</a>
         </form>
     </section>
+
+    <!-- Drilldown results -->
+    <?php
+    $ddSummary  = $drilldown['summary']        ?? ['total' => 0, 'tx_count' => 0];
+    $ddCat      = $drilldown['by_category']    ?? [];
+    $ddSub      = $drilldown['by_subcategory'] ?? [];
+    $ddSource   = $drilldown['by_source']      ?? [];
+    $ddTxns     = $drilldown['transactions']   ?? [];
+    $ddType     = $drilldownFilters['tx_type'] ?? '';
+    $ddTotal    = (float) ($ddSummary['total'] ?? 0);
+    ?>
+    <section class="summary-cards">
+        <article class="card <?= $ddType === 'income' ? 'card--green' : ($ddType === 'expense' ? 'card--red' : 'card--cyan') ?>">
+            <h3><?= $ddType === 'income' ? 'Total income' : ($ddType === 'expense' ? 'Total expense' : 'Total amount') ?></h3>
+            <p><?= formatCurrency($ddTotal) ?></p>
+            <small><?= (int)($ddSummary['tx_count'] ?? 0) ?> transactions</small>
+        </article>
+    </section>
+
+    <?php if (!empty($ddCat) || !empty($ddSub) || !empty($ddSource)): ?>
+    <?php if (!$hasChartData): ?>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <?php endif; ?>
+    <section class="module-panel">
+        <h2>Breakdown</h2>
+        <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
+            <?php if (!empty($ddCat)): ?>
+            <div>
+                <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">By category</h3>
+                <canvas id="dd-cat-chart"></canvas>
+                <div class="table-wrapper" style="margin-top:0.8rem;">
+                    <table>
+                        <thead><tr><th>Category</th><th>Amount</th><th>%</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($ddCat as $row): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($row['label']) ?></td>
+                                    <td><?= formatCurrency((float)$row['total']) ?></td>
+                                    <td><?= $ddTotal > 0 ? number_format((float)$row['total'] / $ddTotal * 100, 1) . '%' : '—' ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($ddSub)): ?>
+            <div>
+                <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">By subcategory</h3>
+                <canvas id="dd-sub-chart"></canvas>
+                <div class="table-wrapper" style="margin-top:0.8rem;">
+                    <table>
+                        <thead><tr><th>Subcategory</th><th>Amount</th><th>%</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($ddSub as $row): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($row['label']) ?></td>
+                                    <td><?= formatCurrency((float)$row['total']) ?></td>
+                                    <td><?= $ddTotal > 0 ? number_format((float)$row['total'] / $ddTotal * 100, 1) . '%' : '—' ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php if (!empty($ddSource)): ?>
+        <div style="margin-top:1.2rem;">
+            <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">By purchased from</h3>
+            <canvas id="dd-source-chart" style="max-height:220px;"></canvas>
+            <div class="table-wrapper" style="margin-top:0.8rem;">
+                <table>
+                    <thead><tr><th>Source</th><th>Amount</th><th>%</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($ddSource as $row): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($row['label']) ?></td>
+                                <td><?= formatCurrency((float)$row['total']) ?></td>
+                                <td><?= $ddTotal > 0 ? number_format((float)$row['total'] / $ddTotal * 100, 1) . '%' : '—' ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+        <script>
+        (function () {
+            const colors = ['#3b82f6','#22d3ee','#a855f7','#f97316','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
+            const donutOpts = { responsive: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ctx.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } } } };
+            const barOpts   = { indexAxis: 'y', responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.07)' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.07)' } } } };
+
+            <?php if (!empty($ddCat)): ?>
+            (function () {
+                const rows = <?= json_encode($ddCat, JSON_UNESCAPED_UNICODE) ?>;
+                new Chart(document.getElementById('dd-cat-chart'), { type: 'doughnut', data: { labels: rows.map(r => r.label), datasets: [{ data: rows.map(r => Number(r.total)), backgroundColor: rows.map((_, i) => colors[i % colors.length]), borderColor: '#0f172a', borderWidth: 2 }] }, options: donutOpts });
+            })();
+            <?php endif; ?>
+            <?php if (!empty($ddSub)): ?>
+            (function () {
+                const rows = <?= json_encode($ddSub, JSON_UNESCAPED_UNICODE) ?>;
+                new Chart(document.getElementById('dd-sub-chart'), { type: 'doughnut', data: { labels: rows.map(r => r.label), datasets: [{ data: rows.map(r => Number(r.total)), backgroundColor: rows.map((_, i) => colors[i % colors.length]), borderColor: '#0f172a', borderWidth: 2 }] }, options: donutOpts });
+            })();
+            <?php endif; ?>
+            <?php if (!empty($ddSource)): ?>
+            (function () {
+                const rows = <?= json_encode($ddSource, JSON_UNESCAPED_UNICODE) ?>;
+                new Chart(document.getElementById('dd-source-chart'), { type: 'bar', data: { labels: rows.map(r => r.label), datasets: [{ data: rows.map(r => Number(r.total)), backgroundColor: rows.map((_, i) => colors[i % colors.length]), borderRadius: 4 }] }, options: barOpts });
+            })();
+            <?php endif; ?>
+        })();
+        </script>
+    </section>
+    <?php endif; ?>
+
+    <?php if (!empty($ddTxns)): ?>
+    <section class="module-panel">
+        <h2>Transactions (latest <?= count($ddTxns) ?>)</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Type</th><th>Category</th><th>Subcategory</th><th>Purchased from</th><th>Amount</th><th>Notes</th></tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($ddTxns as $tx): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($tx['transaction_date']) ?></td>
+                            <td><span class="pill <?= $tx['transaction_type'] === 'income' ? 'pill--green' : 'pill--red' ?>"><?= ucfirst($tx['transaction_type']) ?></span></td>
+                            <td><?= htmlspecialchars($tx['category_name']) ?></td>
+                            <td><?= htmlspecialchars($tx['subcategory_name']) ?: '—' ?></td>
+                            <td><?= htmlspecialchars($tx['source_name']) ?: '—' ?></td>
+                            <td><?= formatCurrency((float)$tx['amount']) ?></td>
+                            <td><?= htmlspecialchars($tx['notes'] ?? '') ?: '—' ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <?php endif; ?>
 
     <!-- Summary cards -->
     <section class="summary-cards">
@@ -63,6 +254,28 @@ include __DIR__ . '/../partials/nav.php';
             <small>Income minus expense</small>
         </article>
     </section>
+
+    <script>
+    (function () {
+        const catSel = document.getElementById('dd-category');
+        const subSel = document.getElementById('dd-subcategory');
+        if (!catSel || !subSel) return;
+        const allOptions = Array.from(subSel.options);
+        function filterSubs() {
+            const catId = catSel.value;
+            subSel.innerHTML = '';
+            const blank = document.createElement('option');
+            blank.value = ''; blank.textContent = 'All subcategories';
+            subSel.appendChild(blank);
+            allOptions.forEach(opt => {
+                if (opt.value === '') return;
+                if (catId === '' || opt.dataset.parent === catId) subSel.appendChild(opt.cloneNode(true));
+            });
+        }
+        catSel.addEventListener('change', filterSubs);
+        filterSubs();
+    })();
+    </script>
 
     <?php if ($hasChartData): ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
