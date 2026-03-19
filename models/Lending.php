@@ -62,11 +62,12 @@ class Lending extends BaseModel
         $sql = <<<SQL
 SELECT
     lr.id,
-    lr.outstanding_amount,
+    GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) AS outstanding_amount,
     c.name AS contact_name
 FROM lending_records lr
 JOIN contacts c ON c.id = lr.contact_id
-WHERE lr.status = 'ongoing' AND lr.outstanding_amount > 0
+WHERE lr.status = 'ongoing'
+  AND GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) > 0
 ORDER BY lr.lending_date DESC
 SQL;
         $stmt = $this->db->query($sql);
@@ -77,7 +78,10 @@ SQL;
     {
         $sql = <<<SQL
 SELECT
-    lr.*, c.name AS contact_name, c.mobile, c.email
+    lr.*,
+    COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0) AS total_repaid,
+    GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) AS outstanding_amount,
+    c.name AS contact_name, c.mobile, c.email
 FROM lending_records lr
 JOIN contacts c ON c.id = lr.contact_id
 ORDER BY lr.lending_date DESC
@@ -89,7 +93,13 @@ SQL;
 
     public function getSummary(): array
     {
-        $stmt = $this->db->query('SELECT COUNT(*) AS total_records, COALESCE(SUM(outstanding_amount),0) AS total_outstanding FROM lending_records');
+        $sql = <<<SQL
+SELECT
+    COUNT(*) AS total_records,
+    COALESCE(SUM(GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0))), 0) AS total_outstanding
+FROM lending_records lr
+SQL;
+        $stmt = $this->db->query($sql);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return [
@@ -111,7 +121,10 @@ SQL;
         }
 
         $stmt = $this->db->prepare(
-            'SELECT lr.id, lr.contact_id, lr.total_repaid, lr.outstanding_amount, c.name AS contact_name
+            'SELECT lr.id, lr.contact_id, lr.principal_amount,
+                    COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0) AS total_repaid,
+                    GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) AS outstanding_amount,
+                    c.name AS contact_name
              FROM lending_records lr
              JOIN contacts c ON c.id = lr.contact_id
              WHERE lr.id = :id
@@ -128,26 +141,34 @@ SQL;
             return false;
         }
 
-        $newTotalRepaid = round((float) $record['total_repaid'] + $payAmount, 2);
-        $newOutstanding = round(max(0, (float) $record['outstanding_amount'] - $payAmount), 2);
-        $newStatus = $newOutstanding <= 0 ? 'closed' : 'ongoing';
-
         $this->db->beginTransaction();
         try {
-            $update = $this->db->prepare(
-                'UPDATE lending_records
-                 SET total_repaid = :total_repaid,
-                     outstanding_amount = :outstanding_amount,
-                     status = :status,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = :id'
-            );
-            $update->execute([
-                ':total_repaid' => $newTotalRepaid,
-                ':outstanding_amount' => $newOutstanding,
-                ':status' => $newStatus,
-                ':id' => $recordId,
+            // Insert repayment row first so the sync query below counts it
+            [$depType, $depId] = $depositAccount !== '' && strpos($depositAccount, ':') !== false
+                ? explode(':', $depositAccount, 2)
+                : [null, null];
+
+            $this->db->prepare(
+                'INSERT INTO lending_repayments (lending_record_id, amount, repayment_date, deposit_account_type, deposit_account_id, notes)
+                 VALUES (:lending_record_id, :amount, :repayment_date, :deposit_account_type, :deposit_account_id, :notes)'
+            )->execute([
+                ':lending_record_id'    => $recordId,
+                ':amount'               => $payAmount,
+                ':repayment_date'       => $repaymentDate,
+                ':deposit_account_type' => $depType,
+                ':deposit_account_id'   => $depId !== null ? (int) $depId : null,
+                ':notes'                => $notes !== '' ? $notes : null,
             ]);
+
+            // Sync stored columns from live sum
+            $this->db->prepare(
+                'UPDATE lending_records
+                 SET total_repaid      = COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = id), 0),
+                     outstanding_amount = GREATEST(0, principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = id), 0)),
+                     status             = CASE WHEN GREATEST(0, principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = id), 0)) <= 0 THEN \'closed\' ELSE status END,
+                     updated_at         = CURRENT_TIMESTAMP
+                 WHERE id = :id'
+            )->execute([':id' => $recordId]);
 
             $this->createRepaymentLedgerTransactions(
                 $recordId,
@@ -157,22 +178,6 @@ SQL;
                 $depositAccount,
                 $notes
             );
-
-            [$depType, $depId] = $depositAccount !== '' && strpos($depositAccount, ':') !== false
-                ? explode(':', $depositAccount, 2)
-                : [null, null];
-
-            $this->db->prepare(
-                'INSERT INTO lending_repayments (lending_record_id, amount, repayment_date, deposit_account_type, deposit_account_id, notes)
-                 VALUES (:lending_record_id, :amount, :repayment_date, :deposit_account_type, :deposit_account_id, :notes)'
-            )->execute([
-                ':lending_record_id'   => $recordId,
-                ':amount'              => $payAmount,
-                ':repayment_date'      => $repaymentDate,
-                ':deposit_account_type'=> $depType,
-                ':deposit_account_id'  => $depId !== null ? (int) $depId : null,
-                ':notes'               => $notes !== '' ? $notes : null,
-            ]);
 
             $this->db->commit();
             return true;
@@ -187,7 +192,13 @@ SQL;
     public function getById(int $id): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT lr.*, c.name AS contact_name FROM lending_records lr JOIN contacts c ON c.id = lr.contact_id WHERE lr.id = :id LIMIT 1'
+            'SELECT lr.*,
+                    COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0) AS total_repaid,
+                    GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) AS outstanding_amount,
+                    c.name AS contact_name
+             FROM lending_records lr
+             JOIN contacts c ON c.id = lr.contact_id
+             WHERE lr.id = :id LIMIT 1'
         );
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
