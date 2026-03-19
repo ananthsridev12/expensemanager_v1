@@ -28,65 +28,96 @@ include __DIR__ . '/../partials/nav.php';
     </header>
 
     <!-- Drilldown filter -->
+    <?php
+    $selCatIds = $drilldownFilters['category_ids'] ?? [];
+    $selSubIds = $drilldownFilters['subcategory_ids'] ?? [];
+    $selSrcIds = $drilldownFilters['purchase_source_ids'] ?? [];
+    ?>
     <section class="module-panel">
         <h2>Drill-down analysis</h2>
-        <form method="get" class="module-form" id="drilldown-form">
+        <form method="get" id="drilldown-form">
             <input type="hidden" name="module" value="analytics">
-            <label>
-                Start date
-                <input type="date" name="start_date" value="<?= htmlspecialchars($startDate) ?>">
-            </label>
-            <label>
-                End date
-                <input type="date" name="end_date" value="<?= htmlspecialchars($endDate) ?>">
-            </label>
-            <label>
-                Type
-                <select name="tx_type">
-                    <option value="">All (income + expense)</option>
-                    <option value="expense" <?= ($drilldownFilters['tx_type'] ?? '') === 'expense' ? 'selected' : '' ?>>Expense only</option>
-                    <option value="income"  <?= ($drilldownFilters['tx_type'] ?? '') === 'income'  ? 'selected' : '' ?>>Income only</option>
-                </select>
-            </label>
-            <label>
-                Category
-                <select name="category_id" id="dd-category">
-                    <option value="">All categories</option>
-                    <?php foreach ($categoriesWithSubs as $cat): ?>
-                        <option value="<?= (int)$cat['id'] ?>" <?= (string)($drilldownFilters['category_id'] ?? '') === (string)$cat['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($cat['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label>
-                Subcategory
-                <select name="subcategory_id" id="dd-subcategory">
-                    <option value="">All subcategories</option>
-                    <?php foreach ($categoriesWithSubs as $cat): ?>
-                        <?php foreach (($cat['subcategories'] ?? []) as $sub): ?>
-                            <option value="<?= (int)$sub['id'] ?>"
-                                data-parent="<?= (int)$cat['id'] ?>"
-                                <?= (string)($drilldownFilters['subcategory_id'] ?? '') === (string)$sub['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($sub['name']) ?>
-                            </option>
+            <div class="module-form">
+                <label>Start date
+                    <input type="date" name="start_date" value="<?= htmlspecialchars($startDate) ?>">
+                </label>
+                <label>End date
+                    <input type="date" name="end_date" value="<?= htmlspecialchars($endDate) ?>">
+                </label>
+                <label>Type
+                    <select name="tx_type">
+                        <option value="">All (income + expense)</option>
+                        <option value="expense" <?= ($drilldownFilters['tx_type'] ?? '') === 'expense' ? 'selected' : '' ?>>Expense only</option>
+                        <option value="income"  <?= ($drilldownFilters['tx_type'] ?? '') === 'income'  ? 'selected' : '' ?>>Income only</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="check-group-wrap" style="margin-top:1rem;">
+
+                <!-- Categories -->
+                <div class="check-group <?= !empty($selCatIds) ? 'open' : '' ?>" id="cg-category">
+                    <div class="check-group-header" onclick="toggleCG('cg-category')">
+                        Category<?php if (!empty($selCatIds)): ?><span class="check-sel-count"><?= count($selCatIds) ?></span><?php endif; ?>
+                        <span class="cg-arrow">▼</span>
+                    </div>
+                    <div class="check-group-body">
+                        <?php foreach ($categoriesWithSubs as $cat): ?>
+                            <label>
+                                <input type="checkbox" name="category_id[]" value="<?= (int)$cat['id'] ?>"
+                                    <?= in_array((int)$cat['id'], $selCatIds) ? 'checked' : '' ?>
+                                    data-cg-cat="<?= (int)$cat['id'] ?>"
+                                    onchange="filterSubcategories()">
+                                <?= htmlspecialchars($cat['name']) ?>
+                            </label>
                         <?php endforeach; ?>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label>
-                Purchased from
-                <select name="purchase_source_id">
-                    <option value="">All sources</option>
-                    <?php foreach ($purchaseSources as $src): ?>
-                        <option value="<?= (int)$src['id'] ?>" <?= (string)($drilldownFilters['purchase_source_id'] ?? '') === (string)$src['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($src['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <button type="submit">Apply</button>
-            <a class="secondary" href="?module=analytics">Reset</a>
+                    </div>
+                </div>
+
+                <!-- Subcategories -->
+                <div class="check-group <?= !empty($selSubIds) ? 'open' : '' ?>" id="cg-subcategory">
+                    <div class="check-group-header" onclick="toggleCG('cg-subcategory')">
+                        Subcategory<?php if (!empty($selSubIds)): ?><span class="check-sel-count"><?= count($selSubIds) ?></span><?php endif; ?>
+                        <span class="cg-arrow">▼</span>
+                    </div>
+                    <div class="check-group-body">
+                        <?php foreach ($categoriesWithSubs as $cat): ?>
+                            <?php foreach (($cat['subcategories'] ?? []) as $sub): ?>
+                                <label data-sub-parent="<?= (int)$cat['id'] ?>">
+                                    <input type="checkbox" name="subcategory_id[]" value="<?= (int)$sub['id'] ?>"
+                                        <?= in_array((int)$sub['id'], $selSubIds) ? 'checked' : '' ?>>
+                                    <?= htmlspecialchars($sub['name']) ?>
+                                </label>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- Purchase sources -->
+                <?php if (!empty($purchaseSources)): ?>
+                <div class="check-group <?= !empty($selSrcIds) ? 'open' : '' ?>" id="cg-source">
+                    <div class="check-group-header" onclick="toggleCG('cg-source')">
+                        Purchased from<?php if (!empty($selSrcIds)): ?><span class="check-sel-count"><?= count($selSrcIds) ?></span><?php endif; ?>
+                        <span class="cg-arrow">▼</span>
+                    </div>
+                    <div class="check-group-body">
+                        <?php foreach ($purchaseSources as $src): ?>
+                            <label>
+                                <input type="checkbox" name="purchase_source_id[]" value="<?= (int)$src['id'] ?>"
+                                    <?= in_array((int)$src['id'], $selSrcIds) ? 'checked' : '' ?>>
+                                <?= htmlspecialchars($src['name']) ?>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+            </div>
+
+            <div style="display:flex;gap:0.75rem;margin-top:1rem;">
+                <button type="submit">Apply</button>
+                <a class="secondary" href="?module=analytics">Reset</a>
+            </div>
         </form>
     </section>
 
@@ -256,25 +287,20 @@ include __DIR__ . '/../partials/nav.php';
     </section>
 
     <script>
-    (function () {
-        const catSel = document.getElementById('dd-category');
-        const subSel = document.getElementById('dd-subcategory');
-        if (!catSel || !subSel) return;
-        const allOptions = Array.from(subSel.options);
-        function filterSubs() {
-            const catId = catSel.value;
-            subSel.innerHTML = '';
-            const blank = document.createElement('option');
-            blank.value = ''; blank.textContent = 'All subcategories';
-            subSel.appendChild(blank);
-            allOptions.forEach(opt => {
-                if (opt.value === '') return;
-                if (catId === '' || opt.dataset.parent === catId) subSel.appendChild(opt.cloneNode(true));
-            });
-        }
-        catSel.addEventListener('change', filterSubs);
-        filterSubs();
-    })();
+    function toggleCG(id) {
+        document.getElementById(id).classList.toggle('open');
+    }
+    function filterSubcategories() {
+        const checkedCats = new Set(
+            Array.from(document.querySelectorAll('[data-cg-cat]:checked')).map(el => el.value)
+        );
+        document.querySelectorAll('#cg-subcategory [data-sub-parent]').forEach(label => {
+            const show = checkedCats.size === 0 || checkedCats.has(label.dataset.subParent);
+            label.classList.toggle('hidden', !show);
+            if (!show) label.querySelector('input').checked = false;
+        });
+    }
+    filterSubcategories();
     </script>
 
     <?php if ($hasChartData): ?>

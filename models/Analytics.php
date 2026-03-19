@@ -183,15 +183,15 @@ SQL;
 
     public function getDrilldown(array $filters): array
     {
-        $startDate       = $filters['start_date'] ?? date('Y-m-01');
-        $endDate         = $filters['end_date']   ?? date('Y-m-d');
-        $txType          = $filters['tx_type']    ?? '';
-        $categoryId      = !empty($filters['category_id'])       ? (int) $filters['category_id']       : null;
-        $subcategoryId   = !empty($filters['subcategory_id'])    ? (int) $filters['subcategory_id']     : null;
-        $purchaseSourceId = !empty($filters['purchase_source_id']) ? (int) $filters['purchase_source_id'] : null;
+        $startDate   = $filters['start_date'] ?? date('Y-m-01');
+        $endDate     = $filters['end_date']   ?? date('Y-m-d');
+        $txType      = $filters['tx_type']    ?? '';
+        $categoryIds = array_values(array_filter(array_map('intval', (array) ($filters['category_ids'] ?? []))));
+        $subIds      = array_values(array_filter(array_map('intval', (array) ($filters['subcategory_ids'] ?? []))));
+        $sourceIds   = array_values(array_filter(array_map('intval', (array) ($filters['purchase_source_ids'] ?? []))));
 
-        $where   = ['t.transaction_date BETWEEN :start_date AND :end_date'];
-        $params  = [':start_date' => $startDate, ':end_date' => $endDate];
+        $where  = ['t.transaction_date BETWEEN :start_date AND :end_date'];
+        $params = [':start_date' => $startDate, ':end_date' => $endDate];
 
         if (in_array($txType, ['income', 'expense'], true)) {
             $where[] = 't.transaction_type = :tx_type';
@@ -200,19 +200,22 @@ SQL;
             $where[] = "t.transaction_type IN ('income','expense')";
         }
 
-        if ($categoryId !== null) {
-            $where[] = 't.category_id = :category_id';
-            $params[':category_id'] = $categoryId;
+        if (!empty($categoryIds)) {
+            $ph = [];
+            foreach ($categoryIds as $i => $id) { $ph[] = ":cat_{$i}"; $params[":cat_{$i}"] = $id; }
+            $where[] = 't.category_id IN (' . implode(',', $ph) . ')';
         }
 
-        if ($subcategoryId !== null) {
-            $where[] = 't.subcategory_id = :subcategory_id';
-            $params[':subcategory_id'] = $subcategoryId;
+        if (!empty($subIds)) {
+            $ph = [];
+            foreach ($subIds as $i => $id) { $ph[] = ":sub_{$i}"; $params[":sub_{$i}"] = $id; }
+            $where[] = 't.subcategory_id IN (' . implode(',', $ph) . ')';
         }
 
-        if ($purchaseSourceId !== null) {
-            $where[] = 't.purchase_source_id = :purchase_source_id';
-            $params[':purchase_source_id'] = $purchaseSourceId;
+        if (!empty($sourceIds)) {
+            $ph = [];
+            foreach ($sourceIds as $i => $id) { $ph[] = ":src_{$i}"; $params[":src_{$i}"] = $id; }
+            $where[] = 't.purchase_source_id IN (' . implode(',', $ph) . ')';
         }
 
         $whereClause = implode(' AND ', $where);

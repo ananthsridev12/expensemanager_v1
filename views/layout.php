@@ -14,6 +14,9 @@ if (!function_exists('formatCurrency')) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Personal Finance Manager</title>
 
+    <!-- Favicon -->
+    <link rel="icon" href="public/icons/icon.svg" type="image/svg+xml">
+
     <!-- PWA -->
     <link rel="manifest" href="public/manifest.json">
     <meta name="theme-color" content="#0f1a2e">

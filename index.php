@@ -48,6 +48,7 @@ if ($pinHash !== '') {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="public/manifest.json">
+<link rel="icon" href="public/icons/icon.svg" type="image/svg+xml">
 <title>PersonFin — Unlock</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

@@ -28,12 +28,12 @@ class AnalyticsController extends BaseController
         if (!$this->isValidDate($endDate))   $endDate   = date('Y-m-d');
 
         $drilldownFilters = [
-            'start_date'        => $startDate,
-            'end_date'          => $endDate,
-            'tx_type'           => (string) ($_GET['tx_type']           ?? ''),
-            'category_id'       => (string) ($_GET['category_id']       ?? ''),
-            'subcategory_id'    => (string) ($_GET['subcategory_id']    ?? ''),
-            'purchase_source_id'=> (string) ($_GET['purchase_source_id']?? ''),
+            'start_date'          => $startDate,
+            'end_date'            => $endDate,
+            'tx_type'             => (string) ($_GET['tx_type'] ?? ''),
+            'category_ids'        => array_values(array_filter(array_map('intval', (array) ($_GET['category_id']        ?? [])))),
+            'subcategory_ids'     => array_values(array_filter(array_map('intval', (array) ($_GET['subcategory_id']     ?? [])))),
+            'purchase_source_ids' => array_values(array_filter(array_map('intval', (array) ($_GET['purchase_source_id'] ?? [])))),
         ];
 
         $summary              = $this->analyticsModel->getSummary($startDate, $endDate);

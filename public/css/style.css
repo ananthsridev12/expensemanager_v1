@@ -251,3 +251,19 @@ table tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 400px) {
     .summary-cards { grid-template-columns: 1fr; }
 }
+
+/* Checkbox filter groups */
+.check-group-wrap { display: flex; flex-direction: column; gap: 1rem; }
+.check-group { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.check-group-header { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.85rem; cursor: pointer; user-select: none; font-size: 0.82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.check-group-header:hover { color: var(--text); }
+.check-group-header .cg-arrow { transition: transform .2s; }
+.check-group.open .cg-arrow { transform: rotate(180deg); }
+.check-group-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+.check-group.open .check-group-body { max-height: 260px; overflow-y: auto; }
+.check-group-body label { display: flex; align-items: center; gap: 0.55rem; padding: 0.45rem 0.85rem; font-size: 0.88rem; color: var(--text); cursor: pointer; text-transform: none; letter-spacing: normal; border-top: 1px solid var(--line); }
+.check-group-body label:first-child { border-top: none; }
+.check-group-body label:hover { background: var(--panel-hover); }
+.check-group-body input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
+.check-group-body label.hidden { display: none; }
+.check-sel-count { font-size: 0.75rem; background: var(--accent); color: #fff; border-radius: 999px; padding: 0.1rem 0.45rem; margin-left: 0.35rem; }
