@@ -54,6 +54,7 @@ class LendingController extends BaseController
 
         $records = $this->lendingModel->getAll();
         $openRecords = $this->lendingModel->getOpenRecords();
+        $allRepayments = $this->lendingModel->getAllRepayments();
         $accounts = array_values(array_filter(
             $this->accountModel->getList(),
             static fn (array $account): bool => ($account['account_type'] ?? '') !== 'credit_card'
@@ -63,6 +64,7 @@ class LendingController extends BaseController
         return $this->render('lending/index.php', [
             'records' => $records,
             'openRecords' => $openRecords,
+            'allRepayments' => $allRepayments,
             'accounts' => $accounts,
             'summary' => $summary,
             'editRecord' => $editRecord,

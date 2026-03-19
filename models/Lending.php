@@ -158,6 +158,22 @@ SQL;
                 $notes
             );
 
+            [$depType, $depId] = $depositAccount !== '' && strpos($depositAccount, ':') !== false
+                ? explode(':', $depositAccount, 2)
+                : [null, null];
+
+            $this->db->prepare(
+                'INSERT INTO lending_repayments (lending_record_id, amount, repayment_date, deposit_account_type, deposit_account_id, notes)
+                 VALUES (:lending_record_id, :amount, :repayment_date, :deposit_account_type, :deposit_account_id, :notes)'
+            )->execute([
+                ':lending_record_id'   => $recordId,
+                ':amount'              => $payAmount,
+                ':repayment_date'      => $repaymentDate,
+                ':deposit_account_type'=> $depType,
+                ':deposit_account_id'  => $depId !== null ? (int) $depId : null,
+                ':notes'               => $notes !== '' ? $notes : null,
+            ]);
+
             $this->db->commit();
             return true;
         } catch (\Throwable $exception) {
@@ -176,6 +192,37 @@ SQL;
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
+    }
+
+    public function getRepaymentsByRecord(int $recordId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT * FROM lending_repayments WHERE lending_record_id = :id ORDER BY repayment_date DESC, created_at DESC'
+        );
+        $stmt->execute([':id' => $recordId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAllRepayments(): array
+    {
+        $sql = <<<SQL
+SELECT
+    lr2.id AS repayment_id,
+    lr2.lending_record_id,
+    lr2.amount,
+    lr2.repayment_date,
+    lr2.deposit_account_type,
+    lr2.deposit_account_id,
+    lr2.notes,
+    lr2.created_at,
+    c.name AS contact_name
+FROM lending_repayments lr2
+JOIN lending_records lr ON lr.id = lr2.lending_record_id
+JOIN contacts c ON c.id = lr.contact_id
+ORDER BY lr2.repayment_date DESC, lr2.created_at DESC
+SQL;
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function update(array $input): bool

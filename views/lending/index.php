@@ -2,6 +2,7 @@
 $activeModule = 'lending';
 $records = $records ?? [];
 $openRecords = $openRecords ?? [];
+$allRepayments = $allRepayments ?? [];
 $accounts = $accounts ?? [];
 $summary = $summary ?? ['count' => 0, 'outstanding' => 0.0];
 $editRecord = $editRecord ?? null;
@@ -198,6 +199,44 @@ include __DIR__ . '/../partials/nav.php';
                                 <td><?= formatCurrency((float) $record['outstanding_amount']) ?></td>
                                 <td><?= htmlspecialchars($record['due_date'] ?? '?') ?></td>
                                 <td><a class="secondary" href="?module=lending&edit=<?= (int) $record['id'] ?>">Edit</a></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </section>
+
+    <section class="module-panel">
+        <h2>Repayment history</h2>
+        <?php if (empty($allRepayments)): ?>
+            <p class="muted">No repayments recorded yet.</p>
+        <?php else: ?>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Contact</th>
+                            <th>Amount</th>
+                            <th>Deposited to</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($allRepayments as $rep): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($rep['repayment_date']) ?></td>
+                                <td><?= htmlspecialchars($rep['contact_name']) ?></td>
+                                <td style="color:var(--green)"><?= formatCurrency((float)$rep['amount']) ?></td>
+                                <td>
+                                    <?php if (!empty($rep['deposit_account_type'])): ?>
+                                        <span class="pill pill--green"><?= htmlspecialchars(ucfirst($rep['deposit_account_type'])) ?> #<?= (int)$rep['deposit_account_id'] ?></span>
+                                    <?php else: ?>
+                                        <span class="muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= htmlspecialchars($rep['notes'] ?? '—') ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
