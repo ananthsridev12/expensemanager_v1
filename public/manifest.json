@@ -1,0 +1,19 @@
+{
+  "name": "Personal Finance Manager",
+  "short_name": "PersonFin",
+  "description": "Track accounts, loans, lending, investments and expenses",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#060b16",
+  "theme_color": "#0f1a2e",
+  "icons": [
+    {
+      "src": "public/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
