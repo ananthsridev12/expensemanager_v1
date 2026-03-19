@@ -11,6 +11,16 @@ $totalsByType = $totalsByType ?? [];
 $recentTransactions = $recentTransactions ?? [];
 $upcomingReminders = $upcomingReminders ?? [];
 $upcomingEmis = $upcomingEmis ?? [];
+$monthComparison = $monthComparison ?? [];
+$sparkline = $sparkline ?? [];
+
+$fmtPct = function (?float $pct, bool $invertColor = false): string {
+    if ($pct === null) return '';
+    $up = $pct >= 0;
+    $color = $invertColor ? ($up ? 'var(--red)' : 'var(--green)') : ($up ? 'var(--green)' : 'var(--red)');
+    $arrow = $up ? '▲' : '▼';
+    return ' <span style="font-size:0.78rem;color:' . $color . '">' . $arrow . ' ' . abs($pct) . '%</span>';
+};
 
 include __DIR__ . '/partials/nav.php';
 ?>
@@ -62,6 +72,64 @@ include __DIR__ . '/partials/nav.php';
             <small>Upcoming bills/EMIs</small>
         </article>
     </section>
+
+    <!-- This month at a glance -->
+    <?php if (!empty($monthComparison)): ?>
+    <section class="module-panel">
+        <h2>This month at a glance</h2>
+        <div class="summary-cards" style="margin-bottom:1rem;">
+            <article class="card card--green">
+                <h3>Income <?= $fmtPct($monthComparison['income_pct'] ?? null) ?></h3>
+                <p><?= formatCurrency((float)($monthComparison['this_income'] ?? 0)) ?></p>
+                <small>Last month <?= formatCurrency((float)($monthComparison['last_income'] ?? 0)) ?></small>
+            </article>
+            <article class="card card--red">
+                <h3>Expense <?= $fmtPct($monthComparison['expense_pct'] ?? null, true) ?></h3>
+                <p><?= formatCurrency((float)($monthComparison['this_expense'] ?? 0)) ?></p>
+                <small>Last month <?= formatCurrency((float)($monthComparison['last_expense'] ?? 0)) ?></small>
+            </article>
+            <?php $net = (float)($monthComparison['this_net'] ?? 0); ?>
+            <article class="card <?= $net >= 0 ? 'card--cyan' : 'card--orange' ?>">
+                <h3>Net cashflow</h3>
+                <p><?= formatCurrency($net) ?></p>
+                <small>Income minus expense</small>
+            </article>
+        </div>
+        <?php if (!empty($sparkline)): ?>
+        <div style="max-width:520px;">
+            <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:.05em;">6-month income vs expense</p>
+            <canvas id="dashboard-sparkline" height="80"></canvas>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+        (function () {
+            const rows = <?= json_encode($sparkline, JSON_UNESCAPED_UNICODE) ?>;
+            new Chart(document.getElementById('dashboard-sparkline'), {
+                type: 'bar',
+                data: {
+                    labels: rows.map(r => r.period),
+                    datasets: [
+                        { label: 'Income',  data: rows.map(r => Number(r.income)),  backgroundColor: 'rgba(34,197,94,0.7)',  borderRadius: 3 },
+                        { label: 'Expense', data: rows.map(r => Number(r.expense)), backgroundColor: 'rgba(244,63,94,0.7)', borderRadius: 3 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', boxWidth: 10, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+        })();
+        </script>
+        <?php endif; ?>
+    </section>
+    <?php endif; ?>
 
     <section class="module-panel">
         <h2>Accounts & credit cards</h2>

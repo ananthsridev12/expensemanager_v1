@@ -181,6 +181,67 @@ SQL;
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getThisMonthVsLastMonth(): array
+    {
+        $thisStart  = date('Y-m-01');
+        $thisEnd    = date('Y-m-d');
+        $lastStart  = date('Y-m-01', strtotime('first day of last month'));
+        $lastEnd    = date('Y-m-t',  strtotime('last day of last month'));
+
+        $sql = <<<SQL
+SELECT
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'income'  THEN t.amount ELSE 0 END), 0) AS income,
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense
+FROM transactions t
+WHERE t.transaction_date BETWEEN :start AND :end
+SQL;
+        $fetch = function (string $start, string $end) use ($sql): array {
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([':start' => $start, ':end' => $end]);
+            return $stmt->fetch(PDO::FETCH_ASSOC) ?: ['income' => 0, 'expense' => 0];
+        };
+
+        $curr  = $fetch($thisStart, $thisEnd);
+        $last  = $fetch($lastStart, $lastEnd);
+
+        $pctChange = function (float $current, float $previous): ?float {
+            if ($previous == 0) return null;
+            return round((($current - $previous) / $previous) * 100, 1);
+        };
+
+        return [
+            'this_income'   => (float) $curr['income'],
+            'this_expense'  => (float) $curr['expense'],
+            'this_net'      => (float) $curr['income'] - (float) $curr['expense'],
+            'last_income'   => (float) $last['income'],
+            'last_expense'  => (float) $last['expense'],
+            'income_pct'    => $pctChange((float) $curr['income'],  (float) $last['income']),
+            'expense_pct'   => $pctChange((float) $curr['expense'], (float) $last['expense']),
+        ];
+    }
+
+    public function getMiniSparkline(int $months = 6): array
+    {
+        $months = max(2, min(12, $months));
+        $start  = date('Y-m-01', strtotime('-' . ($months - 1) . ' months'));
+        $end    = date('Y-m-t');
+
+        $sql = <<<SQL
+SELECT
+    DATE_FORMAT(t.transaction_date, '%Y-%m') AS period,
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'income'  THEN t.amount ELSE 0 END), 0) AS income,
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense
+FROM transactions t
+WHERE t.transaction_date BETWEEN :start AND :end
+GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m')
+ORDER BY period ASC
+SQL;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':start' => $start, ':end' => $end]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function getAccountWiseExpense(string $startDate, string $endDate): array
     {
         $sql = <<<SQL
