@@ -115,7 +115,7 @@ SQL;
                     ':transaction_date' => $txDate,
                     ':account_type' => $accountType,
                     ':account_id' => $accountId,
-                    ':transaction_type' => 'transfer',
+                    ':transaction_type' => $txType === 'sell' ? 'income' : 'expense',
                     ':amount' => $amount,
                     ':reference_type' => 'investment',
                     ':reference_id' => $invTxId,
