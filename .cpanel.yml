@@ -9,4 +9,4 @@ deployment:
     - /bin/cp -R views/ $DEPLOYPATH
     - /bin/cp -R public/ $DEPLOYPATH
     - /bin/cp -R api/ $DEPLOYPATH
-    - /bin/cp config/database.php config/pin.php $DEPLOYPATH/config/
+    - /bin/cp -R config/ $DEPLOYPATH

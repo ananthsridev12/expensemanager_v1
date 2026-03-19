@@ -1,7 +1,3 @@
-# Sensitive config overrides (contain credentials)
-config/database.override.php
-config/pin.override.php
-pin.override.php
 
 # Database exports
 db/

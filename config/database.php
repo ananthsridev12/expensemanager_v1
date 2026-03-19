@@ -8,15 +8,10 @@ use PDOException;
 class Database
 {
     private string $host = 'localhost';
-    private string $dbName = 'expensemanager';
-    private string $username = 'root';
-    private string $password = '';
+    private string $dbName = 'de2shrnx_personalfin';
+    private string $username = 'de2shrnx_userpersonalfin';
+    private string $password = ')%ovi]Ie6kNv';
     private ?PDO $pdo = null;
-
-    public function __construct()
-    {
-        $this->applyOverride();
-    }
 
     public function connect(): PDO
     {
@@ -35,32 +30,5 @@ class Database
         return $this->pdo;
     }
 
-    private function applyOverride(): void
-    {
-        $overridePath = __DIR__ . '/database.override.php';
-        if (!file_exists($overridePath)) {
-            return;
-        }
 
-        $override = require $overridePath;
-        if (!is_array($override)) {
-            return;
-        }
-
-        $host = trim((string) ($override['host'] ?? ''));
-        $dbName = trim((string) ($override['dbName'] ?? ''));
-        $username = trim((string) ($override['username'] ?? ''));
-        $password = (string) ($override['password'] ?? '');
-
-        if ($host !== '') {
-            $this->host = $host;
-        }
-        if ($dbName !== '') {
-            $this->dbName = $dbName;
-        }
-        if ($username !== '') {
-            $this->username = $username;
-        }
-        $this->password = $password;
-    }
 }
