@@ -1,0 +1,218 @@
+<?php
+$activeModule = 'accounts';
+$accountSummary = $summary ?? ['count' => 0, 'total_balance' => 0.0];
+$accounts = $accounts ?? [];
+$accountTypes = $accountTypes ?? [];
+$editAccount = $editAccount ?? null;
+$lockAccountType = $editAccount && ($editAccount['account_type'] ?? '') === 'credit_card';
+
+include __DIR__ . '/../partials/nav.php';
+?>
+<main class="module-content">
+    <header class="module-header">
+        <h1>Accounts</h1>
+        <p>Ledger-driven overview of your bank accounts and linked wallets.</p>
+    </header>
+
+    <section class="summary-cards">
+        <article class="card">
+            <h3>Total accounts</h3>
+            <p><?= number_format($accountSummary['count'], 0) ?></p>
+        </article>
+        <article class="card">
+            <h3>Ledger balance</h3>
+            <p><?= formatCurrency($accountSummary['total_balance']) ?></p>
+        </article>
+    </section>
+
+    <section class="module-panel">
+        <h2><?= $editAccount ? 'Edit account' : 'Add a new account' ?></h2>
+        <form method="post" class="module-form">
+            <input type="hidden" name="form" value="<?= $editAccount ? 'account_update' : 'account' ?>">
+            <?php if ($editAccount): ?>
+                <input type="hidden" name="account_id" value="<?= (int) $editAccount['id'] ?>">
+            <?php endif; ?>
+            <label>
+                Account type
+                <select name="account_type" id="account-type" required <?= $lockAccountType ? 'disabled' : '' ?>>
+                    <optgroup label="System types">
+                        <option value="savings" <?= ($editAccount['account_type'] ?? '') === 'savings' ? 'selected' : '' ?>>Savings</option>
+                        <option value="current" <?= ($editAccount['account_type'] ?? '') === 'current' ? 'selected' : '' ?>>Current</option>
+                        <option value="credit_card" <?= ($editAccount['account_type'] ?? '') === 'credit_card' ? 'selected' : '' ?>>Credit card</option>
+                        <option value="cash" <?= ($editAccount['account_type'] ?? '') === 'cash' ? 'selected' : '' ?>>Cash</option>
+                        <option value="wallet" <?= ($editAccount['account_type'] ?? '') === 'wallet' ? 'selected' : '' ?>>Wallet</option>
+                        <option value="other" <?= ($editAccount['account_type'] ?? '') === 'other' ? 'selected' : '' ?>>Other</option>
+                    </optgroup>
+                    <?php if (!empty($accountTypes)): ?>
+                        <?php
+                        $customTypes = array_filter(
+                            $accountTypes,
+                            static fn (array $row): bool => empty($row['system_key'])
+                        );
+                        ?>
+                        <?php if (!empty($customTypes)): ?>
+                            <optgroup label="Custom types">
+                                <?php foreach ($customTypes as $type): ?>
+                                    <option value="<?= 'custom:' . (int) $type['id'] ?>" <?= ($editAccount['account_type_id'] ?? null) == $type['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($type['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                    <option value="new">+ Add new type</option>
+                </select>
+            </label>
+            <?php if ($lockAccountType): ?>
+                <input type="hidden" name="account_type" value="credit_card">
+            <?php endif; ?>
+            <label id="new-account-type-wrap" style="display: none;">
+                New account type
+                <input type="text" name="new_account_type" placeholder="Example: Travel Card">
+            </label>
+            <label>
+                Bank name
+                <input type="text" name="bank_name" value="<?= htmlspecialchars($editAccount['bank_name'] ?? '') ?>" required>
+            </label>
+            <label>
+                Account name
+                <input type="text" name="account_name" value="<?= htmlspecialchars($editAccount['account_name'] ?? '') ?>" required>
+            </label>
+            <div id="bank-fields" class="module-form">
+                <label>
+                    Account number
+                    <input type="text" name="account_number" value="<?= htmlspecialchars($editAccount['account_number'] ?? '') ?>">
+                </label>
+                <label>
+                    IFSC
+                    <input type="text" name="ifsc" value="<?= htmlspecialchars($editAccount['ifsc'] ?? '') ?>">
+                </label>
+                <label>
+                    Opening balance
+                    <input type="number" name="opening_balance" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['opening_balance'] ?? '0.00')) ?>">
+                </label>
+            </div>
+            <div id="credit-card-fields" class="module-form" style="display: none;">
+                <label>
+                    Card name
+                    <input type="text" name="card_name" value="<?= htmlspecialchars($editAccount['card_name'] ?? '') ?>">
+                </label>
+                <label>
+                    Credit limit
+                    <input type="number" name="credit_limit" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['credit_limit'] ?? '0.00')) ?>">
+                </label>
+                <label>
+                    Billing date (day)
+                    <input type="number" name="billing_date" min="1" max="28" value="<?= htmlspecialchars((string) ($editAccount['billing_date'] ?? '1')) ?>">
+                </label>
+                <label>
+                    Due date (day)
+                    <input type="number" name="due_date" min="1" max="28" value="<?= htmlspecialchars((string) ($editAccount['due_date'] ?? '1')) ?>">
+                </label>
+                <label>
+                    Outstanding balance
+                    <input type="number" name="outstanding_balance" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['outstanding_balance'] ?? '0.00')) ?>">
+                </label>
+                <label>
+                    Outstanding principal
+                    <input type="number" name="outstanding_principal" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['outstanding_principal'] ?? '0.00')) ?>">
+                </label>
+                <label>
+                    Interest rate (% p.a.)
+                    <input type="number" name="interest_rate" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['interest_rate'] ?? '0')) ?>">
+                </label>
+                <label>
+                    Tenure months
+                    <input type="number" name="tenure_months" min="0" value="<?= htmlspecialchars((string) ($editAccount['tenure_months'] ?? '0')) ?>">
+                </label>
+                <label>
+                    Processing fee
+                    <input type="number" name="processing_fee" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['processing_fee'] ?? '0.00')) ?>">
+                </label>
+                <label>
+                    GST rate (%)
+                    <input type="number" name="gst_rate" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['gst_rate'] ?? '18.00')) ?>">
+                </label>
+                <label>
+                    EMI amount (optional)
+                    <input type="number" name="emi_amount" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['emi_amount'] ?? '0.00')) ?>">
+                </label>
+                <label>
+                    EMI start date
+                    <input type="date" name="emi_start_date" value="<?= htmlspecialchars((string) ($editAccount['emi_start_date'] ?? '')) ?>">
+                </label>
+                <label>
+                    Reward points balance
+                    <input type="number" name="points_balance" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['points_balance'] ?? '0.00')) ?>">
+                </label>
+            </div>
+            <button type="submit"><?= $editAccount ? 'Update account' : 'Save account' ?></button>
+            <?php if ($editAccount): ?>
+                <a class="secondary" href="?module=accounts">Cancel</a>
+            <?php endif; ?>
+        </form>
+    </section>
+
+    <section class="module-panel">
+        <h2>Existing accounts</h2>
+        <?php if (count($accounts) === 0): ?>
+            <p class="muted">No accounts added yet.</p>
+        <?php else: ?>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Bank</th>
+                            <th>Name</th>
+                            <th>Balance</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($accounts as $account): ?>
+                            <tr>
+                                <td>
+                                    <?= htmlspecialchars($account['account_type_name'] ?? ucfirst(str_replace('_', ' ', $account['account_type'] ?? 'savings'))) ?>
+                                </td>
+                                <td><?= htmlspecialchars($account['bank_name']) ?></td>
+                                <td><?= htmlspecialchars($account['account_name']) ?></td>
+                                <td>
+                                    <?php if (($account['account_type'] ?? '') === 'credit_card'): ?>
+                                        <?= formatCurrency((float) ($account['outstanding_balance'] ?? 0)) ?> / <?= formatCurrency((float) ($account['credit_limit'] ?? 0)) ?>
+                                    <?php else: ?>
+                                        <?= formatCurrency((float) ($account['balance'] ?? 0)) ?>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= htmlspecialchars($account['created_at']) ?></td>
+                                <td>
+                                    <a class="secondary" href="?module=accounts&edit=<?= (int) $account['id'] ?>">Edit</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </section>
+
+    <script>
+        (function () {
+            const typeSelect = document.getElementById('account-type');
+            const bankFields = document.getElementById('bank-fields');
+            const cardFields = document.getElementById('credit-card-fields');
+            const newTypeWrap = document.getElementById('new-account-type-wrap');
+
+            function toggleAccountFields() {
+                const isCreditCard = typeSelect.value === 'credit_card';
+                bankFields.style.display = isCreditCard ? 'none' : 'grid';
+                cardFields.style.display = isCreditCard ? 'grid' : 'none';
+                newTypeWrap.style.display = typeSelect.value === 'new' ? 'flex' : 'none';
+            }
+
+            typeSelect.addEventListener('change', toggleAccountFields);
+            toggleAccountFields();
+        })();
+    </script>
+</main>

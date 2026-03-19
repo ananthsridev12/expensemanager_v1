@@ -1,0 +1,24 @@
+# Sensitive config overrides (contain credentials)
+config/database.override.php
+config/pin.override.php
+pin.override.php
+
+# Database exports
+db/
+
+# Error logs
+error_log
+*.log
+
+# OS / server junk
+.DS_Store
+Thumbs.db
+.ftpquota
+cgi-bin/
+
+# Editor
+.vscode/
+.idea/
+
+# Python scripts (one-off utilities)
+replace_snippet.py

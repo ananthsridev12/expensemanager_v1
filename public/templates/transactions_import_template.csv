@@ -1,0 +1,4 @@
+transaction_date,account_token,transaction_type,amount,category_id,subcategory_id,payment_method_id,payment_method_name,contact_id,purchase_parent_id,purchase_parent_name,purchase_source_id,purchase_source_name,notes,transfer_to_account_token
+2026-03-01,savings:1,expense,250.00,2,5,1,,3,1,,5,,Cab fare paid to known contact,
+2026-03-01,savings:1,income,5000.00,1,,2,,,,,,,Salary credit,
+2026-03-02,savings:1,transfer,1200.00,3,,4,,,,,,,Card payment,credit_card:2
