@@ -1,4 +1,7 @@
 
+# Database config (contains credentials — manage manually on server)
+config/database.php
+
 # Database exports
 db/
 
