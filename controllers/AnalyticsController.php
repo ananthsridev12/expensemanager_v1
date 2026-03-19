@@ -31,6 +31,8 @@ class AnalyticsController extends BaseController
         $expensesByCategory = $this->analyticsModel->getExpensesByCategory($startDate, $endDate);
         $incomeByCategory = $this->analyticsModel->getIncomeByCategory($startDate, $endDate);
         $monthlyTrend = $this->analyticsModel->getMonthlyIncomeVsExpense(12);
+        $accountWiseExpense = $this->analyticsModel->getAccountWiseExpense($startDate, $endDate);
+        $dayOfWeekSpend = $this->analyticsModel->getDayOfWeekSpend($startDate, $endDate);
 
         return $this->render('analytics/index.php', [
             'startDate' => $startDate,
@@ -41,6 +43,8 @@ class AnalyticsController extends BaseController
             'expensesByCategory' => $expensesByCategory,
             'incomeByCategory' => $incomeByCategory,
             'monthlyTrend' => $monthlyTrend,
+            'accountWiseExpense' => $accountWiseExpense,
+            'dayOfWeekSpend' => $dayOfWeekSpend,
         ]);
     }
 

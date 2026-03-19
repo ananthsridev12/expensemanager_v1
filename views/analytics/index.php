@@ -8,11 +8,13 @@ $earningsBySubcategory = $earningsBySubcategory ?? [];
 $expensesByCategory = $expensesByCategory ?? [];
 $incomeByCategory = $incomeByCategory ?? [];
 $monthlyTrend = $monthlyTrend ?? [];
+$accountWiseExpense = $accountWiseExpense ?? [];
+$dayOfWeekSpend = $dayOfWeekSpend ?? [];
 
 $netCashflow = (float) ($summary['net_cashflow'] ?? 0);
 $netClass = $netCashflow >= 0 ? 'card--green' : 'card--red';
 
-$hasChartData = !empty($expensesByCategory) || !empty($incomeByCategory) || !empty($monthlyTrend);
+$hasChartData = !empty($expensesByCategory) || !empty($incomeByCategory) || !empty($monthlyTrend) || !empty($accountWiseExpense) || !empty($dayOfWeekSpend);
 
 include __DIR__ . '/../partials/nav.php';
 ?>
@@ -254,6 +256,125 @@ include __DIR__ . '/../partials/nav.php';
                         datasets: [{ data: rows.map(r => Number(r.total_amount)), backgroundColor: rows.map((_, i) => colors[i % colors.length]), borderColor: '#0f172a', borderWidth: 2 }]
                     },
                     options: donutOptions('Income by category')
+                });
+            })();
+            <?php endif; ?>
+        })();
+        </script>
+    </section>
+    <?php endif; ?>
+
+    <!-- Account-wise spending + Day-of-week -->
+    <?php if (!empty($accountWiseExpense) || !empty($dayOfWeekSpend)): ?>
+    <section class="module-panel">
+        <h2>Spending patterns</h2>
+        <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
+            <?php if (!empty($accountWiseExpense)): ?>
+            <div>
+                <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">Expense by account</h3>
+                <canvas id="account-expense-chart"></canvas>
+                <div class="table-wrapper" style="margin-top:0.8rem;">
+                    <table>
+                        <thead><tr><th>Account</th><th>Total spent</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($accountWiseExpense as $row): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($row['account_label'] ?? '—') ?></td>
+                                    <td><?= formatCurrency((float)($row['total_amount'] ?? 0)) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($dayOfWeekSpend)): ?>
+            <div>
+                <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">Spend by day of week</h3>
+                <canvas id="dow-chart"></canvas>
+                <div class="table-wrapper" style="margin-top:0.8rem;">
+                    <table>
+                        <thead><tr><th>Day</th><th>Total spent</th><th>Transactions</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($dayOfWeekSpend as $row): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($row['dow_name']) ?></td>
+                                    <td><?= formatCurrency((float)$row['total_amount']) ?></td>
+                                    <td><?= (int)$row['tx_count'] ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+        <script>
+        (function () {
+            const colors = ['#3b82f6','#22d3ee','#a855f7','#f97316','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
+            const gridColor = 'rgba(255,255,255,0.07)';
+            const tickColor = '#94a3b8';
+
+            <?php if (!empty($accountWiseExpense)): ?>
+            (function () {
+                const rows = <?= json_encode($accountWiseExpense, JSON_UNESCAPED_UNICODE) ?>;
+                new Chart(document.getElementById('account-expense-chart'), {
+                    type: 'bar',
+                    data: {
+                        labels: rows.map(r => r.account_label || '—'),
+                        datasets: [{
+                            label: 'Spent',
+                            data: rows.map(r => Number(r.total_amount)),
+                            backgroundColor: rows.map((_, i) => colors[i % colors.length]),
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => '₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } }
+                        },
+                        scales: {
+                            x: { ticks: { color: tickColor }, grid: { color: gridColor } },
+                            y: { ticks: { color: tickColor }, grid: { color: gridColor } }
+                        }
+                    }
+                });
+            })();
+            <?php endif; ?>
+
+            <?php if (!empty($dayOfWeekSpend)): ?>
+            (function () {
+                const rows = <?= json_encode($dayOfWeekSpend, JSON_UNESCAPED_UNICODE) ?>;
+                const maxVal = Math.max(...rows.map(r => Number(r.total_amount)));
+                new Chart(document.getElementById('dow-chart'), {
+                    type: 'bar',
+                    data: {
+                        labels: rows.map(r => r.dow_name),
+                        datasets: [{
+                            label: 'Spent',
+                            data: rows.map(r => Number(r.total_amount)),
+                            backgroundColor: rows.map(r => {
+                                const val = Number(r.total_amount);
+                                const intensity = maxVal > 0 ? val / maxVal : 0;
+                                return `rgba(239,68,68,${0.2 + intensity * 0.75})`;
+                            }),
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => '₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) + ' · ' + rows[ctx.dataIndex].tx_count + ' txns' } }
+                        },
+                        scales: {
+                            x: { ticks: { color: tickColor }, grid: { color: gridColor } },
+                            y: { ticks: { color: tickColor }, grid: { color: gridColor } }
+                        }
+                    }
                 });
             })();
             <?php endif; ?>

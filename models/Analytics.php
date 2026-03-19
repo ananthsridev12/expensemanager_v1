@@ -180,4 +180,68 @@ SQL;
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    public function getAccountWiseExpense(string $startDate, string $endDate): array
+    {
+        $sql = <<<SQL
+SELECT
+    CASE
+        WHEN t.account_type = 'savings'     THEN CONCAT(a.account_name, ' (Savings)')
+        WHEN t.account_type = 'current'     THEN CONCAT(a.account_name, ' (Current)')
+        WHEN t.account_type = 'cash'        THEN CONCAT(a.account_name, ' (Cash)')
+        WHEN t.account_type = 'wallet'      THEN CONCAT(a.account_name, ' (Wallet)')
+        WHEN t.account_type = 'other'       THEN CONCAT(a.account_name, ' (Other)')
+        WHEN t.account_type = 'credit_card' THEN CONCAT(cc.card_name, ' (CC)')
+        ELSE t.account_type
+    END AS account_label,
+    COALESCE(SUM(t.amount), 0) AS total_amount
+FROM transactions t
+LEFT JOIN accounts a ON a.id = t.account_id AND t.account_type IN ('savings','current','cash','wallet','other')
+LEFT JOIN credit_cards cc ON cc.id = t.account_id AND t.account_type = 'credit_card'
+WHERE t.transaction_date BETWEEN :start_date AND :end_date
+  AND t.transaction_type = 'expense'
+  AND t.account_type NOT IN ('lending','investment','rental','loan')
+GROUP BY t.account_type, t.account_id
+ORDER BY total_amount DESC
+SQL;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getDayOfWeekSpend(string $startDate, string $endDate): array
+    {
+        $sql = <<<SQL
+SELECT
+    DAYOFWEEK(t.transaction_date) AS dow_num,
+    DAYNAME(t.transaction_date)   AS dow_name,
+    COALESCE(SUM(t.amount), 0)    AS total_amount,
+    COUNT(*)                      AS tx_count
+FROM transactions t
+WHERE t.transaction_date BETWEEN :start_date AND :end_date
+  AND t.transaction_type = 'expense'
+GROUP BY DAYOFWEEK(t.transaction_date), DAYNAME(t.transaction_date)
+ORDER BY dow_num ASC
+SQL;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
+
+        // Fill all 7 days so chart has no gaps
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $map[(int) $row['dow_num']] = $row;
+        }
+        $days = [1 => 'Sunday', 2 => 'Monday', 3 => 'Tuesday', 4 => 'Wednesday', 5 => 'Thursday', 6 => 'Friday', 7 => 'Saturday'];
+        $result = [];
+        foreach ($days as $num => $name) {
+            $result[] = [
+                'dow_name'     => $name,
+                'total_amount' => (float) ($map[$num]['total_amount'] ?? 0),
+                'tx_count'     => (int) ($map[$num]['tx_count'] ?? 0),
+            ];
+        }
+
+        return $result;
+    }
 }
