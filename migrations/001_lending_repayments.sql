@@ -6,6 +6,5 @@ CREATE TABLE IF NOT EXISTS lending_repayments (
     deposit_account_type VARCHAR(30)   DEFAULT NULL,
     deposit_account_id  INT            DEFAULT NULL,
     notes               TEXT           DEFAULT NULL,
-    created_at          TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_lr_lending_record FOREIGN KEY (lending_record_id) REFERENCES lending_records(id)
+    created_at          TIMESTAMP      DEFAULT CURRENT_TIMESTAMP
 );
