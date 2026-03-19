@@ -3,7 +3,7 @@ $activeModule = 'loans';
 $loans = $loans ?? [];
 $accounts = $accounts ?? [];
 $upcomingEmis = $upcomingEmis ?? [];
-$summary = $summary ?? ['count' => 0, 'total_principal' => 0.0];
+$summary = $summary ?? ['count' => 0, 'total_outstanding' => 0.0];
 $editLoan = $editLoan ?? null;
 
 include __DIR__ . '/../partials/nav.php';
@@ -19,9 +19,9 @@ include __DIR__ . '/../partials/nav.php';
             <h3>Active loans</h3>
             <p><?= $summary['count'] ?></p>
         </article>
-        <article class="card">
-            <h3>Total principal</h3>
-            <p><?= formatCurrency($summary['total_principal']) ?></p>
+        <article class="card card--red">
+            <h3>Total outstanding</h3>
+            <p><?= formatCurrency($summary['total_outstanding']) ?></p>
         </article>
     </section>
 

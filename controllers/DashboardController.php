@@ -67,7 +67,7 @@ class DashboardController extends BaseController
             'reminders' => $this->reminderModel->count(),
             'loans' => [
                 'count' => count($loans),
-                'principal' => array_sum(array_column($loans, 'principal_amount')),
+                'outstanding' => array_sum(array_column($loans, 'outstanding_principal')),
             ],
             'credit_cards' => $this->creditCardModel->getSummary(),
             'lending' => $this->lendingModel->getSummary(),

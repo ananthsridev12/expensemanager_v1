@@ -50,7 +50,7 @@ class LoanController extends BaseController
         $upcomingEmis = $this->loanModel->getUpcomingEmis(8);
         $summary = [
             'count' => count($loans),
-            'total_principal' => array_sum(array_column($loans, 'principal_amount')),
+            'total_outstanding' => array_sum(array_column($loans, 'outstanding_principal')),
         ];
 
         return $this->render('loans/index.php', [

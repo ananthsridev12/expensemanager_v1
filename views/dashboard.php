@@ -21,48 +21,45 @@ include __DIR__ . '/partials/nav.php';
     </header>
 
     <section class="summary-cards">
-        <article class="card">
+        <article class="card card--green">
             <h3>Bank balance</h3>
             <p><?= formatCurrency($summary['accounts']['total_balance']) ?></p>
             <small><?= $summary['accounts']['count'] ?> accounts</small>
         </article>
-        <article class="card">
-            <h3>Categories</h3>
-            <p><?= $summary['categories'] ?> total</p>
-            <small>Income, expense, transfer mapped</small>
+        <article class="card card--red">
+            <h3>Loan outstanding</h3>
+            <p><?= formatCurrency($summary['loans']['outstanding']) ?></p>
+            <small><?= $summary['loans']['count'] ?> loans</small>
+        </article>
+        <article class="card card--orange">
+            <h3>Credit cards</h3>
+            <p><?= formatCurrency($summary['credit_cards']['total_outstanding']) ?></p>
+            <small>Limit <?= formatCurrency($summary['credit_cards']['total_limit']) ?></small>
+        </article>
+        <article class="card card--cyan">
+            <h3>Lending out</h3>
+            <p><?= formatCurrency($summary['lending']['outstanding']) ?></p>
+            <small><?= $summary['lending']['count'] ?> records</small>
+        </article>
+        <article class="card card--purple">
+            <h3>Investments</h3>
+            <p><?= $summary['investments']['count'] ?> items</p>
+            <small>Tracked portfolios</small>
+        </article>
+        <article class="card card--yellow">
+            <h3>Rental</h3>
+            <p><?= $summary['rentals']['contracts'] ?> contracts</p>
+            <small><?= $summary['rentals']['properties'] ?> properties</small>
         </article>
         <article class="card">
             <h3>Transactions</h3>
-            <p><?= number_format($summary['transactions']) ?> entries</p>
-            <small>Ledger history</small>
+            <p><?= number_format($summary['transactions']) ?></p>
+            <small>Ledger entries</small>
         </article>
         <article class="card">
             <h3>Reminders</h3>
             <p><?= $summary['reminders'] ?></p>
             <small>Upcoming bills/EMIs</small>
-        </article>
-        <article class="card">
-            <h3>Loans</h3>
-            <p><?= formatCurrency($summary['loans']['principal']) ?></p>
-            <small><?= $summary['loans']['count'] ?> loans tracked</small>
-        </article>
-        <article class="card">
-            <h3>Credit cards</h3>
-            <p><?= formatCurrency($summary['credit_cards']['total_limit']) ?> limit</p>
-            <small>Outstanding <?= formatCurrency($summary['credit_cards']['total_outstanding']) ?></small>
-        </article>
-        <article class="card">
-            <h3>Lending</h3>
-            <p><?= formatCurrency($summary['lending']['outstanding']) ?></p>
-            <small><?= $summary['lending']['count'] ?> records</small>
-        </article>
-        <article class="card">
-            <h3>Investments</h3>
-            <p><?= $summary['investments']['count'] ?> items</p>
-        </article>
-        <article class="card">
-            <h3>Rental contracts</h3>
-            <p><?= $summary['rentals']['contracts'] ?></p>
         </article>
     </section>
 
