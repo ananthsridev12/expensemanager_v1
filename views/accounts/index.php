@@ -68,7 +68,7 @@ include __DIR__ . '/../partials/nav.php';
             <?php if ($lockAccountType): ?>
                 <input type="hidden" name="account_type" value="credit_card">
             <?php endif; ?>
-            <div id="new-account-type-wrap" style="display: none;" class="inline-sub-form">
+            <div id="new-account-type-wrap" class="inline-sub-form">
                 <label>
                     Custom type name
                     <input type="text" name="new_account_type" placeholder="Example: Travel Card">
@@ -93,7 +93,7 @@ include __DIR__ . '/../partials/nav.php';
                 Account name
                 <input type="text" name="account_name" value="<?= htmlspecialchars($editAccount['account_name'] ?? '') ?>" required>
             </label>
-            <div id="bank-fields" class="module-form">
+            <div id="bank-fields" class="inline-sub-form">
                 <label>
                     Account number
                     <input type="text" name="account_number" value="<?= htmlspecialchars($editAccount['account_number'] ?? '') ?>">
@@ -107,7 +107,7 @@ include __DIR__ . '/../partials/nav.php';
                     <input type="number" name="opening_balance" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['opening_balance'] ?? '0.00')) ?>">
                 </label>
             </div>
-            <div id="credit-card-fields" class="module-form" style="display: none;">
+            <div id="credit-card-fields" class="inline-sub-form">
                 <label>
                     Card name
                     <input type="text" name="card_name" value="<?= htmlspecialchars($editAccount['card_name'] ?? '') ?>">
@@ -386,8 +386,8 @@ include __DIR__ . '/../partials/nav.php';
 
                 const template = getEffectiveTemplate();
                 const isCreditCard = template === 'credit_card';
-                bankFields.style.display = isCreditCard ? 'none' : 'grid';
-                cardFields.style.display = isCreditCard ? 'grid' : 'none';
+                bankFields.classList.toggle('visible', !isCreditCard);
+                cardFields.classList.toggle('visible', isCreditCard);
             }
 
             typeSelect.addEventListener('change', toggleAccountFields);
