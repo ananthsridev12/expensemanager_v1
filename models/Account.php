@@ -266,6 +266,13 @@ SQL;
         ];
     }
 
+    public function setDefault(int $accountId): void
+    {
+        $this->db->exec('UPDATE accounts SET is_default = 0');
+        $this->db->prepare('UPDATE accounts SET is_default = 1 WHERE id = :id')
+            ->execute([':id' => $accountId]);
+    }
+
     public function getList(): array
     {
         $stmt = $this->db->query(

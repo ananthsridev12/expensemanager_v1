@@ -167,25 +167,32 @@ include __DIR__ . '/../partials/nav.php';
             </label>
             <label>
                 From account
-                <select name="account_id" required>
-                    <?php foreach ($accounts as $account): ?>
-                        <?php
-                        $accountType = $account['account_type'] ?? 'bank';
-                        $label = $accountType === 'credit_card'
-                            ? 'Card: ' . $account['bank_name'] . ' - ' . $account['account_name']
-                            : $account['bank_name'] . ' - ' . $account['account_name'];
-                        $isDefault = !empty($account['is_default']);
-                        ?>
-                        <option value="<?= $accountType . ':' . $account['id'] ?>" data-type="<?= htmlspecialchars($accountType) ?>" <?= $isDefault ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($label) ?><?= $isDefault ? ' ★' : '' ?>
-                        </option>
-                    <?php endforeach; ?>
-                    <?php foreach ($loans as $loan): ?>
-                        <option value="loan:<?= (int) $loan['id'] ?>" data-type="loan">
-                            <?= htmlspecialchars('Loan: ' . ($loan['loan_name'] ?? 'Loan #' . $loan['id'])) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <select name="account_id" id="from-account-select" required style="flex:1;">
+                        <?php foreach ($accounts as $account): ?>
+                            <?php
+                            $accountType = $account['account_type'] ?? 'bank';
+                            $label = $accountType === 'credit_card'
+                                ? 'Card: ' . $account['bank_name'] . ' - ' . $account['account_name']
+                                : $account['bank_name'] . ' - ' . $account['account_name'];
+                            $isDefault = !empty($account['is_default']);
+                            ?>
+                            <option value="<?= $accountType . ':' . $account['id'] ?>" data-type="<?= htmlspecialchars($accountType) ?>" data-account-id="<?= (int) $account['id'] ?>" <?= $isDefault ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($label) ?><?= $isDefault ? ' ★' : '' ?>
+                            </option>
+                        <?php endforeach; ?>
+                        <?php foreach ($loans as $loan): ?>
+                            <option value="loan:<?= (int) $loan['id'] ?>" data-type="loan" data-account-id="">
+                                <?= htmlspecialchars('Loan: ' . ($loan['loan_name'] ?? 'Loan #' . $loan['id'])) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <form method="post" id="set-default-account-form" style="margin:0;">
+                        <input type="hidden" name="form" value="set_default_account">
+                        <input type="hidden" name="account_id" id="set-default-account-id" value="">
+                        <button type="submit" class="secondary" id="set-default-btn" title="Set as default account" style="white-space:nowrap;">★ Set default</button>
+                    </form>
+                </div>
             </label>
             <label>
                 Transaction type
@@ -728,7 +735,20 @@ include __DIR__ . '/../partials/nav.php';
     <script>
         (function () {
             const typeSelect = document.getElementById('transaction-type');
-            const accountSelect = document.querySelector('select[name=\"account_id\"]');
+            const accountSelect = document.getElementById('from-account-select');
+            const setDefaultAccountIdInput = document.getElementById('set-default-account-id');
+            const setDefaultBtn = document.getElementById('set-default-btn');
+
+            function syncDefaultAccountBtn() {
+                const opt = accountSelect.options[accountSelect.selectedIndex];
+                const accountId = opt ? opt.dataset.accountId : '';
+                setDefaultAccountIdInput.value = accountId || '';
+                if (setDefaultBtn) {
+                    setDefaultBtn.disabled = !accountId;
+                }
+            }
+            accountSelect.addEventListener('change', syncDefaultAccountBtn);
+            syncDefaultAccountBtn();
             const transferPanel = document.getElementById('transfer-options');
             const transferTargetSelect = document.getElementById('transfer-target');
             const transferAccountPanel = document.getElementById('transfer-account-panel');

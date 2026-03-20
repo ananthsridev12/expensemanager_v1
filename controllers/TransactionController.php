@@ -56,6 +56,15 @@ class TransactionController extends BaseController
             );
         }
 
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'set_default_account') {
+            $id = (int) ($_POST['account_id'] ?? 0);
+            if ($id > 0) {
+                $this->accountModel->setDefault($id);
+            }
+            header('Location: ?module=transactions');
+            exit;
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction') {
             $this->handleTransaction($_POST);
             header('Location: ?module=transactions');
