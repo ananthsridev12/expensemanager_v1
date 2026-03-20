@@ -221,7 +221,7 @@ include __DIR__ . '/../partials/nav.php';
                     <?php endif; ?>
                 </select>
             </label>
-            <div style="display:flex;justify-content:flex-end;grid-column:1/-1;margin-top:-0.5rem;">
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:0.5rem;grid-column:1/-1;">
                 <button type="button" class="secondary" id="set-default-btn" style="font-size:0.8rem;padding:0.25rem 0.6rem;" title="Pre-select this account every time">★ Set as default</button>
                 <span id="set-default-msg" class="muted" style="font-size:0.8rem;margin-left:0.5rem;align-self:center;display:none;">Saved</span>
             </div>
@@ -273,7 +273,7 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="new_category">+ New category</option>
                 </select>
             </label>
-            <div id="new-category-wrap" style="display:none;" class="module-form">
+            <div id="new-category-wrap" class="inline-sub-form">
                 <label>
                     Category name
                     <input type="text" name="new_category_name" placeholder="e.g. Groceries">
@@ -299,7 +299,7 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="new_subcategory">+ New subcategory</option>
                 </select>
             </label>
-            <label id="new-subcategory-wrap" style="display:none;">
+            <label id="new-subcategory-wrap" style="display:none;grid-column:1/-1;">
                 Subcategory name
                 <input type="text" name="new_subcategory_name" placeholder="e.g. Vegetables">
             </label>
@@ -910,23 +910,15 @@ include __DIR__ . '/../partials/nav.php';
 
             function toggleCategoryOther() {
                 const isNew = categorySelect.value === 'new_category';
-                newCategoryWrap.style.display = isNew ? 'grid' : 'none';
-                if (isNew) {
-                    categorySelect.name = '';
-                } else {
-                    categorySelect.name = 'category_id';
-                }
+                newCategoryWrap.classList.toggle('visible', isNew);
+                categorySelect.name = isNew ? '' : 'category_id';
                 refreshSubcategories();
             }
 
             function toggleSubcategoryOther() {
                 const isNew = subcategorySelect.value === 'new_subcategory';
                 newSubcategoryWrap.style.display = isNew ? 'flex' : 'none';
-                if (isNew) {
-                    subcategorySelect.name = '';
-                } else {
-                    subcategorySelect.name = 'subcategory_id';
-                }
+                subcategorySelect.name = isNew ? '' : 'subcategory_id';
             }
 
             function refreshSubcategories() {

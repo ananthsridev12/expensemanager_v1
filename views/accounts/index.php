@@ -68,7 +68,7 @@ include __DIR__ . '/../partials/nav.php';
             <?php if ($lockAccountType): ?>
                 <input type="hidden" name="account_type" value="credit_card">
             <?php endif; ?>
-            <div id="new-account-type-wrap" style="display: none;" class="module-form">
+            <div id="new-account-type-wrap" style="display: none;" class="inline-sub-form">
                 <label>
                     Custom type name
                     <input type="text" name="new_account_type" placeholder="Example: Travel Card">
@@ -373,7 +373,7 @@ include __DIR__ . '/../partials/nav.php';
 
             function toggleAccountFields() {
                 const isNew = typeSelect.value === 'new';
-                newTypeWrap.style.display = isNew ? 'grid' : 'none';
+                newTypeWrap.classList.toggle('visible', isNew);
 
                 const template = getEffectiveTemplate();
                 const isCreditCard = template === 'credit_card';
