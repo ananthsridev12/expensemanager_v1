@@ -17,6 +17,7 @@ SELECT
     cc.credit_limit,
     cc.outstanding_balance,
     cc.outstanding_principal,
+    cc.points_balance,
     COALESCE(a.opening_balance + SUM(CASE
         WHEN t.transaction_type = 'income' THEN t.amount
         WHEN t.transaction_type = 'expense' THEN -t.amount
