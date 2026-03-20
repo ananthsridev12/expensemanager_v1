@@ -153,49 +153,103 @@ include __DIR__ . '/../partials/nav.php';
         </form>
     </section>
 
+    <?php
+    $typeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
+    $grouped = [];
+    foreach ($accounts as $account) {
+        $type = $account['account_type'] ?? 'other';
+        $grouped[$type][] = $account;
+    }
+    // Sort groups by defined order, then any custom types at the end
+    $orderedGroups = [];
+    foreach ($typeOrder as $typeKey => $typeLabel) {
+        if (!empty($grouped[$typeKey])) {
+            $orderedGroups[$typeKey] = ['label' => $typeLabel, 'accounts' => $grouped[$typeKey]];
+        }
+    }
+    foreach ($grouped as $typeKey => $accs) {
+        if (!isset($typeOrder[$typeKey])) {
+            $orderedGroups[$typeKey] = ['label' => ucfirst(str_replace('_', ' ', $typeKey)), 'accounts' => $accs];
+        }
+    }
+    ?>
+
+    <?php if (empty($orderedGroups)): ?>
     <section class="module-panel">
-        <h2>Existing accounts</h2>
-        <?php if (count($accounts) === 0): ?>
-            <p class="muted">No accounts added yet.</p>
-        <?php else: ?>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Bank</th>
-                            <th>Name</th>
-                            <th>Balance</th>
-                            <th>Created</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($accounts as $account): ?>
-                            <tr>
-                                <td>
-                                    <?= htmlspecialchars($account['account_type_name'] ?? ucfirst(str_replace('_', ' ', $account['account_type'] ?? 'savings'))) ?>
-                                </td>
-                                <td><?= htmlspecialchars($account['bank_name']) ?></td>
-                                <td><?= htmlspecialchars($account['account_name']) ?></td>
-                                <td>
-                                    <?php if (($account['account_type'] ?? '') === 'credit_card'): ?>
-                                        <?= formatCurrency((float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0)) ?> / <?= formatCurrency((float) ($account['credit_limit'] ?? 0)) ?>
-                                    <?php else: ?>
-                                        <?= formatCurrency((float) ($account['balance'] ?? 0)) ?>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?= htmlspecialchars($account['created_at']) ?></td>
-                                <td>
-                                    <a class="secondary" href="?module=accounts&edit=<?= (int) $account['id'] ?>">Edit</a>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
+        <p class="muted">No accounts added yet.</p>
     </section>
+    <?php endif; ?>
+
+    <?php foreach ($orderedGroups as $typeKey => $group): ?>
+    <section class="module-panel">
+        <h2><?= htmlspecialchars($group['label']) ?></h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bank / Issuer</th>
+                        <th>Name</th>
+                        <?php if ($typeKey === 'credit_card'): ?>
+                            <th>Outstanding</th>
+                            <th>Limit</th>
+                            <th>Available</th>
+                        <?php else: ?>
+                            <th>Balance</th>
+                        <?php endif; ?>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($group['accounts'] as $account): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($account['bank_name']) ?></td>
+                            <td><?= htmlspecialchars($account['account_name']) ?></td>
+                            <?php if ($typeKey === 'credit_card'): ?>
+                                <?php
+                                $outstanding = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0);
+                                $limit       = (float) ($account['credit_limit'] ?? 0);
+                                $available   = max(0, $limit - $outstanding);
+                                ?>
+                                <td><?= formatCurrency($outstanding) ?></td>
+                                <td><?= formatCurrency($limit) ?></td>
+                                <td><?= formatCurrency($available) ?></td>
+                            <?php else: ?>
+                                <td><?= formatCurrency((float) ($account['balance'] ?? 0)) ?></td>
+                            <?php endif; ?>
+                            <td>
+                                <a class="secondary" href="?module=accounts&edit=<?= (int) $account['id'] ?>">Edit</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <?php if ($typeKey === 'credit_card' && count($group['accounts']) > 1): ?>
+                <tfoot>
+                    <?php
+                    $totalOutstanding = array_sum(array_map(fn($a) => (float)($a['live_cc_outstanding'] ?? $a['outstanding_balance'] ?? 0), $group['accounts']));
+                    $totalLimit       = array_sum(array_map(fn($a) => (float)($a['credit_limit'] ?? 0), $group['accounts']));
+                    $totalAvailable   = max(0, $totalLimit - $totalOutstanding);
+                    ?>
+                    <tr>
+                        <td colspan="2"><strong>Total</strong></td>
+                        <td><strong><?= formatCurrency($totalOutstanding) ?></strong></td>
+                        <td><strong><?= formatCurrency($totalLimit) ?></strong></td>
+                        <td><strong><?= formatCurrency($totalAvailable) ?></strong></td>
+                    </tr>
+                </tfoot>
+                <?php elseif ($typeKey !== 'credit_card' && count($group['accounts']) > 1): ?>
+                <tfoot>
+                    <?php $totalBalance = array_sum(array_map(fn($a) => (float)($a['balance'] ?? 0), $group['accounts'])); ?>
+                    <tr>
+                        <td colspan="2"><strong>Total</strong></td>
+                        <td><strong><?= formatCurrency($totalBalance) ?></strong></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+                <?php endif; ?>
+            </table>
+        </div>
+    </section>
+    <?php endforeach; ?>
 
     <script>
         (function () {
