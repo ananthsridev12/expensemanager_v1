@@ -66,6 +66,17 @@ class TransactionController extends BaseController
             header('Location: ?module=transactions');
             exit;
         }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction_delete') {
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($id > 0) {
+                // Delete companion fuel surcharge transactions first
+                $this->transactionModel->deleteByReference('fuel_surcharge', $id);
+                $this->transactionModel->deleteByReference('fuel_surcharge_refund', $id);
+                $this->transactionModel->delete($id);
+            }
+            header('Location: ?module=transactions');
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction_import') {
             $result = $this->handleTransactionImport($_FILES['transaction_file'] ?? null);
             $query = http_build_query([
@@ -420,7 +431,7 @@ class TransactionController extends BaseController
                 return;
             }
 
-            $this->transactionModel->create(array_merge($input, [
+            $txId = $this->transactionModel->create(array_merge($input, [
                 'account_type' => $fromType,
                 'account_id' => $this->resolveTransactionAccountId($fromType, $fromId),
                 'payment_method_id' => $paymentMethodId,
@@ -430,6 +441,11 @@ class TransactionController extends BaseController
                 'reference_id' => $this->resolveReferenceId($fromType, $fromId, !empty($input['reference_id']) ? (int) $input['reference_id'] : null),
             ]));
             $this->applyDebtDelta($fromType, $fromId, $transactionType, $amount);
+
+            // Auto-create fuel surcharge transactions if applicable
+            if ($txId > 0 && $transactionType === 'expense' && $fromType === 'credit_card') {
+                $this->applyFuelSurcharge($txId, $fromId, $amount, $input);
+            }
         }
     }
 
@@ -443,6 +459,62 @@ class TransactionController extends BaseController
         $allowedTypes = ['savings', 'current', 'credit_card', 'cash', 'wallet', 'other', 'loan'];
         $normalizedType = in_array($type, $allowedTypes, true) ? $type : 'savings';
         return [$normalizedType, (int) $id];
+    }
+
+    private function applyFuelSurcharge(int $txId, int $accountId, float $amount, array $input): void
+    {
+        $categoryId = !empty($input['category_id']) ? (int) $input['category_id'] : 0;
+        if ($categoryId <= 0) {
+            return;
+        }
+
+        $category = $this->categoryModel->getCategoryById($categoryId);
+        if (!$category || empty($category['is_fuel'])) {
+            return;
+        }
+
+        $card = $this->creditCardModel->getByAccountId($accountId);
+        if (!$card) {
+            return;
+        }
+
+        $rate      = (float) ($card['fuel_surcharge_rate'] ?? 1.0);
+        $minRefund = (float) ($card['fuel_surcharge_min_refund'] ?? 400.0);
+        $surcharge = round($amount * $rate / 100, 2);
+        $gst       = round($surcharge * 0.18, 2);
+        $total     = round($surcharge + $gst, 2);
+
+        if ($total <= 0) {
+            return;
+        }
+
+        $date = $input['transaction_date'] ?? date('Y-m-d');
+
+        // Surcharge expense (surcharge + GST)
+        $this->transactionModel->create([
+            'transaction_date' => $date,
+            'account_type'     => 'credit_card',
+            'account_id'       => $accountId,
+            'transaction_type' => 'expense',
+            'amount'           => $total,
+            'reference_type'   => 'fuel_surcharge',
+            'reference_id'     => $txId,
+            'notes'            => 'Fuel surcharge: ' . $rate . '% + 18% GST = ' . $total,
+        ]);
+
+        // Refund income (surcharge only, GST not refunded) if spend >= min
+        if ($amount >= $minRefund && $surcharge > 0) {
+            $this->transactionModel->create([
+                'transaction_date' => $date,
+                'account_type'     => 'credit_card',
+                'account_id'       => $accountId,
+                'transaction_type' => 'income',
+                'amount'           => $surcharge,
+                'reference_type'   => 'fuel_surcharge_refund',
+                'reference_id'     => $txId,
+                'notes'            => 'Fuel surcharge refund: ' . $rate . '% of ' . $amount,
+            ]);
+        }
     }
 
     private function applyDebtDelta(string $accountType, int $accountId, string $transactionType, float $amount): void

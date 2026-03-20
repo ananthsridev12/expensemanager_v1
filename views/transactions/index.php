@@ -684,7 +684,18 @@ include __DIR__ . '/../partials/nav.php';
                                     <?php endif; ?>
                                 </td>
                                 <td><?= htmlspecialchars($txn['notes'] ?? '') ?></td>
-                                <td><a class="secondary" href="?module=transactions&edit=<?= (int) $txn['id'] ?>">Edit</a></td>
+                                <td style="white-space:nowrap;">
+                                    <?php if (in_array($txn['reference_type'] ?? '', ['fuel_surcharge', 'fuel_surcharge_refund'], true)): ?>
+                                        <span class="pill card--orange" style="font-size:0.7rem;">Auto</span>
+                                    <?php else: ?>
+                                        <a class="secondary" href="?module=transactions&edit=<?= (int) $txn['id'] ?>">Edit</a>
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('Delete this transaction and any linked surcharge entries?')">
+                                            <input type="hidden" name="form" value="transaction_delete">
+                                            <input type="hidden" name="id" value="<?= (int) $txn['id'] ?>">
+                                            <button type="submit" class="secondary" style="color:var(--red);">Delete</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

@@ -160,12 +160,12 @@ SQL;
         return $stmt->fetchAll();
     }
 
-    public function create(array $input): bool
+    public function create(array $input): int
     {
         $sql = 'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, subcategory_id, payment_method_id, contact_id, purchase_source_id, amount, reference_type, reference_id, notes) VALUES (:transaction_date, :account_type, :account_id, :transaction_type, :category_id, :subcategory_id, :payment_method_id, :contact_id, :purchase_source_id, :amount, :reference_type, :reference_id, :notes)';
         $stmt = $this->db->prepare($sql);
 
-        return $stmt->execute([
+        $ok = $stmt->execute([
             ':transaction_date' => $input['transaction_date'] ?? date('Y-m-d'),
             ':account_type' => $input['account_type'] ?? 'bank',
             ':account_id' => !empty($input['account_id']) ? (int) $input['account_id'] : null,
@@ -180,6 +180,20 @@ SQL;
             ':reference_id' => !empty($input['reference_id']) ? (int) $input['reference_id'] : null,
             ':notes' => $input['notes'] ?? null,
         ]);
+
+        return $ok ? (int) $this->db->lastInsertId() : 0;
+    }
+
+    public function delete(int $id): bool
+    {
+        $stmt = $this->db->prepare('DELETE FROM transactions WHERE id = :id');
+        return $stmt->execute([':id' => $id]);
+    }
+
+    public function deleteByReference(string $refType, int $refId): void
+    {
+        $stmt = $this->db->prepare('DELETE FROM transactions WHERE reference_type = :ref_type AND reference_id = :ref_id');
+        $stmt->execute([':ref_type' => $refType, ':ref_id' => $refId]);
     }
 
     public function getTotalsByType(): array
