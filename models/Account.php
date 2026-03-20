@@ -280,7 +280,7 @@ SQL;
     public function getAccountTypes(): array
     {
         $stmt = $this->db->query(
-            'SELECT id, name, system_key
+            'SELECT id, name, system_key, template
              FROM account_types
              ORDER BY system_key IS NULL, name ASC'
         );
@@ -294,13 +294,19 @@ SQL;
         $accountTypeId = null;
 
         if (strpos($accountTypeRaw, 'custom:') === 0) {
-            $accountType = 'other';
             $accountTypeId = (int) substr($accountTypeRaw, 7);
+            $accountType = $this->getTemplateForAccountType($accountTypeId) ?? 'other';
         } elseif ($accountTypeRaw === 'new') {
-            $accountType = 'other';
             $customName = trim((string) ($input['new_account_type'] ?? ''));
+            $customTemplate = trim((string) ($input['new_account_type_template'] ?? 'other'));
+            if (!in_array($customTemplate, self::SYSTEM_TYPES, true)) {
+                $customTemplate = 'other';
+            }
             if ($customName !== '') {
-                $accountTypeId = $this->findOrCreateAccountType($customName);
+                $accountTypeId = $this->findOrCreateAccountType($customName, $customTemplate);
+                $accountType = $customTemplate;
+            } else {
+                $accountType = $fallbackType ?? 'savings';
             }
         } elseif (!in_array($accountTypeRaw, self::SYSTEM_TYPES, true)) {
             $accountType = $fallbackType ?? 'savings';
@@ -313,7 +319,7 @@ SQL;
         return [$accountType, $accountTypeId];
     }
 
-    private function findOrCreateAccountType(string $name): ?int
+    private function findOrCreateAccountType(string $name, string $template = 'other'): ?int
     {
         $cleanName = trim($name);
         if ($cleanName === '') {
@@ -327,9 +333,21 @@ SQL;
             return (int) $row['id'];
         }
 
-        $insert = $this->db->prepare('INSERT INTO account_types (name) VALUES (:name)');
-        $insert->execute([':name' => $cleanName]);
+        $insert = $this->db->prepare('INSERT INTO account_types (name, template) VALUES (:name, :template)');
+        $insert->execute([':name' => $cleanName, ':template' => $template]);
         return (int) $this->db->lastInsertId();
+    }
+
+    private function getTemplateForAccountType(int $id): ?string
+    {
+        $stmt = $this->db->prepare('SELECT template FROM account_types WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return null;
+        }
+        $template = $row['template'] ?? null;
+        return ($template !== null && $template !== '') ? $template : 'other';
     }
 
     private function getAccountTypeIdBySystemKey(string $systemKey): ?int

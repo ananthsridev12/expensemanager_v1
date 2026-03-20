@@ -53,7 +53,9 @@ include __DIR__ . '/../partials/nav.php';
                         <?php if (!empty($customTypes)): ?>
                             <optgroup label="Custom types">
                                 <?php foreach ($customTypes as $type): ?>
-                                    <option value="<?= 'custom:' . (int) $type['id'] ?>" <?= ($editAccount['account_type_id'] ?? null) == $type['id'] ? 'selected' : '' ?>>
+                                    <option value="<?= 'custom:' . (int) $type['id'] ?>"
+                                        data-template="<?= htmlspecialchars($type['template'] ?? 'other') ?>"
+                                        <?= ($editAccount['account_type_id'] ?? null) == $type['id'] ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($type['name']) ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -66,10 +68,23 @@ include __DIR__ . '/../partials/nav.php';
             <?php if ($lockAccountType): ?>
                 <input type="hidden" name="account_type" value="credit_card">
             <?php endif; ?>
-            <label id="new-account-type-wrap" style="display: none;">
-                New account type
-                <input type="text" name="new_account_type" placeholder="Example: Travel Card">
-            </label>
+            <div id="new-account-type-wrap" style="display: none;" class="module-form">
+                <label>
+                    Custom type name
+                    <input type="text" name="new_account_type" placeholder="Example: Travel Card">
+                </label>
+                <label>
+                    Based on template
+                    <select name="new_account_type_template" id="new-account-type-template">
+                        <option value="savings">Savings account</option>
+                        <option value="current">Current account</option>
+                        <option value="credit_card">Credit card (rewards, limit, billing cycle)</option>
+                        <option value="cash">Cash</option>
+                        <option value="wallet">Wallet</option>
+                        <option value="other">Other (basic)</option>
+                    </select>
+                </label>
+            </div>
             <label>
                 Bank name
                 <input type="text" name="bank_name" value="<?= htmlspecialchars($editAccount['bank_name'] ?? '') ?>" required>
@@ -343,15 +358,33 @@ include __DIR__ . '/../partials/nav.php';
             const bankFields = document.getElementById('bank-fields');
             const cardFields = document.getElementById('credit-card-fields');
             const newTypeWrap = document.getElementById('new-account-type-wrap');
+            const newTypeTemplateSelect = document.getElementById('new-account-type-template');
+
+            function getEffectiveTemplate() {
+                const val = typeSelect.value;
+                if (val === 'credit_card') return 'credit_card';
+                if (val === 'new') return newTypeTemplateSelect ? newTypeTemplateSelect.value : 'other';
+                if (val.startsWith('custom:')) {
+                    const opt = typeSelect.options[typeSelect.selectedIndex];
+                    return opt.dataset.template || 'other';
+                }
+                return val; // savings, current, cash, wallet, other
+            }
 
             function toggleAccountFields() {
-                const isCreditCard = typeSelect.value === 'credit_card';
+                const isNew = typeSelect.value === 'new';
+                newTypeWrap.style.display = isNew ? 'grid' : 'none';
+
+                const template = getEffectiveTemplate();
+                const isCreditCard = template === 'credit_card';
                 bankFields.style.display = isCreditCard ? 'none' : 'grid';
                 cardFields.style.display = isCreditCard ? 'grid' : 'none';
-                newTypeWrap.style.display = typeSelect.value === 'new' ? 'flex' : 'none';
             }
 
             typeSelect.addEventListener('change', toggleAccountFields);
+            if (newTypeTemplateSelect) {
+                newTypeTemplateSelect.addEventListener('change', toggleAccountFields);
+            }
             toggleAccountFields();
         })();
     </script>
