@@ -13,6 +13,7 @@ SELECT
     c.id AS category_id,
     c.name AS category_name,
     c.type AS category_type,
+    c.is_fuel AS category_is_fuel,
     c.created_at AS category_created_at,
     sc.id AS sub_id,
     sc.name AS sub_name,
@@ -31,6 +32,7 @@ SQL;
                     'id' => $row['category_id'],
                     'name' => $row['category_name'],
                     'type' => $row['category_type'],
+                    'is_fuel' => (bool) $row['category_is_fuel'],
                     'created_at' => $row['category_created_at'],
                     'subcategories' => [],
                 ];
@@ -55,14 +57,15 @@ SQL;
         return $stmt->fetchAll();
     }
 
-    public function createCategory(string $name, string $type): bool
+    public function createCategory(string $name, string $type, bool $isFuel = false): bool
     {
-        $sql = 'INSERT INTO categories (name, type) VALUES (:name, :type)';
+        $sql = 'INSERT INTO categories (name, type, is_fuel) VALUES (:name, :type, :is_fuel)';
         $stmt = $this->db->prepare($sql);
 
         return $stmt->execute([
             ':name' => trim($name),
             ':type' => $type,
+            ':is_fuel' => $isFuel ? 1 : 0,
         ]);
     }
 
@@ -109,8 +112,9 @@ SQL;
         $type = (string) ($input['type'] ?? 'expense');
         $allowed = ['income', 'expense', 'transfer'];
         if (!in_array($type, $allowed, true)) $type = 'expense';
-        $stmt = $this->db->prepare('UPDATE categories SET name=:name, type=:type WHERE id=:id');
-        return $stmt->execute([':name' => $name, ':type' => $type, ':id' => $id]);
+        $isFuel = isset($input['is_fuel']) && $input['is_fuel'] ? 1 : 0;
+        $stmt = $this->db->prepare('UPDATE categories SET name=:name, type=:type, is_fuel=:is_fuel WHERE id=:id');
+        return $stmt->execute([':name' => $name, ':type' => $type, ':is_fuel' => $isFuel, ':id' => $id]);
     }
 
     public function updateSubcategory(array $input): bool

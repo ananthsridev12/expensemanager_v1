@@ -145,6 +145,14 @@ include __DIR__ . '/../partials/nav.php';
                     Reward points balance
                     <input type="number" name="points_balance" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['points_balance'] ?? '0.00')) ?>">
                 </label>
+                <label>
+                    Fuel surcharge rate (%)
+                    <input type="number" name="fuel_surcharge_rate" step="0.01" min="0" max="10" value="<?= htmlspecialchars((string) ($editAccount['fuel_surcharge_rate'] ?? '1.00')) ?>">
+                </label>
+                <label>
+                    Min. spend for surcharge refund (₹)
+                    <input type="number" name="fuel_surcharge_min_refund" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['fuel_surcharge_min_refund'] ?? '400.00')) ?>">
+                </label>
             </div>
             <button type="submit"><?= $editAccount ? 'Update account' : 'Save account' ?></button>
             <?php if ($editAccount): ?>
@@ -250,6 +258,73 @@ include __DIR__ . '/../partials/nav.php';
         </div>
     </section>
     <?php endforeach; ?>
+
+    <?php
+    $fuelSurchargeReport = $fuelSurchargeReport ?? [];
+    $hasFuelData = !empty($fuelSurchargeReport);
+    ?>
+    <?php if ($hasFuelData): ?>
+    <section class="module-panel">
+        <h2>Fuel surcharge tracker</h2>
+        <p class="muted" style="margin-bottom:1rem;">Surcharge = spend × rate. GST (18%) is charged on surcharge but <strong>not refunded</strong>. Transactions above the minimum spend qualify for surcharge refund.</p>
+        <?php foreach ($fuelSurchargeReport as $cardReport): ?>
+            <h3 style="margin:1rem 0 0.5rem;"><?= htmlspecialchars($cardReport['bank_name'] . ' — ' . $cardReport['card_name']) ?> <small class="muted">(<?= $cardReport['surcharge_rate'] ?>% · min ₹<?= number_format($cardReport['min_refund'], 2) ?> for refund)</small></h3>
+            <div class="summary-cards" style="margin-bottom:1rem;">
+                <article class="card">
+                    <h3>Total surcharge charged</h3>
+                    <p><?= formatCurrency($cardReport['total_surcharge'] + $cardReport['total_gst']) ?></p>
+                    <small>Surcharge <?= formatCurrency($cardReport['total_surcharge']) ?> + GST <?= formatCurrency($cardReport['total_gst']) ?></small>
+                </article>
+                <article class="card card--green">
+                    <h3>Refundable surcharge</h3>
+                    <p><?= formatCurrency($cardReport['total_refundable']) ?></p>
+                    <small>On eligible transactions</small>
+                </article>
+                <article class="card card--red">
+                    <h3>Net surcharge cost</h3>
+                    <p><?= formatCurrency($cardReport['net_cost']) ?></p>
+                    <small>GST not refunded</small>
+                </article>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th>Spend</th>
+                            <th>Surcharge</th>
+                            <th>GST on surcharge</th>
+                            <th>Total charged</th>
+                            <th>Refund?</th>
+                            <th>Net cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($cardReport['transactions'] as $tx): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($tx['date']) ?></td>
+                                <td><?= htmlspecialchars($tx['category']) ?></td>
+                                <td><?= formatCurrency($tx['amount']) ?></td>
+                                <td><?= formatCurrency($tx['surcharge']) ?></td>
+                                <td><?= formatCurrency($tx['gst']) ?></td>
+                                <td><?= formatCurrency($tx['total_charged']) ?></td>
+                                <td>
+                                    <?php if ($tx['refundable']): ?>
+                                        <span class="pill card--green">Yes <?= formatCurrency($tx['refund_amount']) ?></span>
+                                    <?php else: ?>
+                                        <span class="pill">No</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= formatCurrency($tx['net_cost']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endforeach; ?>
+    </section>
+    <?php endif; ?>
 
     <script>
         (function () {

@@ -65,8 +65,8 @@ SQL;
             $accountId = (int) $this->db->lastInsertId();
 
             if ($accountType === 'credit_card') {
-                $cardSql = 'INSERT INTO credit_cards (account_id, bank_name, card_name, credit_limit, billing_date, due_date, outstanding_balance, outstanding_principal, interest_rate, tenure_months, processing_fee, gst_rate, emi_amount, emi_start_date)
-                            VALUES (:account_id, :bank_name, :card_name, :credit_limit, :billing_date, :due_date, :outstanding_balance, :outstanding_principal, :interest_rate, :tenure_months, :processing_fee, :gst_rate, :emi_amount, :emi_start_date)';
+                $cardSql = 'INSERT INTO credit_cards (account_id, bank_name, card_name, credit_limit, billing_date, due_date, outstanding_balance, outstanding_principal, interest_rate, tenure_months, processing_fee, gst_rate, emi_amount, emi_start_date, fuel_surcharge_rate, fuel_surcharge_min_refund)
+                            VALUES (:account_id, :bank_name, :card_name, :credit_limit, :billing_date, :due_date, :outstanding_balance, :outstanding_principal, :interest_rate, :tenure_months, :processing_fee, :gst_rate, :emi_amount, :emi_start_date, :fuel_surcharge_rate, :fuel_surcharge_min_refund)';
                 $cardStmt = $this->db->prepare($cardSql);
                 $cardStmt->execute([
                     ':account_id' => $accountId,
@@ -83,6 +83,8 @@ SQL;
                     ':gst_rate' => is_numeric($input['gst_rate'] ?? null) ? (float) $input['gst_rate'] : 0.0,
                     ':emi_amount' => is_numeric($input['emi_amount'] ?? null) ? (float) $input['emi_amount'] : 0.0,
                     ':emi_start_date' => !empty($input['emi_start_date']) ? $input['emi_start_date'] : null,
+                    ':fuel_surcharge_rate' => is_numeric($input['fuel_surcharge_rate'] ?? null) ? (float) $input['fuel_surcharge_rate'] : 1.0,
+                    ':fuel_surcharge_min_refund' => is_numeric($input['fuel_surcharge_min_refund'] ?? null) ? (float) $input['fuel_surcharge_min_refund'] : 400.0,
                 ]);
 
                 $points = is_numeric($input['points_balance'] ?? null) ? (float) $input['points_balance'] : 0.0;
@@ -207,6 +209,8 @@ SQL;
                              emi_amount = :emi_amount,
                              emi_start_date = :emi_start_date,
                              points_balance = :points_balance,
+                             fuel_surcharge_rate = :fuel_surcharge_rate,
+                             fuel_surcharge_min_refund = :fuel_surcharge_min_refund,
                              updated_at = CURRENT_TIMESTAMP
                          WHERE id = :id'
                     )->execute([
@@ -224,6 +228,8 @@ SQL;
                         ':emi_amount' => is_numeric($input['emi_amount'] ?? null) ? (float) $input['emi_amount'] : (float) ($existing['emi_amount'] ?? 0),
                         ':emi_start_date' => !empty($input['emi_start_date']) ? $input['emi_start_date'] : ($existing['emi_start_date'] ?? null),
                         ':points_balance' => is_numeric($input['points_balance'] ?? null) ? (float) $input['points_balance'] : (float) ($existing['points_balance'] ?? 0),
+                        ':fuel_surcharge_rate' => is_numeric($input['fuel_surcharge_rate'] ?? null) ? (float) $input['fuel_surcharge_rate'] : (float) ($existing['fuel_surcharge_rate'] ?? 1.0),
+                        ':fuel_surcharge_min_refund' => is_numeric($input['fuel_surcharge_min_refund'] ?? null) ? (float) $input['fuel_surcharge_min_refund'] : (float) ($existing['fuel_surcharge_min_refund'] ?? 400.0),
                         ':id' => $cardId,
                     ]);
                 }

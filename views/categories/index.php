@@ -33,6 +33,10 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="transfer" <?= ($editCategory['type'] ?? '') === 'transfer' ? 'selected' : '' ?>>Transfer</option>
                 </select>
             </label>
+            <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+                <input type="checkbox" name="is_fuel" value="1" <?= !empty($editCategory['is_fuel']) ? 'checked' : '' ?>>
+                Fuel category (for surcharge tracking)
+            </label>
             <button type="submit"><?= $editCategory ? 'Update category' : 'Create category' ?></button>
             <?php if ($editCategory): ?>
                 <a class="secondary" href="?module=categories">Cancel</a>
@@ -85,6 +89,9 @@ include __DIR__ . '/../partials/nav.php';
                         <header>
                             <strong><?= htmlspecialchars($category['name']) ?></strong>
                             <span class="pill"><?= ucfirst($category['type']) ?></span>
+                            <?php if (!empty($category['is_fuel'])): ?>
+                                <span class="pill card--orange">Fuel</span>
+                            <?php endif; ?>
                             <a class="secondary" href="?module=categories&edit_cat=<?= (int) $category['id'] ?>">Edit</a>
                         </header>
                         <?php if (count($category['subcategories']) === 0): ?>

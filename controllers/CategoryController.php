@@ -18,7 +18,11 @@ class CategoryController extends BaseController
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($_POST['form']) && $_POST['form'] === 'category') {
-                $this->categoryModel->createCategory($_POST['name'] ?? '', $_POST['type'] ?? 'expense');
+                $this->categoryModel->createCategory(
+                    $_POST['name'] ?? '',
+                    $_POST['type'] ?? 'expense',
+                    isset($_POST['is_fuel']) && $_POST['is_fuel'] === '1'
+                );
             }
 
             if (isset($_POST['form']) && $_POST['form'] === 'subcategory') {

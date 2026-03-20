@@ -548,6 +548,89 @@ SQL;
         }
     }
 
+    public function getFuelSurchargeReport(): array
+    {
+        $cards = $this->getAll();
+        $report = [];
+
+        foreach ($cards as $card) {
+            $accountId = (int) ($card['account_id'] ?? 0);
+            $rate      = (float) ($card['fuel_surcharge_rate'] ?? 1.0);
+            $minRefund = (float) ($card['fuel_surcharge_min_refund'] ?? 400.0);
+
+            if ($accountId <= 0 || $rate <= 0) {
+                continue;
+            }
+
+            $stmt = $this->db->prepare(
+                'SELECT
+                    t.id,
+                    t.transaction_date,
+                    t.amount,
+                    c.name AS category_name
+                 FROM transactions t
+                 JOIN categories c ON c.id = t.category_id AND c.is_fuel = 1
+                 WHERE t.account_id = :account_id
+                   AND t.transaction_type = \'expense\'
+                 ORDER BY t.transaction_date DESC'
+            );
+            $stmt->execute([':account_id' => $accountId]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($rows)) {
+                continue;
+            }
+
+            $transactions = [];
+            $totalSurcharge   = 0.0;
+            $totalGst         = 0.0;
+            $totalRefundable  = 0.0;
+
+            foreach ($rows as $row) {
+                $amount      = (float) $row['amount'];
+                $surcharge   = round($amount * $rate / 100, 2);
+                $gst         = round($surcharge * 0.18, 2);
+                $totalCharged = round($surcharge + $gst, 2);
+                $refundable  = $amount >= $minRefund;
+                $refundAmt   = $refundable ? $surcharge : 0.0;
+                $netCost     = $refundable ? $gst : $totalCharged;
+
+                $totalSurcharge  += $surcharge;
+                $totalGst        += $gst;
+                $totalRefundable += $refundAmt;
+
+                $transactions[] = [
+                    'id'            => $row['id'],
+                    'date'          => $row['transaction_date'],
+                    'amount'        => $amount,
+                    'category'      => $row['category_name'],
+                    'surcharge'     => $surcharge,
+                    'gst'           => $gst,
+                    'total_charged' => $totalCharged,
+                    'refundable'    => $refundable,
+                    'refund_amount' => $refundAmt,
+                    'net_cost'      => $netCost,
+                ];
+            }
+
+            $report[] = [
+                'card_id'          => (int) $card['id'],
+                'account_id'       => $accountId,
+                'bank_name'        => $card['bank_name'] ?? '',
+                'card_name'        => $card['card_name'] ?? '',
+                'surcharge_rate'   => $rate,
+                'min_refund'       => $minRefund,
+                'transactions'     => $transactions,
+                'total_surcharge'  => round($totalSurcharge, 2),
+                'total_gst'        => round($totalGst, 2),
+                'total_refundable' => round($totalRefundable, 2),
+                'net_cost'         => round($totalSurcharge + $totalGst - $totalRefundable, 2),
+            ];
+        }
+
+        return $report;
+    }
+
     private function tableExists(string $tableName): bool
     {
         $stmt = $this->db->prepare('SHOW TABLES LIKE :table_name');
