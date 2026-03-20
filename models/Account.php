@@ -12,6 +12,7 @@ class Account extends BaseModel
 SELECT
     a.*,
     at.name AS account_type_name,
+    at.system_key AS account_type_system_key,
     cc.id AS credit_card_id,
     cc.credit_limit,
     cc.outstanding_balance,
@@ -276,7 +277,8 @@ SQL;
     public function getList(): array
     {
         $stmt = $this->db->query(
-            'SELECT a.id, a.bank_name, a.account_name, a.account_type, a.is_default, at.name AS account_type_name
+            'SELECT a.id, a.bank_name, a.account_name, a.account_type, a.account_type_id, a.is_default,
+                    at.name AS account_type_name, at.system_key AS account_type_system_key
              FROM accounts a
              LEFT JOIN account_types at ON at.id = a.account_type_id
              ORDER BY a.created_at DESC'

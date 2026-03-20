@@ -135,14 +135,25 @@ include __DIR__ . '/partials/nav.php';
     $dashTypeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
     $dashGrouped = [];
     foreach ($accounts as $account) {
-        $dashGrouped[$account['account_type'] ?? 'other'][] = $account;
+        $sysKey   = $account['account_type_system_key'] ?? null;
+        $typeId   = $account['account_type_id'] ?? null;
+        $isCustom = ($sysKey === null || $sysKey === '') && !empty($typeId);
+        $groupKey = $isCustom ? 'custom_' . (int) $typeId : ($account['account_type'] ?? 'other');
+        $dashGrouped[$groupKey][] = $account;
     }
     $dashOrdered = [];
     foreach ($dashTypeOrder as $typeKey => $typeLabel) {
-        if (!empty($dashGrouped[$typeKey])) $dashOrdered[$typeKey] = ['label' => $typeLabel, 'accounts' => $dashGrouped[$typeKey]];
+        if (!empty($dashGrouped[$typeKey])) {
+            $dashOrdered[$typeKey] = ['label' => $typeLabel, 'template' => $typeKey, 'accounts' => $dashGrouped[$typeKey]];
+        }
     }
-    foreach ($dashGrouped as $typeKey => $accs) {
-        if (!isset($dashTypeOrder[$typeKey])) $dashOrdered[$typeKey] = ['label' => ucfirst(str_replace('_', ' ', $typeKey)), 'accounts' => $accs];
+    foreach ($dashGrouped as $groupKey => $accs) {
+        if (!isset($dashOrdered[$groupKey])) {
+            $first    = $accs[0];
+            $label    = !empty($first['account_type_name']) ? $first['account_type_name'] : ucfirst(str_replace('_', ' ', $groupKey));
+            $template = $first['account_type'] ?? 'other';
+            $dashOrdered[$groupKey] = ['label' => $label, 'template' => $template, 'accounts' => $accs];
+        }
     }
     ?>
 
@@ -155,7 +166,7 @@ include __DIR__ . '/partials/nav.php';
                     <tr>
                         <th>Bank</th>
                         <th>Name</th>
-                        <?php if ($typeKey === 'credit_card'): ?>
+                        <?php if ($group['template'] === 'credit_card'): ?>
                             <th>Outstanding</th>
                             <th>Limit</th>
                             <th>Available</th>
@@ -169,7 +180,7 @@ include __DIR__ . '/partials/nav.php';
                         <tr>
                             <td><?= htmlspecialchars($account['bank_name'] ?? '—') ?></td>
                             <td><?= htmlspecialchars($account['account_name'] ?? '—') ?></td>
-                            <?php if ($typeKey === 'credit_card'): ?>
+                            <?php if ($group['template'] === 'credit_card'): ?>
                                 <?php
                                 $ccOut  = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0);
                                 $ccLim  = (float) ($account['credit_limit'] ?? 0);
@@ -186,7 +197,7 @@ include __DIR__ . '/partials/nav.php';
                 </tbody>
                 <?php if (count($group['accounts']) > 1): ?>
                 <tfoot>
-                    <?php if ($typeKey === 'credit_card'): ?>
+                    <?php if ($group['template'] === 'credit_card'): ?>
                         <?php
                         $tOut   = array_sum(array_map(fn($a) => (float)($a['live_cc_outstanding'] ?? $a['outstanding_balance'] ?? 0), $group['accounts']));
                         $tLim   = array_sum(array_map(fn($a) => (float)($a['credit_limit'] ?? 0), $group['accounts']));

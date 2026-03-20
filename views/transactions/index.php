@@ -171,14 +171,31 @@ include __DIR__ . '/../partials/nav.php';
                 $acctTypeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
                 $acctGrouped = [];
                 foreach ($accounts as $acct) {
-                    $acctGrouped[$acct['account_type'] ?? 'other'][] = $acct;
+                    $sysKey   = $acct['account_type_system_key'] ?? null;
+                    $typeId   = $acct['account_type_id'] ?? null;
+                    $isCustom = ($sysKey === null || $sysKey === '') && !empty($typeId);
+                    $gKey     = $isCustom ? 'custom_' . (int) $typeId : ($acct['account_type'] ?? 'other');
+                    $acctGrouped[$gKey][] = $acct;
+                }
+                // Build ordered groups with label
+                $acctGroups = [];
+                foreach ($acctTypeOrder as $typeKey => $typeLabel) {
+                    if (!empty($acctGrouped[$typeKey])) {
+                        $acctGroups[] = ['label' => $typeLabel, 'accounts' => $acctGrouped[$typeKey]];
+                    }
+                }
+                foreach ($acctGrouped as $gKey => $accts) {
+                    if (!isset($acctTypeOrder[$gKey])) {
+                        $first = $accts[0];
+                        $label = !empty($first['account_type_name']) ? $first['account_type_name'] : ucfirst(str_replace('_', ' ', $gKey));
+                        $acctGroups[] = ['label' => $label, 'accounts' => $accts];
+                    }
                 }
                 ?>
                 <select name="account_id" id="from-account-select" required>
-                    <?php foreach ($acctTypeOrder as $typeKey => $typeLabel): ?>
-                        <?php if (empty($acctGrouped[$typeKey])) continue; ?>
-                        <optgroup label="<?= htmlspecialchars($typeLabel) ?>">
-                            <?php foreach ($acctGrouped[$typeKey] as $account): ?>
+                    <?php foreach ($acctGroups as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
                                 <?php
                                 $isDefault = !empty($account['is_default']);
                                 $aLabel = $account['bank_name'] . ' - ' . $account['account_name'];
@@ -192,24 +209,6 @@ include __DIR__ . '/../partials/nav.php';
                             <?php endforeach; ?>
                         </optgroup>
                     <?php endforeach; ?>
-                    <?php
-                    // Any custom types not in the order above
-                    foreach ($acctGrouped as $typeKey => $accts) {
-                        if (isset($acctTypeOrder[$typeKey])) continue;
-                        echo '<optgroup label="' . htmlspecialchars(ucfirst(str_replace('_', ' ', $typeKey))) . '">';
-                        foreach ($accts as $account) {
-                            $isDefault = !empty($account['is_default']);
-                            $aLabel = $account['bank_name'] . ' - ' . $account['account_name'];
-                            echo '<option value="' . $account['account_type'] . ':' . $account['id'] . '"'
-                                . ' data-type="' . htmlspecialchars($account['account_type']) . '"'
-                                . ' data-account-id="' . (int)$account['id'] . '"'
-                                . ($isDefault ? ' selected' : '') . '>'
-                                . htmlspecialchars($aLabel) . ($isDefault ? ' ★' : '')
-                                . '</option>';
-                        }
-                        echo '</optgroup>';
-                    }
-                    ?>
                     <?php if (!empty($loans)): ?>
                         <optgroup label="Loans">
                             <?php foreach ($loans as $loan): ?>

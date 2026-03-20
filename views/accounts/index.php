@@ -186,19 +186,24 @@ include __DIR__ . '/../partials/nav.php';
     $typeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
     $grouped = [];
     foreach ($accounts as $account) {
-        $type = $account['account_type'] ?? 'other';
-        $grouped[$type][] = $account;
+        $sysKey  = $account['account_type_system_key'] ?? null;
+        $typeId  = $account['account_type_id'] ?? null;
+        $isCustom = ($sysKey === null || $sysKey === '') && !empty($typeId);
+        $groupKey = $isCustom ? 'custom_' . (int) $typeId : ($account['account_type'] ?? 'other');
+        $grouped[$groupKey][] = $account;
     }
-    // Sort groups by defined order, then any custom types at the end
     $orderedGroups = [];
     foreach ($typeOrder as $typeKey => $typeLabel) {
         if (!empty($grouped[$typeKey])) {
-            $orderedGroups[$typeKey] = ['label' => $typeLabel, 'accounts' => $grouped[$typeKey]];
+            $orderedGroups[$typeKey] = ['label' => $typeLabel, 'template' => $typeKey, 'accounts' => $grouped[$typeKey]];
         }
     }
-    foreach ($grouped as $typeKey => $accs) {
-        if (!isset($typeOrder[$typeKey])) {
-            $orderedGroups[$typeKey] = ['label' => ucfirst(str_replace('_', ' ', $typeKey)), 'accounts' => $accs];
+    foreach ($grouped as $groupKey => $accs) {
+        if (!isset($orderedGroups[$groupKey])) {
+            $first    = $accs[0];
+            $label    = !empty($first['account_type_name']) ? $first['account_type_name'] : ucfirst(str_replace('_', ' ', $groupKey));
+            $template = $first['account_type'] ?? 'other';
+            $orderedGroups[$groupKey] = ['label' => $label, 'template' => $template, 'accounts' => $accs];
         }
     }
     ?>
@@ -218,7 +223,7 @@ include __DIR__ . '/../partials/nav.php';
                     <tr>
                         <th>Bank / Issuer</th>
                         <th>Name</th>
-                        <?php if ($typeKey === 'credit_card'): ?>
+                        <?php if ($group['template'] === 'credit_card'): ?>
                             <th>Outstanding</th>
                             <th>Limit</th>
                             <th>Available</th>
@@ -238,7 +243,7 @@ include __DIR__ . '/../partials/nav.php';
                                     <span class="pill card--green" style="font-size:0.7rem;margin-left:0.3rem;">Default</span>
                                 <?php endif; ?>
                             </td>
-                            <?php if ($typeKey === 'credit_card'): ?>
+                            <?php if ($group['template'] === 'credit_card'): ?>
                                 <?php
                                 $outstanding = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0);
                                 $limit       = (float) ($account['credit_limit'] ?? 0);
@@ -256,7 +261,7 @@ include __DIR__ . '/../partials/nav.php';
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
-                <?php if ($typeKey === 'credit_card' && count($group['accounts']) > 1): ?>
+                <?php if ($group['template'] === 'credit_card' && count($group['accounts']) > 1): ?>
                 <tfoot>
                     <?php
                     $totalOutstanding = array_sum(array_map(fn($a) => (float)($a['live_cc_outstanding'] ?? $a['outstanding_balance'] ?? 0), $group['accounts']));
@@ -270,7 +275,7 @@ include __DIR__ . '/../partials/nav.php';
                         <td><strong><?= formatCurrency($totalAvailable) ?></strong></td>
                     </tr>
                 </tfoot>
-                <?php elseif ($typeKey !== 'credit_card' && count($group['accounts']) > 1): ?>
+                <?php elseif ($group['template'] !== 'credit_card' && count($group['accounts']) > 1): ?>
                 <tfoot>
                     <?php $totalBalance = array_sum(array_map(fn($a) => (float)($a['balance'] ?? 0), $group['accounts'])); ?>
                     <tr>
