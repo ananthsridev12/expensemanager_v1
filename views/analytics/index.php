@@ -37,7 +37,7 @@ include __DIR__ . '/../partials/nav.php';
         <h2>Drill-down analysis</h2>
         <form method="get" id="drilldown-form">
             <input type="hidden" name="module" value="analytics">
-            <div class="module-form">
+            <div class="module-form" style="align-items:flex-end;">
                 <label>Start date
                     <input type="date" name="start_date" value="<?= htmlspecialchars($startDate) ?>">
                 </label>
@@ -51,6 +51,10 @@ include __DIR__ . '/../partials/nav.php';
                         <option value="income"  <?= ($drilldownFilters['tx_type'] ?? '') === 'income'  ? 'selected' : '' ?>>Income only</option>
                     </select>
                 </label>
+                <div style="display:flex;gap:0.5rem;">
+                    <button type="submit">Apply</button>
+                    <a class="secondary" href="?module=analytics">Reset</a>
+                </div>
             </div>
 
             <div class="check-group-wrap" style="margin-top:1rem;">
@@ -112,11 +116,6 @@ include __DIR__ . '/../partials/nav.php';
                 </div>
                 <?php endif; ?>
 
-            </div>
-
-            <div style="display:flex;gap:0.75rem;margin-top:1rem;">
-                <button type="submit">Apply</button>
-                <a class="secondary" href="?module=analytics">Reset</a>
             </div>
         </form>
     </section>

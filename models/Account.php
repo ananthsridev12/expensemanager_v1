@@ -146,6 +146,11 @@ SQL;
 
         $this->db->beginTransaction();
         try {
+            $isDefault = isset($input['is_default']) && $input['is_default'] ? 1 : 0;
+            if ($isDefault) {
+                $this->db->exec('UPDATE accounts SET is_default = 0');
+            }
+
             $stmt = $this->db->prepare(
                 'UPDATE accounts
                  SET bank_name = :bank_name,
@@ -155,6 +160,7 @@ SQL;
                      account_number = :account_number,
                      ifsc = :ifsc,
                      opening_balance = :opening_balance,
+                     is_default = :is_default,
                      updated_at = CURRENT_TIMESTAMP
                  WHERE id = :id'
             );
@@ -166,6 +172,7 @@ SQL;
                 ':account_number' => !empty($input['account_number']) ? trim((string) $input['account_number']) : ($existing['account_number'] ?? null),
                 ':ifsc' => !empty($input['ifsc']) ? trim((string) $input['ifsc']) : ($existing['ifsc'] ?? null),
                 ':opening_balance' => is_numeric($input['opening_balance'] ?? null) ? (float) $input['opening_balance'] : (float) ($existing['opening_balance'] ?? 0),
+                ':is_default' => $isDefault,
                 ':id' => $accountId,
             ]);
 
@@ -262,7 +269,7 @@ SQL;
     public function getList(): array
     {
         $stmt = $this->db->query(
-            'SELECT a.id, a.bank_name, a.account_name, a.account_type, at.name AS account_type_name
+            'SELECT a.id, a.bank_name, a.account_name, a.account_type, a.is_default, at.name AS account_type_name
              FROM accounts a
              LEFT JOIN account_types at ON at.id = a.account_type_id
              ORDER BY a.created_at DESC'

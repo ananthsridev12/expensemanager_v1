@@ -298,6 +298,16 @@ class TransactionController extends BaseController
             return;
         }
 
+        // Resolve inline-created category/subcategory
+        $resolvedCategoryId = $this->resolveCategoryId($input);
+        if ($resolvedCategoryId !== null) {
+            $input['category_id'] = $resolvedCategoryId;
+        }
+        $resolvedSubcategoryId = $this->resolveSubcategoryId($input, $resolvedCategoryId ?? (!empty($input['category_id']) ? (int)$input['category_id'] : null));
+        if ($resolvedSubcategoryId !== null) {
+            $input['subcategory_id'] = $resolvedSubcategoryId;
+        }
+
         $paymentMethodId = $this->resolvePaymentMethodId($input);
         $contactId = !empty($input['contact_id']) ? (int) $input['contact_id'] : null;
         $purchaseSourceId = $this->resolvePurchaseSourceId($input);
@@ -598,6 +608,43 @@ class TransactionController extends BaseController
         }
 
         return $this->purchaseSourceModel->findOrCreateChild($parentId, $customChild);
+    }
+
+    private function resolveCategoryId(array $input): ?int
+    {
+        $categoryId = !empty($input['category_id']) ? (int) $input['category_id'] : 0;
+        if ($categoryId > 0) {
+            return $categoryId;
+        }
+
+        $newName = trim((string) ($input['new_category_name'] ?? ''));
+        if ($newName === '') {
+            return null;
+        }
+
+        $type = (string) ($input['new_category_type'] ?? 'expense');
+        if (!in_array($type, ['income', 'expense', 'transfer'], true)) {
+            $type = 'expense';
+        }
+
+        $newId = $this->categoryModel->createCategory($newName, $type);
+        return $newId > 0 ? $newId : null;
+    }
+
+    private function resolveSubcategoryId(array $input, ?int $categoryId): ?int
+    {
+        $subcategoryId = !empty($input['subcategory_id']) ? (int) $input['subcategory_id'] : 0;
+        if ($subcategoryId > 0) {
+            return $subcategoryId;
+        }
+
+        $newName = trim((string) ($input['new_subcategory_name'] ?? ''));
+        if ($newName === '' || !$categoryId) {
+            return null;
+        }
+
+        $newId = $this->categoryModel->createSubcategory($categoryId, $newName);
+        return $newId > 0 ? $newId : null;
     }
 
     private function handleRewardRedemption(array $input): bool

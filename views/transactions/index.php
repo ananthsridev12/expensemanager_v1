@@ -174,9 +174,10 @@ include __DIR__ . '/../partials/nav.php';
                         $label = $accountType === 'credit_card'
                             ? 'Card: ' . $account['bank_name'] . ' - ' . $account['account_name']
                             : $account['bank_name'] . ' - ' . $account['account_name'];
+                        $isDefault = !empty($account['is_default']);
                         ?>
-                        <option value="<?= $accountType . ':' . $account['id'] ?>" data-type="<?= htmlspecialchars($accountType) ?>">
-                            <?= htmlspecialchars($label) ?>
+                        <option value="<?= $accountType . ':' . $account['id'] ?>" data-type="<?= htmlspecialchars($accountType) ?>" <?= $isDefault ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($label) ?><?= $isDefault ? ' ★' : '' ?>
                         </option>
                     <?php endforeach; ?>
                     <?php foreach ($loans as $loan): ?>
@@ -231,8 +232,23 @@ include __DIR__ . '/../partials/nav.php';
                     <?php foreach ($categories as $category): ?>
                         <option value="<?= $category['id'] ?>"><?= htmlspecialchars($category['name']) ?> (<?= $category['type'] ?>)</option>
                     <?php endforeach; ?>
+                    <option value="new_category">+ New category</option>
                 </select>
             </label>
+            <div id="new-category-wrap" style="display:none;" class="module-form">
+                <label>
+                    Category name
+                    <input type="text" name="new_category_name" placeholder="e.g. Groceries">
+                </label>
+                <label>
+                    Type
+                    <select name="new_category_type">
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                        <option value="transfer">Transfer</option>
+                    </select>
+                </label>
+            </div>
             <label>
                 Subcategory
                 <select name="subcategory_id" id="subcategory-select">
@@ -242,7 +258,12 @@ include __DIR__ . '/../partials/nav.php';
                             <option value="<?= $sub['id'] ?>" data-category="<?= $category['id'] ?>"><?= htmlspecialchars($category['name'] . ' - ' . $sub['name']) ?></option>
                         <?php endforeach; ?>
                     <?php endforeach; ?>
+                    <option value="new_subcategory">+ New subcategory</option>
                 </select>
+            </label>
+            <label id="new-subcategory-wrap" style="display:none;">
+                Subcategory name
+                <input type="text" name="new_subcategory_name" placeholder="e.g. Vegetables">
             </label>
             <label>
                 To whom (Contact)
@@ -728,6 +749,8 @@ include __DIR__ . '/../partials/nav.php';
             const emiFields = document.getElementById('emi-fields');
             const categorySelect = document.getElementById('category-select');
             const subcategorySelect = document.getElementById('subcategory-select');
+            const newCategoryWrap = document.getElementById('new-category-wrap');
+            const newSubcategoryWrap = document.getElementById('new-subcategory-wrap');
             const paymentMethodSelect = document.getElementById('payment-method-select');
             const newPaymentMethodWrap = document.getElementById('new-payment-method-wrap');
             const purchaseSourceSelect = document.getElementById('purchase-source-select');
@@ -813,19 +836,52 @@ include __DIR__ . '/../partials/nav.php';
                 emiFields.style.display = emiToggleSelect.value === 'yes' ? 'block' : 'none';
             }
 
+            function toggleCategoryOther() {
+                const isNew = categorySelect.value === 'new_category';
+                newCategoryWrap.style.display = isNew ? 'grid' : 'none';
+                if (isNew) {
+                    categorySelect.name = '';
+                } else {
+                    categorySelect.name = 'category_id';
+                }
+                refreshSubcategories();
+            }
+
+            function toggleSubcategoryOther() {
+                const isNew = subcategorySelect.value === 'new_subcategory';
+                newSubcategoryWrap.style.display = isNew ? 'flex' : 'none';
+                if (isNew) {
+                    subcategorySelect.name = '';
+                } else {
+                    subcategorySelect.name = 'subcategory_id';
+                }
+            }
+
             function refreshSubcategories() {
                 const selectedCategory = categorySelect.value;
+                const isNewCategory = selectedCategory === 'new_category';
                 subcategorySelect.innerHTML = '<option value="">None</option>';
 
-                storedOptions.forEach(item => {
-                    if (!selectedCategory || item.category === selectedCategory) {
-                        const option = document.createElement('option');
-                        option.value = item.value;
-                        option.innerHTML = item.label;
-                        option.dataset.category = item.category;
-                        subcategorySelect.appendChild(option);
-                    }
-                });
+                if (!isNewCategory) {
+                    storedOptions.forEach(item => {
+                        if (!selectedCategory || item.category === selectedCategory) {
+                            const option = document.createElement('option');
+                            option.value = item.value;
+                            option.innerHTML = item.label;
+                            option.dataset.category = item.category;
+                            subcategorySelect.appendChild(option);
+                        }
+                    });
+                }
+
+                const newOpt = document.createElement('option');
+                newOpt.value = 'new_subcategory';
+                newOpt.textContent = '+ New subcategory';
+                subcategorySelect.appendChild(newOpt);
+
+                // Reset subcategory new wrap if category changed
+                newSubcategoryWrap.style.display = 'none';
+                subcategorySelect.name = 'subcategory_id';
             }
 
             function refreshFilterSubcategories() {
@@ -946,7 +1002,8 @@ include __DIR__ . '/../partials/nav.php';
             typeSelect.addEventListener('change', toggleGroupSpendFields);
             accountSelect.addEventListener('change', toggleEmiFields);
             emiToggleSelect.addEventListener('change', toggleEmiFields);
-            categorySelect.addEventListener('change', refreshSubcategories);
+            categorySelect.addEventListener('change', toggleCategoryOther);
+            subcategorySelect.addEventListener('change', toggleSubcategoryOther);
             filterCategorySelect.addEventListener('change', refreshFilterSubcategories);
             if (rewardCategorySelect) {
                 rewardCategorySelect.addEventListener('change', refreshRewardSubcategories);
@@ -977,7 +1034,8 @@ include __DIR__ . '/../partials/nav.php';
             toggleInvestmentMode();
             toggleEmiFields();
             toggleGroupSpendFields();
-            refreshSubcategories();
+            toggleCategoryOther();
+            toggleSubcategoryOther();
             refreshFilterSubcategories();
             refreshRewardSubcategories();
             togglePaymentMethodOther();

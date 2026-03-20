@@ -154,6 +154,12 @@ include __DIR__ . '/../partials/nav.php';
                     <input type="number" name="fuel_surcharge_min_refund" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['fuel_surcharge_min_refund'] ?? '400.00')) ?>">
                 </label>
             </div>
+            <?php if ($editAccount): ?>
+            <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+                <input type="checkbox" name="is_default" value="1" <?= !empty($editAccount['is_default']) ? 'checked' : '' ?>>
+                Set as default account (pre-selected when adding transactions)
+            </label>
+            <?php endif; ?>
             <button type="submit"><?= $editAccount ? 'Update account' : 'Save account' ?></button>
             <?php if ($editAccount): ?>
                 <a class="secondary" href="?module=accounts">Cancel</a>
@@ -211,7 +217,12 @@ include __DIR__ . '/../partials/nav.php';
                     <?php foreach ($group['accounts'] as $account): ?>
                         <tr>
                             <td><?= htmlspecialchars($account['bank_name']) ?></td>
-                            <td><?= htmlspecialchars($account['account_name']) ?></td>
+                            <td>
+                                <?= htmlspecialchars($account['account_name']) ?>
+                                <?php if (!empty($account['is_default'])): ?>
+                                    <span class="pill card--green" style="font-size:0.7rem;margin-left:0.3rem;">Default</span>
+                                <?php endif; ?>
+                            </td>
                             <?php if ($typeKey === 'credit_card'): ?>
                                 <?php
                                 $outstanding = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0);

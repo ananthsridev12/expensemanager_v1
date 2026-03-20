@@ -20,7 +20,7 @@ SELECT
     sc.created_at AS sub_created_at
 FROM categories c
 LEFT JOIN subcategories sc ON sc.category_id = c.id
-ORDER BY c.created_at DESC, sc.created_at ASC
+ORDER BY c.name ASC, sc.name ASC
 SQL;
         $stmt = $this->db->query($sql);
         $rows = $stmt->fetchAll();
@@ -52,32 +52,32 @@ SQL;
 
     public function getCategoryList(): array
     {
-        $stmt = $this->db->query('SELECT id, name FROM categories ORDER BY created_at DESC');
+        $stmt = $this->db->query('SELECT id, name FROM categories ORDER BY name ASC');
 
         return $stmt->fetchAll();
     }
 
-    public function createCategory(string $name, string $type, bool $isFuel = false): bool
+    public function createCategory(string $name, string $type, bool $isFuel = false): int
     {
         $sql = 'INSERT INTO categories (name, type, is_fuel) VALUES (:name, :type, :is_fuel)';
         $stmt = $this->db->prepare($sql);
-
-        return $stmt->execute([
+        $ok = $stmt->execute([
             ':name' => trim($name),
             ':type' => $type,
             ':is_fuel' => $isFuel ? 1 : 0,
         ]);
+        return $ok ? (int) $this->db->lastInsertId() : 0;
     }
 
-    public function createSubcategory(int $categoryId, string $name): bool
+    public function createSubcategory(int $categoryId, string $name): int
     {
         $sql = 'INSERT INTO subcategories (category_id, name) VALUES (:category_id, :name)';
         $stmt = $this->db->prepare($sql);
-
-        return $stmt->execute([
+        $ok = $stmt->execute([
             ':category_id' => $categoryId,
             ':name' => trim($name),
         ]);
+        return $ok ? (int) $this->db->lastInsertId() : 0;
     }
 
     public function count(): int
