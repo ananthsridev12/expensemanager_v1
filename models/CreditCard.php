@@ -149,10 +149,10 @@ SQL;
             $planId = (int) $this->db->lastInsertId();
             $this->generateEmiSchedule($planId, $outstandingPrincipal, $interestRate, $emiAmount, $processingFee, $gstRate, $nextDueDate, $totalEmis);
 
+            // outstanding_balance is now live-calculated from transactions; only update principal for EMI tracking
             $updateCard = $this->db->prepare(
                 'UPDATE credit_cards
                  SET outstanding_principal = outstanding_principal + :pending_principal,
-                     outstanding_balance = outstanding_balance + :pending_principal,
                      updated_at = CURRENT_TIMESTAMP
                  WHERE id = :card_id'
             );
@@ -242,16 +242,15 @@ SQL;
                 $statementIncrease += $firstInstallmentInterest + $firstInstallmentInterestGst;
             }
 
+            // outstanding_balance is now live-calculated from transactions; only update principal for EMI tracking
             $updateCard = $this->db->prepare(
                 'UPDATE credit_cards
                  SET outstanding_principal = outstanding_principal + :principal_amount,
-                     outstanding_balance = outstanding_balance + :statement_increase,
                      updated_at = CURRENT_TIMESTAMP
                  WHERE id = :card_id'
             );
             $updateCard->execute([
                 ':principal_amount' => $principalAmount,
-                ':statement_increase' => round($statementIncrease, 2),
                 ':card_id' => $cardId,
             ]);
 
@@ -524,10 +523,10 @@ SQL;
                 ]);
             }
 
+            // outstanding_balance is now live-calculated from transactions; only update principal for EMI tracking
             $updateCardStmt = $this->db->prepare(
                 'UPDATE credit_cards
                  SET outstanding_principal = GREATEST(0, outstanding_principal - :principal_paid),
-                     outstanding_balance = GREATEST(0, outstanding_balance - :principal_paid),
                      updated_at = CURRENT_TIMESTAMP
                  WHERE id = :card_id'
             );
@@ -558,7 +557,25 @@ SQL;
 
     public function getSummary(): array
     {
-        $sql = 'SELECT COUNT(*) AS count_cards, COALESCE(SUM(credit_limit), 0) AS total_limit, COALESCE(SUM(outstanding_balance), 0) AS total_outstanding FROM credit_cards';
+        $sql = <<<SQL
+SELECT
+    COUNT(*) AS count_cards,
+    COALESCE(SUM(cc.credit_limit), 0) AS total_limit,
+    COALESCE(SUM(
+        GREATEST(0,
+            cc.outstanding_balance + COALESCE((
+                SELECT SUM(CASE
+                    WHEN t.transaction_type = 'expense' THEN t.amount
+                    WHEN t.transaction_type = 'income'  THEN -t.amount
+                    ELSE 0
+                END)
+                FROM transactions t
+                WHERE t.account_id = cc.account_id
+            ), 0)
+        )
+    ), 0) AS total_outstanding
+FROM credit_cards cc
+SQL;
         $stmt = $this->db->query($sql);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -571,38 +588,9 @@ SQL;
 
     public function applyTransactionMovement(int $cardId, string $transactionType, float $amount): void
     {
-        if ($cardId <= 0 || $amount <= 0) {
-            return;
-        }
-
-        if ($transactionType === 'expense') {
-            $stmt = $this->db->prepare(
-                'UPDATE credit_cards
-                 SET outstanding_principal = outstanding_principal + :amount,
-                     outstanding_balance = outstanding_balance + :amount,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = :card_id'
-            );
-            $stmt->execute([
-                ':amount' => $amount,
-                ':card_id' => $cardId,
-            ]);
-            return;
-        }
-
-        if ($transactionType === 'income') {
-            $stmt = $this->db->prepare(
-                'UPDATE credit_cards
-                 SET outstanding_principal = GREATEST(0, outstanding_principal - :amount),
-                     outstanding_balance = GREATEST(0, outstanding_balance - :amount),
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = :card_id'
-            );
-            $stmt->execute([
-                ':amount' => $amount,
-                ':card_id' => $cardId,
-            ]);
-        }
+        // No-op: outstanding_balance is now calculated live from the transactions
+        // table in Account::getAllWithBalances(). Storing it here caused stale
+        // balances when transactions were edited or inserted directly in the DB.
     }
 
     public function applyTransactionMovementByAccount(int $accountId, string $transactionType, float $amount): void
@@ -664,9 +652,23 @@ SQL;
                 $emiDue = (float) ($emiDueStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0.0);
             }
 
-            $principalUsed = (float) ($card['outstanding_principal'] ?? 0.0);
+            // Calculate live outstanding from transactions
+            $liveOutstandingStmt = $this->db->prepare(
+                'SELECT GREATEST(0, cc2.outstanding_balance + COALESCE(SUM(CASE
+                    WHEN t.transaction_type = \'expense\' THEN t.amount
+                    WHEN t.transaction_type = \'income\'  THEN -t.amount
+                    ELSE 0
+                END), 0)) AS live_outstanding
+                FROM credit_cards cc2
+                LEFT JOIN transactions t ON t.account_id = cc2.account_id
+                WHERE cc2.id = :card_id
+                GROUP BY cc2.id'
+            );
+            $liveOutstandingStmt->execute([':card_id' => (int) $card['id']]);
+            $liveOutstanding = (float) ($liveOutstandingStmt->fetch(PDO::FETCH_ASSOC)['live_outstanding'] ?? 0.0);
+
             $creditLimit = (float) ($card['credit_limit'] ?? 0.0);
-            $availableLimit = max(0.0, round($creditLimit - $principalUsed, 2));
+            $availableLimit = max(0.0, round($creditLimit - $liveOutstanding, 2));
 
             $snapshots[] = [
                 'credit_card_id' => (int) $card['id'],
@@ -678,8 +680,8 @@ SQL;
                 'statement_spend_non_emi' => round($nonEmiSpend, 2),
                 'statement_emi_due' => round($emiDue, 2),
                 'statement_total_due' => round($nonEmiSpend + $emiDue, 2),
-                'outstanding_balance' => (float) ($card['outstanding_balance'] ?? 0.0),
-                'outstanding_principal' => $principalUsed,
+                'outstanding_balance' => $liveOutstanding,
+                'outstanding_principal' => (float) ($card['outstanding_principal'] ?? 0.0),
                 'available_limit' => $availableLimit,
             ];
         }

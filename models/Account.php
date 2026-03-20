@@ -22,7 +22,15 @@ SELECT
         ELSE 0
     END), a.opening_balance) AS balance,
     COALESCE(SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END), 0) AS total_income,
-    COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) AS total_expense
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) AS total_expense,
+    GREATEST(0, COALESCE(
+        cc.outstanding_balance + SUM(CASE
+            WHEN t.transaction_type = 'expense' THEN t.amount
+            WHEN t.transaction_type = 'income'  THEN -t.amount
+            ELSE 0
+        END),
+        cc.outstanding_balance
+    )) AS live_cc_outstanding
 FROM accounts a
 LEFT JOIN account_types at ON at.id = a.account_type_id
 LEFT JOIN transactions t ON t.account_id = a.id

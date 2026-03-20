@@ -158,13 +158,15 @@ include __DIR__ . '/partials/nav.php';
                                 <td><span class="pill">Active</span></td>
                             </tr>
                         <?php endforeach; ?>
-                        <?php foreach ($creditCards as $card): ?>
+                        <?php foreach ($accounts as $account): ?>
+                            <?php if (($account['account_type'] ?? '') !== 'credit_card') { continue; } ?>
+                            <?php $ccOutstanding = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0); ?>
                             <tr>
                                 <td>Credit Card</td>
-                                <td><?= htmlspecialchars($card['bank_name'] ?? '—') ?></td>
-                                <td><?= htmlspecialchars($card['card_name'] ?? '—') ?></td>
-                                <td><?= formatCurrency((float) ($card['outstanding_balance'] ?? 0)) ?> / <?= formatCurrency((float) ($card['credit_limit'] ?? 0)) ?></td>
-                                <td><span class="pill"><?= $card['outstanding_balance'] > 0 ? 'Active EMIs' : 'Clear' ?></span></td>
+                                <td><?= htmlspecialchars($account['bank_name'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($account['account_name'] ?? '—') ?></td>
+                                <td><?= formatCurrency($ccOutstanding) ?> / <?= formatCurrency((float) ($account['credit_limit'] ?? 0)) ?></td>
+                                <td><span class="pill"><?= $ccOutstanding > 0 ? 'Outstanding' : 'Clear' ?></span></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

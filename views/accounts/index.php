@@ -180,7 +180,7 @@ include __DIR__ . '/../partials/nav.php';
                                 <td><?= htmlspecialchars($account['account_name']) ?></td>
                                 <td>
                                     <?php if (($account['account_type'] ?? '') === 'credit_card'): ?>
-                                        <?= formatCurrency((float) ($account['outstanding_balance'] ?? 0)) ?> / <?= formatCurrency((float) ($account['credit_limit'] ?? 0)) ?>
+                                        <?= formatCurrency((float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0)) ?> / <?= formatCurrency((float) ($account['credit_limit'] ?? 0)) ?>
                                     <?php else: ?>
                                         <?= formatCurrency((float) ($account['balance'] ?? 0)) ?>
                                     <?php endif; ?>
