@@ -23,6 +23,30 @@
     --transition: 0.18s ease;
 }
 
+/* Font size variants — applied via data-font on <html> */
+html[data-font="compact"] body { font-size: 0.82rem; }
+html[data-font="tiny"]    body { font-size: 0.72rem; }
+
+/* Font size toggle in sidebar */
+.font-size-btns {
+    margin-top: auto; padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+    display: flex; gap: 0.3rem; align-items: center;
+}
+.font-size-btns span {
+    font-size: 0.7rem; color: var(--muted); margin-right: 0.15rem;
+}
+.font-size-btns button {
+    border: 1px solid var(--line); background: transparent; color: var(--muted);
+    border-radius: 6px; cursor: pointer; line-height: 1; padding: 0.28rem 0.5rem;
+    transition: all var(--transition);
+}
+.font-size-btns button:hover { color: var(--text); border-color: var(--accent); }
+.font-size-btns button.is-active { color: var(--accent); border-color: var(--accent); background: rgba(59,130,246,0.12); }
+.font-size-btns button:nth-child(2) { font-size: 1rem; }
+.font-size-btns button:nth-child(3) { font-size: 0.85rem; }
+.font-size-btns button:nth-child(4) { font-size: 0.72rem; }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {

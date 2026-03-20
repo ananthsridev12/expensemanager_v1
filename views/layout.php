@@ -27,6 +27,7 @@ if (!function_exists('formatCurrency')) {
     <link rel="apple-touch-icon" href="public/icons/icon.svg">
 
     <link rel="stylesheet" href="public/css/style.css?v=<?= filemtime(__DIR__ . '/../public/css/style.css') ?>">
+    <script>(function(){var f=localStorage.getItem('em-font');if(f&&f!=='normal')document.documentElement.setAttribute('data-font',f);})();</script>
 </head>
 <body>
     <?= $content ?? '' ?>
