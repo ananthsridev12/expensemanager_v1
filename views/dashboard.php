@@ -170,6 +170,7 @@ include __DIR__ . '/partials/nav.php';
                             <th>Outstanding</th>
                             <th>Limit</th>
                             <th>Available</th>
+                            <th>Points</th>
                         <?php else: ?>
                             <th>Balance</th>
                         <?php endif; ?>
@@ -182,13 +183,15 @@ include __DIR__ . '/partials/nav.php';
                             <td><?= htmlspecialchars($account['account_name'] ?? '—') ?></td>
                             <?php if ($group['template'] === 'credit_card'): ?>
                                 <?php
-                                $ccOut  = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0);
-                                $ccLim  = (float) ($account['credit_limit'] ?? 0);
+                                $ccOut   = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0);
+                                $ccLim   = (float) ($account['credit_limit'] ?? 0);
                                 $ccAvail = max(0, $ccLim - $ccOut);
+                                $ccPts   = (float) ($account['points_balance'] ?? 0);
                                 ?>
                                 <td><?= formatCurrency($ccOut) ?></td>
                                 <td><?= formatCurrency($ccLim) ?></td>
                                 <td><?= formatCurrency($ccAvail) ?></td>
+                                <td><?= $ccPts > 0 ? number_format($ccPts, 2) : '<span class="muted">—</span>' ?></td>
                             <?php else: ?>
                                 <td><?= formatCurrency((float) ($account['balance'] ?? $account['opening_balance'] ?? 0)) ?></td>
                             <?php endif; ?>
@@ -208,6 +211,7 @@ include __DIR__ . '/partials/nav.php';
                             <td><strong><?= formatCurrency($tOut) ?></strong></td>
                             <td><strong><?= formatCurrency($tLim) ?></strong></td>
                             <td><strong><?= formatCurrency($tAvail) ?></strong></td>
+                            <td></td>
                         </tr>
                     <?php else: ?>
                         <?php $tBal = array_sum(array_map(fn($a) => (float)($a['balance'] ?? $a['opening_balance'] ?? 0), $group['accounts'])); ?>

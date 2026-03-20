@@ -227,6 +227,7 @@ include __DIR__ . '/../partials/nav.php';
                             <th>Outstanding</th>
                             <th>Limit</th>
                             <th>Available</th>
+                            <th>Points</th>
                         <?php else: ?>
                             <th>Balance</th>
                         <?php endif; ?>
@@ -248,10 +249,12 @@ include __DIR__ . '/../partials/nav.php';
                                 $outstanding = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0);
                                 $limit       = (float) ($account['credit_limit'] ?? 0);
                                 $available   = max(0, $limit - $outstanding);
+                                $points      = (float) ($account['points_balance'] ?? 0);
                                 ?>
                                 <td><?= formatCurrency($outstanding) ?></td>
                                 <td><?= formatCurrency($limit) ?></td>
                                 <td><?= formatCurrency($available) ?></td>
+                                <td><?= $points > 0 ? number_format($points, 2) : '<span class="muted">—</span>' ?></td>
                             <?php else: ?>
                                 <td><?= formatCurrency((float) ($account['balance'] ?? 0)) ?></td>
                             <?php endif; ?>
@@ -273,6 +276,7 @@ include __DIR__ . '/../partials/nav.php';
                         <td><strong><?= formatCurrency($totalOutstanding) ?></strong></td>
                         <td><strong><?= formatCurrency($totalLimit) ?></strong></td>
                         <td><strong><?= formatCurrency($totalAvailable) ?></strong></td>
+                        <td></td>
                     </tr>
                 </tfoot>
                 <?php elseif ($group['template'] !== 'credit_card' && count($group['accounts']) > 1): ?>
