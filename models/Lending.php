@@ -110,6 +110,49 @@ SQL;
         ];
     }
 
+    public function topUp(array $input): bool
+    {
+        $recordId      = (int) ($input['lending_record_id'] ?? 0);
+        $amount        = max(0, (float) ($input['amount'] ?? 0));
+        $topUpDate     = !empty($input['topup_date']) ? (string) $input['topup_date'] : date('Y-m-d');
+        $fundingAccount = (string) ($input['funding_account'] ?? '');
+        $notes         = trim((string) ($input['notes'] ?? ''));
+
+        if ($recordId <= 0 || $amount <= 0) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare('SELECT lr.*, c.name AS contact_name FROM lending_records lr JOIN contacts c ON c.id = lr.contact_id WHERE lr.id = :id LIMIT 1');
+        $stmt->execute([':id' => $recordId]);
+        $record = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$record) {
+            return false;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare(
+                'UPDATE lending_records
+                 SET principal_amount   = principal_amount + :amount,
+                     outstanding_amount = outstanding_amount + :amount,
+                     status             = CASE WHEN status = \'closed\' THEN \'ongoing\' ELSE status END,
+                     updated_at         = CURRENT_TIMESTAMP
+                 WHERE id = :id'
+            )->execute([':amount' => $amount, ':id' => $recordId]);
+
+            $entryNote = $notes !== '' ? $notes : 'Top-up lending — ' . ($record['contact_name'] ?? 'Contact');
+            $this->createLedgerTransactions($recordId, (int) $record['contact_id'], $amount, $topUpDate, $fundingAccount, $entryNote);
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return false;
+        }
+    }
+
     public function recordRepayment(array $input): bool
     {
         $recordId = (int) ($input['lending_record_id'] ?? 0);

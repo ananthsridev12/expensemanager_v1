@@ -399,6 +399,7 @@ include __DIR__ . '/../partials/nav.php';
                             Mode
                             <select name="lending_mode" id="lending-mode">
                                 <option value="new">New lending record</option>
+                                <option value="topup">Top-up existing record</option>
                                 <option value="repayment">Repayment from contact</option>
                             </select>
                         </label>
@@ -416,6 +417,20 @@ include __DIR__ . '/../partials/nav.php';
                     </div>
                     <div class="module-form" id="lending-repayment-fields" style="display: none;">
                         <small class="muted">Amount is taken from the field above.</small>
+                        <label>
+                            Lending record
+                            <select name="lending_record_id">
+                                <option value="">Select lending record</option>
+                                <?php foreach ($openLendingRecords as $record): ?>
+                                    <option value="<?= (int) $record['id'] ?>">
+                                        <?= htmlspecialchars($record['contact_name']) ?> — Outstanding: <?= formatCurrency((float) $record['outstanding_amount']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="module-form" id="lending-topup-fields" style="display: none;">
+                        <small class="muted">Adds the amount above to the selected record's principal.</small>
                         <label>
                             Lending record
                             <select name="lending_record_id">
@@ -873,10 +888,13 @@ include __DIR__ . '/../partials/nav.php';
                 transferInvestmentPanel.style.display = target === 'investment' ? 'block' : 'none';
             }
 
+            const lendingTopupFields = document.getElementById('lending-topup-fields');
+
             function toggleLendingMode() {
                 const mode = lendingModeSelect ? lendingModeSelect.value : 'new';
-                lendingNewFields.style.display = mode === 'new' ? 'grid' : 'none';
-                lendingRepaymentFields.style.display = mode === 'repayment' ? 'grid' : 'none';
+                lendingNewFields.style.display        = mode === 'new'       ? 'grid' : 'none';
+                lendingRepaymentFields.style.display  = mode === 'repayment' ? 'grid' : 'none';
+                if (lendingTopupFields) lendingTopupFields.style.display = mode === 'topup' ? 'grid' : 'none';
             }
 
             function toggleRentalMode() {

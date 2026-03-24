@@ -751,6 +751,17 @@ class TransactionController extends BaseController
             return;
         }
 
+        if ($mode === 'topup') {
+            $this->lendingModel->topUp([
+                'lending_record_id' => $input['lending_record_id'] ?? null,
+                'amount' => $amount,
+                'topup_date' => $date,
+                'funding_account' => $fundingToken,
+                'notes' => $input['lending_notes'] ?? null,
+            ]);
+            return;
+        }
+
         $this->lendingModel->create([
             'contact_id' => !empty($input['contact_id']) ? (int) $input['contact_id'] : null,
             'principal_amount' => $amount,
