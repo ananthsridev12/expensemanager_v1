@@ -15,6 +15,72 @@ class Loan extends BaseModel
         return $stmt->fetchAll();
     }
 
+    public function linkToLending(int $loanId, ?int $lendingId): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE loans SET linked_lending_id = :lending_id WHERE id = :loan_id'
+        );
+        return $stmt->execute([
+            ':lending_id' => $lendingId > 0 ? $lendingId : null,
+            ':loan_id'    => $loanId,
+        ]);
+    }
+
+    public function getLinkedPairs(): array
+    {
+        $sql = <<<SQL
+SELECT
+    l.id                        AS loan_id,
+    l.loan_name,
+    l.outstanding_principal     AS loan_outstanding,
+    l.linked_lending_id,
+    lr.id                       AS lending_id,
+    lr.principal_amount         AS lending_principal,
+    c.name                      AS contact_name,
+    COALESCE((
+        SELECT SUM(s.principal_component + s.interest_component)
+        FROM loan_emi_schedule s
+        WHERE s.loan_id = l.id AND s.status = 'paid'
+    ), 0)                       AS total_emi_paid,
+    COALESCE((
+        SELECT SUM(lrp.amount)
+        FROM lending_repayments lrp
+        WHERE lrp.lending_record_id = lr.id
+    ), 0)                       AS total_recovered,
+    GREATEST(0, lr.principal_amount - COALESCE((
+        SELECT SUM(lrp.amount)
+        FROM lending_repayments lrp
+        WHERE lrp.lending_record_id = lr.id
+    ), 0))                      AS lending_outstanding
+FROM loans l
+JOIN lending_records lr ON lr.id = l.linked_lending_id
+JOIN contacts c ON c.id = lr.contact_id
+WHERE l.linked_lending_id IS NOT NULL
+ORDER BY l.start_date DESC
+SQL;
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAllLendingOptions(): array
+    {
+        $sql = <<<SQL
+SELECT
+    lr.id,
+    c.name AS contact_name,
+    lr.principal_amount,
+    GREATEST(0, lr.principal_amount - COALESCE((
+        SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id
+    ), 0)) AS outstanding_amount
+FROM lending_records lr
+JOIN contacts c ON c.id = lr.contact_id
+WHERE lr.status = 'ongoing'
+ORDER BY c.name ASC
+SQL;
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function markEmiPaid(array $input): bool
     {
         $emiId  = (int) ($input['emi_id']  ?? 0);

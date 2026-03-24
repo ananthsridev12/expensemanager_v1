@@ -5,12 +5,14 @@ namespace Controllers;
 use Models\Account;
 use Models\Contact;
 use Models\Lending;
+use Models\Loan;
 
 class LendingController extends BaseController
 {
     private Lending $lendingModel;
     private Account $accountModel;
     private Contact $contactModel;
+    private Loan $loanModel;
 
     public function __construct()
     {
@@ -18,6 +20,7 @@ class LendingController extends BaseController
         $this->lendingModel = new Lending($this->database);
         $this->accountModel = new Account($this->database);
         $this->contactModel = new Contact($this->database);
+        $this->loanModel    = new Loan($this->database);
     }
 
     public function index(): string
@@ -47,6 +50,16 @@ class LendingController extends BaseController
             exit;
         }
 
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'lending_link_loan') {
+            $loanId    = (int) ($_POST['loan_id'] ?? 0);
+            $lendingId = (int) ($_POST['lending_record_id'] ?? 0);
+            if ($loanId > 0) {
+                $this->loanModel->linkToLending($loanId, $lendingId ?: null);
+            }
+            header('Location: ?module=lending');
+            exit;
+        }
+
         $editRecord = null;
         if (!empty($_GET['edit'])) {
             $editRecord = $this->lendingModel->getById((int) $_GET['edit']);
@@ -59,15 +72,17 @@ class LendingController extends BaseController
             $this->accountModel->getList(),
             static fn (array $account): bool => ($account['account_type'] ?? '') !== 'credit_card'
         ));
-        $summary = $this->lendingModel->getSummary();
+        $summary  = $this->lendingModel->getSummary();
+        $allLoans = $this->loanModel->getAll();
 
         return $this->render('lending/index.php', [
-            'records' => $records,
-            'openRecords' => $openRecords,
+            'records'       => $records,
+            'openRecords'   => $openRecords,
             'allRepayments' => $allRepayments,
-            'accounts' => $accounts,
-            'summary' => $summary,
-            'editRecord' => $editRecord,
+            'accounts'      => $accounts,
+            'summary'       => $summary,
+            'editRecord'    => $editRecord,
+            'allLoans'      => $allLoans,
         ]);
     }
 }

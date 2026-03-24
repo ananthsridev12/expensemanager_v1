@@ -81,9 +81,11 @@ SELECT
     lr.*,
     COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0) AS total_repaid,
     GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) AS outstanding_amount,
-    c.name AS contact_name, c.mobile, c.email
+    c.name AS contact_name, c.mobile, c.email,
+    ln.id AS linked_loan_id, ln.loan_name AS linked_loan_name
 FROM lending_records lr
 JOIN contacts c ON c.id = lr.contact_id
+LEFT JOIN loans ln ON ln.linked_lending_id = lr.id
 ORDER BY lr.lending_date DESC
 SQL;
         $stmt = $this->db->query($sql);

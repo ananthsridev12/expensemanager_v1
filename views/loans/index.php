@@ -1,10 +1,12 @@
 <?php
-$activeModule = 'loans';
-$loans = $loans ?? [];
-$accounts = $accounts ?? [];
-$upcomingEmis = $upcomingEmis ?? [];
-$summary = $summary ?? ['count' => 0, 'total_outstanding' => 0.0];
-$editLoan = $editLoan ?? null;
+$activeModule    = 'loans';
+$loans           = $loans ?? [];
+$accounts        = $accounts ?? [];
+$upcomingEmis    = $upcomingEmis ?? [];
+$linkedPairs     = $linkedPairs ?? [];
+$lendingOptions  = $lendingOptions ?? [];
+$summary         = $summary ?? ['count' => 0, 'total_outstanding' => 0.0];
+$editLoan        = $editLoan ?? null;
 
 include __DIR__ . '/../partials/nav.php';
 ?>
@@ -24,6 +26,56 @@ include __DIR__ . '/../partials/nav.php';
             <p><?= formatCurrency($summary['total_outstanding']) ?></p>
         </article>
     </section>
+
+    <?php if (!empty($linkedPairs)): ?>
+    <section class="module-panel">
+        <h2>Loan-Lending tracker</h2>
+        <p class="muted">How much you've paid out vs recovered — your net out-of-pocket cost per linked pair.</p>
+        <?php foreach ($linkedPairs as $pair): ?>
+            <?php
+                $emiPaid   = (float) $pair['total_emi_paid'];
+                $recovered = (float) $pair['total_recovered'];
+                $gap       = $emiPaid - $recovered;
+            ?>
+            <div style="border:1px solid var(--border); border-radius:6px; padding:1rem; margin-bottom:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                    <strong><?= htmlspecialchars($pair['loan_name']) ?> ↔ <?= htmlspecialchars($pair['contact_name']) ?></strong>
+                    <form method="post" style="margin:0;">
+                        <input type="hidden" name="form" value="loan_link">
+                        <input type="hidden" name="loan_id" value="<?= (int) $pair['loan_id'] ?>">
+                        <input type="hidden" name="lending_record_id" value="">
+                        <button type="submit" class="secondary" style="font-size:0.75rem; padding:0.2rem 0.6rem;"
+                            onclick="return confirm('Unlink this pair?')">Unlink</button>
+                    </form>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:0.5rem 1.5rem;">
+                    <div>
+                        <small class="muted">Total EMI paid by you</small>
+                        <div style="font-size:1.1rem; font-weight:600;"><?= formatCurrency($emiPaid) ?></div>
+                    </div>
+                    <div>
+                        <small class="muted">Recovered from <?= htmlspecialchars($pair['contact_name']) ?></small>
+                        <div style="font-size:1.1rem; font-weight:600; color:var(--green);"><?= formatCurrency($recovered) ?></div>
+                    </div>
+                    <div>
+                        <small class="muted">Out-of-pocket gap</small>
+                        <div style="font-size:1.15rem; font-weight:700; color:<?= $gap > 0 ? 'var(--red)' : 'var(--green)' ?>;">
+                            <?= $gap > 0 ? '−' : '+' ?><?= formatCurrency(abs($gap)) ?>
+                        </div>
+                    </div>
+                    <div>
+                        <small class="muted">Loan still owed to bank</small>
+                        <div><?= formatCurrency((float) $pair['loan_outstanding']) ?></div>
+                    </div>
+                    <div>
+                        <small class="muted"><?= htmlspecialchars($pair['contact_name']) ?> still owes you</small>
+                        <div><?= formatCurrency((float) $pair['lending_outstanding']) ?></div>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </section>
+    <?php endif; ?>
 
     <?php if ($editLoan): ?>
     <section class="module-panel">
@@ -201,6 +253,7 @@ include __DIR__ . '/../partials/nav.php';
                             <th>Outstanding</th>
                             <th>EMI</th>
                             <th>Start date</th>
+                            <th>Linked lending</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -214,12 +267,49 @@ include __DIR__ . '/../partials/nav.php';
                                 <td><?= formatCurrency((float) $loan['outstanding_principal']) ?></td>
                                 <td><?= formatCurrency((float) $loan['emi_amount']) ?></td>
                                 <td><?= htmlspecialchars($loan['start_date']) ?></td>
+                                <td>
+                                    <?php
+                                        $linkedLendingId = (int) ($loan['linked_lending_id'] ?? 0);
+                                        $linkedPair = null;
+                                        foreach ($linkedPairs as $p) {
+                                            if ((int) $p['loan_id'] === (int) $loan['id']) { $linkedPair = $p; break; }
+                                        }
+                                    ?>
+                                    <?php if ($linkedPair): ?>
+                                        <span class="pill pill--green"><?= htmlspecialchars($linkedPair['contact_name']) ?></span>
+                                    <?php else: ?>
+                                        <button type="button" class="secondary link-loan-btn" style="font-size:0.75rem; padding:0.2rem 0.6rem;"
+                                            data-loan-id="<?= (int) $loan['id'] ?>"
+                                            data-loan-name="<?= htmlspecialchars($loan['loan_name']) ?>">
+                                            + Link
+                                        </button>
+                                    <?php endif; ?>
+                                </td>
                                 <td><a class="secondary" href="?module=loans&edit=<?= (int) $loan['id'] ?>">Edit</a></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
+            <!-- Link to lending inline form -->
+            <form method="post" class="module-form" id="link-loan-form" style="display:none; margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
+                <input type="hidden" name="form" value="loan_link">
+                <input type="hidden" name="loan_id" id="link-loan-id">
+                <p id="link-loan-label" style="grid-column:1/-1; margin:0; font-weight:500;"></p>
+                <label style="grid-column:1/-1;">
+                    Select lending record to link
+                    <select name="lending_record_id" required>
+                        <option value="">Choose…</option>
+                        <?php foreach ($lendingOptions as $opt): ?>
+                            <option value="<?= (int) $opt['id'] ?>">
+                                <?= htmlspecialchars($opt['contact_name']) ?> — Outstanding <?= formatCurrency((float) $opt['outstanding_amount']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <button type="submit">Link</button>
+                <button type="button" class="secondary" id="link-loan-cancel">Cancel</button>
+            </form>
         <?php endif; ?>
     </section>
 
@@ -315,6 +405,27 @@ include __DIR__ . '/../partials/nav.php';
         outstanding.addEventListener('input', calcEmi);
         rate.addEventListener('input', calcEmi);
         tenure.addEventListener('input', calcEmi);
+    })();
+
+    // Link loan to lending inline form
+    (function () {
+        const form   = document.getElementById('link-loan-form');
+        const loanId = document.getElementById('link-loan-id');
+        const label  = document.getElementById('link-loan-label');
+        const cancel = document.getElementById('link-loan-cancel');
+
+        document.querySelectorAll('.link-loan-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                loanId.value = btn.dataset.loanId;
+                label.textContent = 'Linking: ' + btn.dataset.loanName;
+                form.style.display = 'grid';
+                form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+        });
+
+        cancel && cancel.addEventListener('click', function () {
+            form.style.display = 'none';
+        });
     })();
 
     // Pay EMI inline form
