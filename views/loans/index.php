@@ -52,6 +52,9 @@ include __DIR__ . '/../partials/nav.php';
                     <div>
                         <small class="muted">Total EMI paid by you</small>
                         <div style="font-size:1.1rem; font-weight:600;"><?= formatCurrency($emiPaid) ?></div>
+                        <?php if ((float)($pair['prior_payments'] ?? 0) > 0): ?>
+                            <small class="muted">incl. <?= formatCurrency((float)$pair['prior_payments']) ?> before tracking</small>
+                        <?php endif; ?>
                     </div>
                     <div>
                         <small class="muted">Recovered from <?= htmlspecialchars($pair['contact_name']) ?></small>
@@ -107,6 +110,11 @@ include __DIR__ . '/../partials/nav.php';
             <label>
                 Outstanding principal
                 <input type="number" name="outstanding_principal" step="0.01" value="<?= htmlspecialchars($editLoan['outstanding_principal'] ?? '0') ?>">
+            </label>
+            <label>
+                Total paid before tracking (historical EMIs)
+                <input type="number" name="prior_payments" step="0.01" min="0" value="<?= htmlspecialchars($editLoan['prior_payments'] ?? '0') ?>">
+                <small class="muted">Total amount paid to the bank before this loan was added to the system. Used for the Loan-Lending tracker gap calculation.</small>
             </label>
             <button type="submit">Update loan</button>
             <a class="secondary" href="?module=loans">Cancel</a>

@@ -34,10 +34,11 @@ SELECT
     l.loan_name,
     l.outstanding_principal     AS loan_outstanding,
     l.linked_lending_id,
+    l.prior_payments,
     lr.id                       AS lending_id,
     lr.principal_amount         AS lending_principal,
     c.name                      AS contact_name,
-    COALESCE((
+    COALESCE(l.prior_payments, 0) + COALESCE((
         SELECT SUM(s.principal_component + s.interest_component)
         FROM loan_emi_schedule s
         WHERE s.loan_id = l.id AND s.status = 'paid'
@@ -296,7 +297,7 @@ SQL;
         $name = trim((string) ($input['loan_name'] ?? ''));
         if ($name === '') return false;
         $stmt = $this->db->prepare(
-            'UPDATE loans SET loan_name=:loan_name, loan_type=:loan_type, interest_rate=:interest_rate, emi_amount=:emi_amount, outstanding_principal=:outstanding_principal WHERE id=:id'
+            'UPDATE loans SET loan_name=:loan_name, loan_type=:loan_type, interest_rate=:interest_rate, emi_amount=:emi_amount, outstanding_principal=:outstanding_principal, prior_payments=:prior_payments WHERE id=:id'
         );
         return $stmt->execute([
             ':loan_name' => $name,
@@ -304,6 +305,7 @@ SQL;
             ':interest_rate' => (float) ($input['interest_rate'] ?? 0),
             ':emi_amount' => (float) ($input['emi_amount'] ?? 0),
             ':outstanding_principal' => (float) ($input['outstanding_principal'] ?? 0),
+            ':prior_payments' => max(0, (float) ($input['prior_payments'] ?? 0)),
             ':id' => $id,
         ]);
     }
