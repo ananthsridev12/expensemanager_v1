@@ -111,11 +111,27 @@ include __DIR__ . '/../partials/nav.php';
                 Outstanding principal
                 <input type="number" name="outstanding_principal" step="0.01" value="<?= htmlspecialchars($editLoan['outstanding_principal'] ?? '0') ?>">
             </label>
-            <label>
+            <label style="grid-column:1/-1;">
                 Total paid before tracking (historical EMIs)
-                <input type="number" name="prior_payments" step="0.01" min="0" value="<?= htmlspecialchars($editLoan['prior_payments'] ?? '0') ?>">
-                <small class="muted">Total amount paid to the bank before this loan was added to the system. Used for the Loan-Lending tracker gap calculation.</small>
+                <input type="number" name="prior_payments" id="edit-prior-payments" step="0.01" min="0" value="<?= htmlspecialchars($editLoan['prior_payments'] ?? '0') ?>">
+                <small class="muted">Total paid to the bank before this loan was added to the system. Used for the Loan-Lending tracker gap.</small>
             </label>
+            <!-- Auto-calculator -->
+            <div style="grid-column:1/-1; background:var(--surface-alt,#f5f5f5); border-radius:6px; padding:0.75rem; display:grid; grid-template-columns:repeat(2,1fr); gap:0.5rem;">
+                <div style="grid-column:1/-1;"><small><strong>Auto-calculate from first EMI date</strong></small></div>
+                <label style="margin:0;">
+                    First EMI date
+                    <input type="date" id="calc-first-date" value="<?= htmlspecialchars($editLoan['start_date'] ?? date('Y-m-d')) ?>">
+                </label>
+                <label style="margin:0;">
+                    Last EMI paid date
+                    <input type="date" id="calc-last-date" value="<?= date('Y-m-d') ?>">
+                </label>
+                <div style="grid-column:1/-1;">
+                    <button type="button" class="secondary" id="calc-prior-btn">Calculate &amp; fill</button>
+                    <small class="muted" id="calc-prior-result" style="margin-left:0.75rem;"></small>
+                </div>
+            </div>
             <button type="submit">Update loan</button>
             <a class="secondary" href="?module=loans">Cancel</a>
         </form>
@@ -413,6 +429,38 @@ include __DIR__ . '/../partials/nav.php';
         outstanding.addEventListener('input', calcEmi);
         rate.addEventListener('input', calcEmi);
         tenure.addEventListener('input', calcEmi);
+    })();
+
+    // Prior payments auto-calculator
+    (function () {
+        const btn        = document.getElementById('calc-prior-btn');
+        const resultEl   = document.getElementById('calc-prior-result');
+        const priorInput = document.getElementById('edit-prior-payments');
+        const emiInput   = document.querySelector('[name="emi_amount"]');
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            const firstDate = new Date(document.getElementById('calc-first-date').value);
+            const lastDate  = new Date(document.getElementById('calc-last-date').value);
+            const emi       = parseFloat(emiInput ? emiInput.value : '0');
+
+            if (isNaN(firstDate) || isNaN(lastDate) || emi <= 0) {
+                resultEl.textContent = 'Enter valid dates and EMI amount above.';
+                return;
+            }
+
+            const months = (lastDate.getFullYear() - firstDate.getFullYear()) * 12
+                         + (lastDate.getMonth() - firstDate.getMonth()) + 1;
+
+            if (months <= 0) {
+                resultEl.textContent = 'Last date must be after first date.';
+                return;
+            }
+
+            const total = months * emi;
+            priorInput.value = total.toFixed(2);
+            resultEl.textContent = months + ' months × ₹' + emi.toLocaleString('en-IN') + ' = ₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        });
     })();
 
     // Link loan to lending inline form
