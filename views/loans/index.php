@@ -236,20 +236,58 @@ include __DIR__ . '/../partials/nav.php';
                             <th>Due date</th>
                             <th>Principal</th>
                             <th>Interest</th>
+                            <th>Total</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($upcomingEmis as $emi): ?>
+                            <?php $total = (float) $emi['principal_component'] + (float) $emi['interest_component']; ?>
                             <tr>
                                 <td><?= htmlspecialchars($emi['loan_name']) ?></td>
                                 <td><?= htmlspecialchars($emi['emi_date']) ?></td>
                                 <td><?= formatCurrency((float) $emi['principal_component']) ?></td>
                                 <td><?= formatCurrency((float) $emi['interest_component']) ?></td>
+                                <td><strong><?= formatCurrency($total) ?></strong></td>
+                                <td>
+                                    <button type="button" class="secondary pay-emi-btn"
+                                        data-emi-id="<?= (int) $emi['id'] ?>"
+                                        data-loan-id="<?= (int) $emi['loan_id'] ?>"
+                                        data-loan-name="<?= htmlspecialchars($emi['loan_name']) ?>"
+                                        data-total="<?= $total ?>">
+                                        Pay
+                                    </button>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pay EMI form (revealed when Pay is clicked) -->
+            <form method="post" class="module-form" id="pay-emi-form" style="display:none; margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
+                <input type="hidden" name="form" value="emi_pay">
+                <input type="hidden" name="emi_id" id="pay-emi-id">
+                <input type="hidden" name="loan_id" id="pay-loan-id">
+                <p id="pay-emi-label" style="grid-column:1/-1; margin:0; font-weight:500;"></p>
+                <label>
+                    Pay from account
+                    <select name="payment_account" required>
+                        <option value="">Select account</option>
+                        <?php foreach ($accounts as $account): ?>
+                            <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
+                                <?= htmlspecialchars(($account['bank_name'] ?? '') . ' — ' . ($account['account_name'] ?? '')) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label>
+                    Payment date
+                    <input type="date" name="payment_date" value="<?= date('Y-m-d') ?>" required>
+                </label>
+                <button type="submit">Confirm payment</button>
+                <button type="button" class="secondary" id="pay-emi-cancel">Cancel</button>
+            </form>
         <?php endif; ?>
     </section>
 </main>
@@ -277,5 +315,29 @@ include __DIR__ . '/../partials/nav.php';
         outstanding.addEventListener('input', calcEmi);
         rate.addEventListener('input', calcEmi);
         tenure.addEventListener('input', calcEmi);
+    })();
+
+    // Pay EMI inline form
+    (function () {
+        const form    = document.getElementById('pay-emi-form');
+        const emiId   = document.getElementById('pay-emi-id');
+        const loanId  = document.getElementById('pay-loan-id');
+        const label   = document.getElementById('pay-emi-label');
+        const cancel  = document.getElementById('pay-emi-cancel');
+
+        document.querySelectorAll('.pay-emi-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                emiId.value  = btn.dataset.emiId;
+                loanId.value = btn.dataset.loanId;
+                const total  = parseFloat(btn.dataset.total).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                label.textContent = 'Paying EMI for: ' + btn.dataset.loanName + ' — ₹' + total;
+                form.style.display = 'grid';
+                form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+        });
+
+        cancel && cancel.addEventListener('click', function () {
+            form.style.display = 'none';
+        });
     })();
 </script>

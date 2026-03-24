@@ -15,6 +15,76 @@ class Loan extends BaseModel
         return $stmt->fetchAll();
     }
 
+    public function markEmiPaid(array $input): bool
+    {
+        $emiId  = (int) ($input['emi_id']  ?? 0);
+        $loanId = (int) ($input['loan_id'] ?? 0);
+        $paymentDate  = !empty($input['payment_date']) ? (string) $input['payment_date'] : date('Y-m-d');
+        $accountToken = (string) ($input['payment_account'] ?? '');
+
+        if ($emiId <= 0 || $loanId <= 0 || $accountToken === '' || strpos($accountToken, ':') === false) {
+            return false;
+        }
+
+        [$accountType, $accountIdRaw] = explode(':', $accountToken, 2);
+        $accountId = (int) $accountIdRaw;
+        $allowedTypes = ['savings', 'current', 'cash', 'wallet', 'other'];
+        if ($accountId <= 0 || !in_array($accountType, $allowedTypes, true)) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT s.*, l.loan_name FROM loan_emi_schedule s
+             JOIN loans l ON l.id = s.loan_id
+             WHERE s.id = :emi_id AND s.loan_id = :loan_id AND s.status != \'paid\'
+             LIMIT 1'
+        );
+        $stmt->execute([':emi_id' => $emiId, ':loan_id' => $loanId]);
+        $emi = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$emi) {
+            return false;
+        }
+
+        $totalAmount      = (float) $emi['principal_component'] + (float) $emi['interest_component'];
+        $principalComponent = (float) $emi['principal_component'];
+        $loanName         = (string) ($emi['loan_name'] ?? 'Loan #' . $loanId);
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare('UPDATE loan_emi_schedule SET status = \'paid\' WHERE id = :id')
+                ->execute([':id' => $emiId]);
+
+            $this->db->prepare(
+                'UPDATE loans
+                 SET outstanding_principal = GREATEST(0, outstanding_principal - :amount),
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = :loan_id'
+            )->execute([':amount' => $principalComponent, ':loan_id' => $loanId]);
+
+            $this->db->prepare(
+                'INSERT INTO transactions
+                    (transaction_date, account_type, account_id, transaction_type, amount, reference_type, reference_id, notes)
+                 VALUES
+                    (:date, :account_type, :account_id, \'expense\', :amount, \'loan\', :loan_id, :notes)'
+            )->execute([
+                ':date'         => $paymentDate,
+                ':account_type' => $accountType,
+                ':account_id'   => $accountId,
+                ':amount'       => $totalAmount,
+                ':loan_id'      => $loanId,
+                ':notes'        => 'EMI payment — ' . $loanName,
+            ]);
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return false;
+        }
+    }
+
     public function getUpcomingEmis(int $limit = 5): array
     {
         $sql = <<<SQL

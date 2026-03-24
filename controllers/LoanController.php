@@ -37,6 +37,12 @@ class LoanController extends BaseController
             exit;
         }
 
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'emi_pay') {
+            $this->loanModel->markEmiPaid($_POST);
+            header('Location: ?module=loans');
+            exit;
+        }
+
         $editLoan = null;
         if (!empty($_GET['edit'])) {
             $editLoan = $this->loanModel->getById((int) $_GET['edit']);
