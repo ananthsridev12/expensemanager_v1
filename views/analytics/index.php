@@ -18,11 +18,181 @@ $purchaseSources = $purchaseSources ?? [];
 $netCashflow = (float) ($summary['net_cashflow'] ?? 0);
 $netClass = $netCashflow >= 0 ? 'card--green' : 'card--red';
 
-$hasChartData = !empty($expensesByCategory) || !empty($incomeByCategory) || !empty($monthlyTrend) || !empty($accountWiseExpense) || !empty($dayOfWeekSpend);
+// ── Insights engine ──────────────────────────────────────────────────────────
+function buildInsights(array $p): array {
+    $insights    = [];
+    $totalExp    = (float) ($p['summary']['total_expense'] ?? 0);
+    $totalInc    = (float) ($p['summary']['total_income']  ?? 0);
+    $expCats     = $p['expensesByCategory'] ?? [];
+    $dowSpend    = $p['dayOfWeekSpend']    ?? [];
+    $trend       = $p['monthlyTrend']      ?? [];
+    $ddCat       = $p['ddCat']             ?? [];
+    $ddSub       = $p['ddSub']             ?? [];
+    $ddSource    = $p['ddSource']          ?? [];
+    $ddTotal     = (float) ($p['ddTotal']  ?? 0);
+    $ddType      = $p['ddType']            ?? '';
+    $startDate   = $p['startDate'];
+    $endDate     = $p['endDate'];
+
+    $dtStart  = date_create($startDate);
+    $dtEnd    = date_create($endDate);
+    $days     = (int) date_diff($dtStart, $dtEnd)->days + 1;
+    $fmt      = fn($v) => '₹' . number_format((float)$v, 2, '.', ',');
+    $pct      = fn($v, $t) => $t > 0 ? round($v / $t * 100, 1) : 0;
+
+    // 1. Top spending category
+    if (!empty($expCats)) {
+        $top    = $expCats[0];
+        $topAmt = (float) $top['total_amount'];
+        $topPct = $pct($topAmt, $totalExp);
+        $save30 = $topAmt * 0.3;
+        $insights[] = [
+            'type'  => 'warning',
+            'icon'  => '🏷️',
+            'title' => 'Biggest spend: ' . ($top['category_name'] ?? 'Uncategorized'),
+            'body'  => "You spent {$fmt($topAmt)} on {$top['category_name']} — {$topPct}% of total expenses. Trimming this by 30% would free up {$fmt($save30)} over this period.",
+        ];
+    }
+
+    // 2. Top 2 categories concentration
+    if (count($expCats) >= 2 && $totalExp > 0) {
+        $top2   = (float)$expCats[0]['total_amount'] + (float)$expCats[1]['total_amount'];
+        $top2Pc = $pct($top2, $totalExp);
+        if ($top2Pc >= 50) {
+            $insights[] = [
+                'type'  => 'info',
+                'icon'  => '📊',
+                'title' => 'Spending concentrated in 2 categories',
+                'body'  => "{$top2Pc}% of your expenses ({$fmt($top2)}) come from just \"{$expCats[0]['category_name']}\" and \"{$expCats[1]['category_name']}\". Diversifying or controlling these two gives the biggest impact.",
+            ];
+        }
+    }
+
+    // 3. Daily average burn rate
+    if ($totalExp > 0 && $days > 0) {
+        $daily = $totalExp / $days;
+        $proj  = $daily * 30;
+        $insights[] = [
+            'type'  => 'info',
+            'icon'  => '📅',
+            'title' => 'Daily spend rate: ' . $fmt($daily),
+            'body'  => "Over {$days} days you averaged {$fmt($daily)}/day in expenses. At this rate your monthly outflow would be {$fmt($proj)}.",
+        ];
+    }
+
+    // 4. Savings rate
+    if ($totalInc > 0) {
+        $saved    = $totalInc - $totalExp;
+        $saveRate = $pct($saved, $totalInc);
+        $type     = $saveRate >= 20 ? 'positive' : ($saveRate >= 0 ? 'warning' : 'negative');
+        $msg      = $saveRate >= 20
+            ? "Great discipline! You saved {$saveRate}% of income ({$fmt($saved)})."
+            : ($saveRate >= 0
+                ? "You saved {$saveRate}% of income ({$fmt($saved)}). Aim for 20%+ for a stronger financial cushion."
+                : "Expenses exceeded income by {$fmt(abs($saved))} ({$fmt($totalInc)} earned vs {$fmt($totalExp)} spent). Review recurring costs.");
+        $insights[] = [
+            'type'  => $type,
+            'icon'  => $saveRate >= 20 ? '✅' : ($saveRate >= 0 ? '⚠️' : '🚨'),
+            'title' => 'Savings rate: ' . $saveRate . '%',
+            'body'  => $msg,
+        ];
+    }
+
+    // 5. Peak spending day of week
+    if (!empty($dowSpend)) {
+        $sorted = $dowSpend;
+        usort($sorted, fn($a, $b) => (float)$b['total_amount'] <=> (float)$a['total_amount']);
+        $peak    = $sorted[0];
+        $peakAmt = (float) $peak['total_amount'];
+        $peakPct = $pct($peakAmt, $totalExp);
+        $insights[] = [
+            'type'  => 'info',
+            'icon'  => '📆',
+            'title' => 'Peak spending day: ' . $peak['dow_name'],
+            'body'  => "You spend most on {$peak['dow_name']}s — {$fmt($peakAmt)} ({$peakPct}% of expenses, {$peak['tx_count']} transactions). Consider setting a daily budget for high-spend days.",
+        ];
+    }
+
+    // 6. Monthly trend comparison (last 2 months)
+    if (count($trend) >= 2) {
+        $last = end($trend);
+        prev($trend);
+        $prev     = current($trend);
+        $lastExp  = (float) $last['expense'];
+        $prevExp  = (float) $prev['expense'];
+        if ($prevExp > 0) {
+            $delta = $lastExp - $prevExp;
+            $deltaPct = round(abs($delta) / $prevExp * 100, 1);
+            $dir   = $delta > 0 ? 'increased' : 'decreased';
+            $type  = $delta > 0 ? 'warning' : 'positive';
+            $insights[] = [
+                'type'  => $type,
+                'icon'  => $delta > 0 ? '📈' : '📉',
+                'title' => "Spending {$dir} {$deltaPct}% vs prior month",
+                'body'  => "Last month ({$last['period']}) expenses: {$fmt($lastExp)}. Prior month ({$prev['period']}): {$fmt($prevExp)}. Difference: {$fmt(abs($delta))}.",
+            ];
+        }
+    }
+
+    // 7. Drilldown-specific insights (shown only when filter is active)
+    if ($ddTotal > 0) {
+        $typeLabel = $ddType === 'expense' ? 'expense' : ($ddType === 'income' ? 'income' : 'transaction');
+
+        // Top filtered source
+        if (!empty($ddSource)) {
+            $src     = $ddSource[0];
+            $srcAmt  = (float) $src['total'];
+            $srcPct  = $pct($srcAmt, $ddTotal);
+            $insights[] = [
+                'type'  => 'warning',
+                'icon'  => '🏪',
+                'title' => 'Filter focus: most spent at ' . $src['label'],
+                'body'  => "In your filtered results, {$fmt($srcAmt)} ({$srcPct}%) was spent at \"{$src['label']}\". " . (count($ddSource) > 1 ? "Second was \"{$ddSource[1]['label']}\" at {$fmt((float)$ddSource[1]['total'])}." : ""),
+            ];
+        }
+
+        // Top filtered subcategory
+        if (!empty($ddSub)) {
+            $sub    = $ddSub[0];
+            $subAmt = (float) $sub['total'];
+            $subPct = $pct($subAmt, $ddTotal);
+            $insights[] = [
+                'type'  => 'info',
+                'icon'  => '🔍',
+                'title' => 'Filter spotlight: ' . $sub['label'],
+                'body'  => "\"{$sub['label']}\" accounts for {$fmt($subAmt)} ({$subPct}%) of your filtered {$typeLabel}s. " . (count($ddSub) > 1 ? "If you eliminated just this subcategory you'd cut the filtered total by over {$subPct}%." : ""),
+            ];
+        }
+    }
+
+    return $insights;
+}
+
+$ddCat    = $drilldown['by_category']    ?? [];
+$ddSub    = $drilldown['by_subcategory'] ?? [];
+$ddSource = $drilldown['by_source']      ?? [];
+$ddTotal  = (float) ($drilldown['summary']['total'] ?? 0);
+$ddType   = $drilldownFilters['tx_type'] ?? '';
+
+$insights = buildInsights([
+    'summary'           => $summary,
+    'expensesByCategory'=> $expensesByCategory,
+    'dayOfWeekSpend'    => $dayOfWeekSpend,
+    'monthlyTrend'      => $monthlyTrend,
+    'ddCat'             => $ddCat,
+    'ddSub'             => $ddSub,
+    'ddSource'          => $ddSource,
+    'ddTotal'           => $ddTotal,
+    'ddType'            => $ddType,
+    'startDate'         => $startDate,
+    'endDate'           => $endDate,
+]);
 
 include __DIR__ . '/../partials/nav.php';
 ?>
 <main class="module-content">
+    <!-- Chart.js loaded once here — avoids race conditions with conditional loading -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <header class="module-header">
         <h1>Analytics</h1>
     </header>
@@ -123,12 +293,7 @@ include __DIR__ . '/../partials/nav.php';
     <!-- Drilldown results -->
     <?php
     $ddSummary  = $drilldown['summary']        ?? ['total' => 0, 'tx_count' => 0];
-    $ddCat      = $drilldown['by_category']    ?? [];
-    $ddSub      = $drilldown['by_subcategory'] ?? [];
-    $ddSource   = $drilldown['by_source']      ?? [];
     $ddTxns     = $drilldown['transactions']   ?? [];
-    $ddType     = $drilldownFilters['tx_type'] ?? '';
-    $ddTotal    = (float) ($ddSummary['total'] ?? 0);
     ?>
     <section class="summary-cards">
         <article class="card <?= $ddType === 'income' ? 'card--green' : ($ddType === 'expense' ? 'card--red' : 'card--cyan') ?>">
@@ -138,12 +303,65 @@ include __DIR__ . '/../partials/nav.php';
         </article>
     </section>
 
-    <?php if (!empty($ddCat) || !empty($ddSub) || !empty($ddSource)): ?>
-    <?php if (!$hasChartData): ?>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <?php endif; ?>
+    <!-- Insights panel -->
+    <?php if (!empty($insights)): ?>
     <section class="module-panel">
-        <h2>Breakdown</h2>
+        <h2>Spending insights <small style="font-size:0.75rem;color:var(--muted);font-weight:400;">· <?= htmlspecialchars($startDate) ?> to <?= htmlspecialchars($endDate) ?></small></h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;">
+            <?php
+            $insightColors = [
+                'warning'  => ['bg' => 'rgba(251,146,60,0.12)', 'border' => '#f97316', 'text' => '#fdba74'],
+                'info'     => ['bg' => 'rgba(59,130,246,0.12)', 'border' => '#3b82f6', 'text' => '#93c5fd'],
+                'positive' => ['bg' => 'rgba(16,185,129,0.12)', 'border' => '#10b981', 'text' => '#6ee7b7'],
+                'negative' => ['bg' => 'rgba(239,68,68,0.12)',  'border' => '#ef4444', 'text' => '#fca5a5'],
+            ];
+            foreach ($insights as $ins):
+                $c = $insightColors[$ins['type']] ?? $insightColors['info'];
+            ?>
+            <div style="background:<?= $c['bg'] ?>;border:1px solid <?= $c['border'] ?>;border-radius:8px;padding:1rem;">
+                <div style="font-size:1.3rem;margin-bottom:0.4rem;"><?= $ins['icon'] ?></div>
+                <div style="font-weight:600;margin-bottom:0.3rem;color:<?= $c['text'] ?>;font-size:0.9rem;"><?= htmlspecialchars($ins['title']) ?></div>
+                <div style="font-size:0.82rem;color:var(--muted);line-height:1.5;"><?= htmlspecialchars($ins['body']) ?></div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <?php endif; ?>
+
+    <?php if (!empty($ddCat) || !empty($ddSub) || !empty($ddSource)): ?>
+    <section class="module-panel">
+        <h2>Filter breakdown <small style="font-size:0.75rem;color:var(--muted);font-weight:400;">· <?= $ddType ? ucfirst($ddType) . 's' : 'All transactions' ?> · <?= htmlspecialchars($startDate) ?> → <?= htmlspecialchars($endDate) ?></small></h2>
+
+        <?php if (!empty($ddCat)): ?>
+        <!-- Horizontal stacked bar showing category proportions -->
+        <div style="margin-bottom:1.5rem;">
+            <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.5rem;">Category share</div>
+            <div style="display:flex;height:28px;border-radius:6px;overflow:hidden;gap:2px;">
+                <?php
+                $barColors = ['#3b82f6','#f97316','#a855f7','#22d3ee','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
+                foreach ($ddCat as $i => $row):
+                    $w = $ddTotal > 0 ? round((float)$row['total'] / $ddTotal * 100, 2) : 0;
+                    if ($w <= 0) continue;
+                    $col = $barColors[$i % count($barColors)];
+                ?>
+                <div title="<?= htmlspecialchars($row['label']) ?>: <?= formatCurrency((float)$row['total']) ?> (<?= $w ?>%)"
+                     style="background:<?= $col ?>;width:<?= $w ?>%;min-width:3px;transition:opacity .2s;cursor:default;"
+                     onmouseenter="this.style.opacity='.7'" onmouseleave="this.style.opacity='1'"></div>
+                <?php endforeach; ?>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:0.4rem 1rem;margin-top:0.5rem;">
+                <?php foreach ($ddCat as $i => $row):
+                    $col = $barColors[$i % count($barColors)];
+                ?>
+                <span style="font-size:0.75rem;display:flex;align-items:center;gap:0.3rem;color:var(--muted);">
+                    <span style="width:10px;height:10px;border-radius:2px;background:<?= $col ?>;display:inline-block;flex-shrink:0;"></span>
+                    <?= htmlspecialchars($row['label']) ?>
+                </span>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
             <?php if (!empty($ddCat)): ?>
             <div>
@@ -301,10 +519,6 @@ include __DIR__ . '/../partials/nav.php';
     }
     filterSubcategories();
     </script>
-
-    <?php if ($hasChartData): ?>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <?php endif; ?>
 
     <!-- Monthly income vs expense bar chart + cashflow line -->
     <?php if (!empty($monthlyTrend)): ?>
