@@ -82,11 +82,15 @@ SQL;
             $where[] = 't.account_id = :account_id';
             $params[':account_id'] = $filters['account_id'];
         }
-        if (!empty($filters['category_id'])) {
+        if (($filters['category_id'] ?? null) === 'uncategorized') {
+            $where[] = 't.category_id IS NULL';
+        } elseif (!empty($filters['category_id'])) {
             $where[] = 't.category_id = :category_id';
             $params[':category_id'] = $filters['category_id'];
         }
-        if (!empty($filters['subcategory_id'])) {
+        if (($filters['subcategory_id'] ?? null) === 'unspecified') {
+            $where[] = 't.subcategory_id IS NULL';
+        } elseif (!empty($filters['subcategory_id'])) {
             $where[] = 't.subcategory_id = :subcategory_id';
             $params[':subcategory_id'] = $filters['subcategory_id'];
         }

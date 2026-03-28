@@ -247,6 +247,13 @@ include __DIR__ . '/../partials/nav.php';
                         <span class="cg-arrow">▼</span>
                     </div>
                     <div class="check-group-body">
+                        <label>
+                            <input type="checkbox" name="category_id[]" value="0"
+                                <?= in_array(0, $selCatIds) ? 'checked' : '' ?>
+                                data-cg-cat="0"
+                                onchange="filterSubcategories()">
+                            <em class="muted">Uncategorized</em>
+                        </label>
                         <?php foreach ($categoriesWithSubs as $cat): ?>
                             <label>
                                 <input type="checkbox" name="category_id[]" value="<?= (int)$cat['id'] ?>"
@@ -266,6 +273,11 @@ include __DIR__ . '/../partials/nav.php';
                         <span class="cg-arrow">▼</span>
                     </div>
                     <div class="check-group-body">
+                        <label data-sub-parent="0">
+                            <input type="checkbox" name="subcategory_id[]" value="0"
+                                <?= in_array(0, $selSubIds) ? 'checked' : '' ?>>
+                            <em class="muted">Unspecified</em>
+                        </label>
                         <?php foreach ($categoriesWithSubs as $cat): ?>
                             <?php foreach (($cat['subcategories'] ?? []) as $sub): ?>
                                 <label data-sub-parent="<?= (int)$cat['id'] ?>">

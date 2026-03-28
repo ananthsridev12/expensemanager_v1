@@ -70,6 +70,7 @@ include __DIR__ . '/../partials/nav.php';
                 Category
                 <select name="category_id" id="filter-category-select">
                     <option value="">All categories</option>
+                    <option value="uncategorized" <?= ($filters['category_id'] ?? null) === 'uncategorized' ? 'selected' : '' ?>>— Uncategorized</option>
                     <?php foreach ($categories as $category): ?>
                         <option value="<?= $category['id'] ?>" <?= ($filters['category_id'] ?? null) == $category['id'] ? 'selected' : '' ?>>
                             <?= htmlspecialchars($category['name']) ?>
@@ -81,6 +82,7 @@ include __DIR__ . '/../partials/nav.php';
                 Subcategory
                 <select name="subcategory_id" id="filter-subcategory-select">
                     <option value="">All subcategories</option>
+                    <option value="unspecified" <?= ($filters['subcategory_id'] ?? null) === 'unspecified' ? 'selected' : '' ?>>— Unspecified</option>
                     <?php foreach ($categories as $category): ?>
                         <?php foreach ($category['subcategories'] as $sub): ?>
                             <option value="<?= $sub['id'] ?>" data-category="<?= $category['id'] ?>" <?= ($filters['subcategory_id'] ?? null) == $sub['id'] ? 'selected' : '' ?>>

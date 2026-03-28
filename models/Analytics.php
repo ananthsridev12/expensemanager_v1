@@ -209,15 +209,35 @@ SQL;
         }
 
         if (!empty($categoryIds)) {
-            $ph = [];
-            foreach ($categoryIds as $i => $id) { $ph[] = ":cat_{$i}"; $params[":cat_{$i}"] = $id; }
-            $where[] = 't.category_id IN (' . implode(',', $ph) . ')';
+            $includeNull = in_array(0, $categoryIds, true);
+            $realIds     = array_values(array_filter($categoryIds, fn($id) => $id > 0));
+            if ($realIds && $includeNull) {
+                $ph = [];
+                foreach ($realIds as $i => $id) { $ph[] = ":cat_{$i}"; $params[":cat_{$i}"] = $id; }
+                $where[] = '(t.category_id IS NULL OR t.category_id IN (' . implode(',', $ph) . '))';
+            } elseif ($includeNull) {
+                $where[] = 't.category_id IS NULL';
+            } else {
+                $ph = [];
+                foreach ($realIds as $i => $id) { $ph[] = ":cat_{$i}"; $params[":cat_{$i}"] = $id; }
+                $where[] = 't.category_id IN (' . implode(',', $ph) . ')';
+            }
         }
 
         if (!empty($subIds)) {
-            $ph = [];
-            foreach ($subIds as $i => $id) { $ph[] = ":sub_{$i}"; $params[":sub_{$i}"] = $id; }
-            $where[] = 't.subcategory_id IN (' . implode(',', $ph) . ')';
+            $includeNull = in_array(0, $subIds, true);
+            $realIds     = array_values(array_filter($subIds, fn($id) => $id > 0));
+            if ($realIds && $includeNull) {
+                $ph = [];
+                foreach ($realIds as $i => $id) { $ph[] = ":sub_{$i}"; $params[":sub_{$i}"] = $id; }
+                $where[] = '(t.subcategory_id IS NULL OR t.subcategory_id IN (' . implode(',', $ph) . '))';
+            } elseif ($includeNull) {
+                $where[] = 't.subcategory_id IS NULL';
+            } else {
+                $ph = [];
+                foreach ($realIds as $i => $id) { $ph[] = ":sub_{$i}"; $params[":sub_{$i}"] = $id; }
+                $where[] = 't.subcategory_id IN (' . implode(',', $ph) . ')';
+            }
         }
 
         if (!empty($sourceIds)) {

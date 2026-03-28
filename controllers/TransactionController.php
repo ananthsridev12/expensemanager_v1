@@ -850,8 +850,8 @@ class TransactionController extends BaseController
 
         return [
             'account_id' => !empty($_GET['account_id']) ? (int) $_GET['account_id'] : null,
-            'category_id' => !empty($_GET['category_id']) ? (int) $_GET['category_id'] : null,
-            'subcategory_id' => !empty($_GET['subcategory_id']) ? (int) $_GET['subcategory_id'] : null,
+            'category_id' => $_GET['category_id'] === 'uncategorized' ? 'uncategorized' : (!empty($_GET['category_id']) ? (int) $_GET['category_id'] : null),
+            'subcategory_id' => $_GET['subcategory_id'] === 'unspecified' ? 'unspecified' : (!empty($_GET['subcategory_id']) ? (int) $_GET['subcategory_id'] : null),
             'start_date' => $start !== '' ? $start : null,
             'end_date' => $end !== '' ? $end : null,
         ];
