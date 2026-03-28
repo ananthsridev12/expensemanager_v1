@@ -47,6 +47,7 @@ class AnalyticsController extends BaseController
         $drilldown            = $this->analyticsModel->getDrilldown($drilldownFilters);
         $categoriesWithSubs   = $this->categoryModel->getAllWithSubcategories();
         $purchaseSources      = $this->purchaseSourceModel->getChildren();
+        $excludedCategories   = array_values(array_filter($categoriesWithSubs, fn($c) => !empty($c['exclude_from_analytics'])));
 
         return $this->render('analytics/index.php', [
             'startDate'            => $startDate,
@@ -63,6 +64,7 @@ class AnalyticsController extends BaseController
             'drilldown'            => $drilldown,
             'categoriesWithSubs'   => $categoriesWithSubs,
             'purchaseSources'      => $purchaseSources,
+            'excludedCategories'   => $excludedCategories,
         ]);
     }
 

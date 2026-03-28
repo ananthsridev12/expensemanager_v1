@@ -16,6 +16,13 @@ class CategoryController extends BaseController
 
     public function index(): string
     {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'toggle_analytics_exclude') {
+            $id = (int) ($_POST['category_id'] ?? 0);
+            $this->categoryModel->toggleExcludeFromAnalytics($id);
+            header('Content-Type: application/json');
+            return json_encode(['ok' => true]);
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($_POST['form']) && $_POST['form'] === 'category') {
                 $this->categoryModel->createCategory(

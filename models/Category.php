@@ -14,6 +14,7 @@ SELECT
     c.name AS category_name,
     c.type AS category_type,
     c.is_fuel AS category_is_fuel,
+    c.exclude_from_analytics AS category_exclude_from_analytics,
     c.created_at AS category_created_at,
     sc.id AS sub_id,
     sc.name AS sub_name,
@@ -29,12 +30,13 @@ SQL;
         foreach ($rows as $row) {
             if (!isset($result[$row['category_id']])) {
                 $result[$row['category_id']] = [
-                    'id' => $row['category_id'],
-                    'name' => $row['category_name'],
-                    'type' => $row['category_type'],
-                    'is_fuel' => (bool) $row['category_is_fuel'],
-                    'created_at' => $row['category_created_at'],
-                    'subcategories' => [],
+                    'id'                    => $row['category_id'],
+                    'name'                  => $row['category_name'],
+                    'type'                  => $row['category_type'],
+                    'is_fuel'               => (bool) $row['category_is_fuel'],
+                    'exclude_from_analytics'=> (bool) $row['category_exclude_from_analytics'],
+                    'created_at'            => $row['category_created_at'],
+                    'subcategories'         => [],
                 ];
             }
 
@@ -112,9 +114,19 @@ SQL;
         $type = (string) ($input['type'] ?? 'expense');
         $allowed = ['income', 'expense', 'transfer'];
         if (!in_array($type, $allowed, true)) $type = 'expense';
-        $isFuel = isset($input['is_fuel']) && $input['is_fuel'] ? 1 : 0;
-        $stmt = $this->db->prepare('UPDATE categories SET name=:name, type=:type, is_fuel=:is_fuel WHERE id=:id');
-        return $stmt->execute([':name' => $name, ':type' => $type, ':is_fuel' => $isFuel, ':id' => $id]);
+        $isFuel  = isset($input['is_fuel'])  && $input['is_fuel']  ? 1 : 0;
+        $exclude = isset($input['exclude_from_analytics']) && $input['exclude_from_analytics'] ? 1 : 0;
+        $stmt = $this->db->prepare('UPDATE categories SET name=:name, type=:type, is_fuel=:is_fuel, exclude_from_analytics=:exclude WHERE id=:id');
+        return $stmt->execute([':name' => $name, ':type' => $type, ':is_fuel' => $isFuel, ':exclude' => $exclude, ':id' => $id]);
+    }
+
+    public function toggleExcludeFromAnalytics(int $id): bool
+    {
+        if ($id <= 0) return false;
+        $stmt = $this->db->prepare(
+            'UPDATE categories SET exclude_from_analytics = 1 - exclude_from_analytics WHERE id = :id'
+        );
+        return $stmt->execute([':id' => $id]);
     }
 
     public function updateSubcategory(array $input): bool

@@ -15,8 +15,9 @@ $drilldownFilters = $drilldownFilters ?? [];
 $categoriesWithSubs = $categoriesWithSubs ?? [];
 $purchaseSources = $purchaseSources ?? [];
 
-$netCashflow = (float) ($summary['net_cashflow'] ?? 0);
-$netClass = $netCashflow >= 0 ? 'card--green' : 'card--red';
+$netCashflow        = (float) ($summary['net_cashflow'] ?? 0);
+$netClass           = $netCashflow >= 0 ? 'card--green' : 'card--red';
+$excludedCategories = $excludedCategories ?? [];
 
 // ── Insights engine ──────────────────────────────────────────────────────────
 function buildInsights(array $p): array {
@@ -196,6 +197,16 @@ include __DIR__ . '/../partials/nav.php';
     <header class="module-header">
         <h1>Analytics</h1>
     </header>
+
+    <?php if (!empty($excludedCategories)): ?>
+    <div style="background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.25);border-radius:6px;padding:0.6rem 1rem;display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;font-size:0.82rem;color:var(--muted);">
+        <span>⚙️ Excluded from all analytics:</span>
+        <?php foreach ($excludedCategories as $exc): ?>
+            <span class="pill pill--muted"><?= htmlspecialchars($exc['name']) ?></span>
+        <?php endforeach; ?>
+        <a href="?module=categories" style="margin-left:auto;font-size:0.78rem;color:var(--muted);">Manage →</a>
+    </div>
+    <?php endif; ?>
 
     <!-- Drilldown filter -->
     <?php

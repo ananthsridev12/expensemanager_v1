@@ -37,6 +37,10 @@ include __DIR__ . '/../partials/nav.php';
                 <input type="checkbox" name="is_fuel" value="1" <?= !empty($editCategory['is_fuel']) ? 'checked' : '' ?>>
                 Fuel category (for surcharge tracking)
             </label>
+            <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+                <input type="checkbox" name="exclude_from_analytics" value="1" <?= !empty($editCategory['exclude_from_analytics']) ? 'checked' : '' ?>>
+                Exclude from analytics (e.g. credit card payments, internal transfers)
+            </label>
             <button type="submit"><?= $editCategory ? 'Update category' : 'Create category' ?></button>
             <?php if ($editCategory): ?>
                 <a class="secondary" href="?module=categories">Cancel</a>
@@ -85,14 +89,25 @@ include __DIR__ . '/../partials/nav.php';
         <?php else: ?>
             <div class="category-list">
                 <?php foreach ($categories as $category): ?>
-                    <article class="category-card">
+                    <article class="category-card" id="cat-card-<?= (int) $category['id'] ?>">
                         <header>
                             <strong><?= htmlspecialchars($category['name']) ?></strong>
                             <span class="pill"><?= ucfirst($category['type']) ?></span>
                             <?php if (!empty($category['is_fuel'])): ?>
                                 <span class="pill card--orange">Fuel</span>
                             <?php endif; ?>
+                            <?php if (!empty($category['exclude_from_analytics'])): ?>
+                                <span class="pill pill--muted cat-excluded-badge-<?= (int) $category['id'] ?>">Excluded from analytics</span>
+                            <?php else: ?>
+                                <span class="pill pill--muted cat-excluded-badge-<?= (int) $category['id'] ?>" style="display:none;">Excluded from analytics</span>
+                            <?php endif; ?>
                             <a class="secondary" href="?module=categories&edit_cat=<?= (int) $category['id'] ?>">Edit</a>
+                            <button type="button" class="secondary cat-exclude-toggle"
+                                style="font-size:0.75rem;padding:0.2rem 0.6rem;"
+                                data-id="<?= (int) $category['id'] ?>"
+                                data-excluded="<?= !empty($category['exclude_from_analytics']) ? '1' : '0' ?>">
+                                <?= !empty($category['exclude_from_analytics']) ? 'Include in analytics' : 'Exclude from analytics' ?>
+                            </button>
                         </header>
                         <?php if (count($category['subcategories']) === 0): ?>
                             <p class="muted">No subcategories.</p>
@@ -111,4 +126,25 @@ include __DIR__ . '/../partials/nav.php';
             </div>
         <?php endif; ?>
     </section>
+<script>
+    document.querySelectorAll('.cat-exclude-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const id       = btn.dataset.id;
+            const excluded = btn.dataset.excluded === '1';
+            const badge    = document.querySelector('.cat-excluded-badge-' + id);
+
+            fetch('?module=categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'form=toggle_analytics_exclude&category_id=' + id,
+            }).then(function (r) { return r.json(); }).then(function (data) {
+                if (!data.ok) return;
+                const nowExcluded = !excluded;
+                btn.dataset.excluded = nowExcluded ? '1' : '0';
+                btn.textContent = nowExcluded ? 'Include in analytics' : 'Exclude from analytics';
+                if (badge) badge.style.display = nowExcluded ? '' : 'none';
+            });
+        });
+    });
+</script>
 </main>

@@ -8,6 +8,7 @@ class Analytics extends BaseModel
 {
     private const EARNINGS_CATEGORY_ID = 1;
 
+
     public function getSummary(string $startDate, string $endDate): array
     {
         $sql = <<<SQL
@@ -17,6 +18,7 @@ SELECT
     COALESCE(SUM(CASE WHEN t.transaction_type = 'transfer' THEN t.amount ELSE 0 END), 0) AS total_transfer
 FROM transactions t
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
+  AND (t.category_id IS NULL OR t.category_id NOT IN (SELECT id FROM categories WHERE exclude_from_analytics = 1))
 SQL;
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
@@ -125,6 +127,7 @@ FROM transactions t
 LEFT JOIN categories c ON c.id = t.category_id
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
   AND t.transaction_type = 'expense'
+  AND (c.exclude_from_analytics = 0 OR c.id IS NULL)
 GROUP BY c.id, c.name
 ORDER BY total_amount DESC
 SQL;
@@ -147,6 +150,7 @@ FROM transactions t
 LEFT JOIN categories c ON c.id = t.category_id
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
   AND t.transaction_type = 'income'
+  AND (c.exclude_from_analytics = 0 OR c.id IS NULL)
 GROUP BY c.id, c.name
 ORDER BY total_amount DESC
 SQL;
@@ -172,6 +176,7 @@ SELECT
     COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense
 FROM transactions t
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
+  AND (t.category_id IS NULL OR t.category_id NOT IN (SELECT id FROM categories WHERE exclude_from_analytics = 1))
 GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m')
 ORDER BY period ASC
 SQL;
@@ -190,7 +195,10 @@ SQL;
         $subIds      = array_values(array_filter(array_map('intval', (array) ($filters['subcategory_ids'] ?? []))));
         $sourceIds   = array_values(array_filter(array_map('intval', (array) ($filters['purchase_source_ids'] ?? []))));
 
-        $where  = ['t.transaction_date BETWEEN :start_date AND :end_date'];
+        $where  = [
+            't.transaction_date BETWEEN :start_date AND :end_date',
+            '(t.category_id IS NULL OR t.category_id NOT IN (SELECT id FROM categories WHERE exclude_from_analytics = 1))',
+        ];
         $params = [':start_date' => $startDate, ':end_date' => $endDate];
 
         if (in_array($txType, ['income', 'expense'], true)) {
@@ -335,6 +343,7 @@ LEFT JOIN credit_cards cc ON cc.id = t.account_id AND t.account_type = 'credit_c
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
   AND t.transaction_type = 'expense'
   AND t.account_type NOT IN ('lending','investment','rental','loan')
+  AND (t.category_id IS NULL OR t.category_id NOT IN (SELECT id FROM categories WHERE exclude_from_analytics = 1))
 GROUP BY t.account_type, t.account_id
 ORDER BY total_amount DESC
 SQL;
@@ -355,6 +364,7 @@ SELECT
 FROM transactions t
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
   AND t.transaction_type = 'expense'
+  AND (t.category_id IS NULL OR t.category_id NOT IN (SELECT id FROM categories WHERE exclude_from_analytics = 1))
 GROUP BY DAYOFWEEK(t.transaction_date), DAYNAME(t.transaction_date)
 ORDER BY dow_num ASC
 SQL;
