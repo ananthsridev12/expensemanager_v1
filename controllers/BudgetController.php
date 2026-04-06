@@ -37,9 +37,9 @@ class BudgetController extends BaseController
                 foreach ($catRows as $c) { $catMap[$c['id']] = $c['name']; }
 
                 $budgets = [];
-                foreach ($inputs as $catId => $amount) {
+                foreach ($inputs as $catId => $data) {
                     $budgets[(int)$catId] = [
-                        'amount' => (float) str_replace(',', '', $amount),
+                        'amount' => (float) str_replace(',', '', $data['amount'] ?? ''),
                         'name'   => ($catMap[(int)$catId] ?? 'Budget') . ' — ' . date('M Y', mktime(0,0,0,$pm,1,$py)),
                     ];
                 }
