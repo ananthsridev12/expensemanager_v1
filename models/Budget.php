@@ -21,8 +21,8 @@ FROM budgets b
 LEFT JOIN categories c ON c.id = b.category_id
 LEFT JOIN transactions t
     ON  t.transaction_type = 'expense'
-    AND MONTH(t.date) = :month
-    AND YEAR(t.date)  = :year
+    AND MONTH(t.transaction_date) = :month
+    AND YEAR(t.transaction_date)  = :year
     AND (b.category_id IS NULL OR t.category_id = b.category_id)
 WHERE
     (b.month = :month2 AND b.year = :year2)
