@@ -86,7 +86,11 @@ class DashboardController extends BaseController
         $upcomingEmis = $this->loanModel->getUpcomingEmis(5);
         $monthComparison = $this->analyticsModel->getThisMonthVsLastMonth();
         $sparkline = $this->analyticsModel->getMiniSparkline(6);
-        $budgetSummary = $this->budgetModel->getSummaryForMonth((int) date('n'), (int) date('Y'));
+        try {
+            $budgetSummary = $this->budgetModel->getSummaryForMonth((int) date('n'), (int) date('Y'));
+        } catch (\Throwable $e) {
+            $budgetSummary = ['count' => 0, 'total_budgeted' => 0, 'total_spent' => 0, 'over_count' => 0, 'rows' => []];
+        }
 
         return $this->render('dashboard.php', [
             'summary' => $summary,
