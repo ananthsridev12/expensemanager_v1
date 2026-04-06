@@ -4,7 +4,6 @@ namespace Controllers;
 
 use Models\Account;
 use Models\Analytics;
-use Models\Budget;
 use Models\Category;
 use Models\CreditCard;
 use Models\Investment;
@@ -18,7 +17,6 @@ class DashboardController extends BaseController
 {
     private Account $accountModel;
     private Analytics $analyticsModel;
-    private Budget $budgetModel;
     private Category $categoryModel;
     private CreditCard $creditCardModel;
     private Investment $investmentModel;
@@ -33,7 +31,6 @@ class DashboardController extends BaseController
         parent::__construct();
         $this->accountModel = new Account($this->database);
         $this->analyticsModel = new Analytics($this->database);
-        $this->budgetModel = new Budget($this->database);
         $this->categoryModel = new Category($this->database);
         $this->creditCardModel = new CreditCard($this->database);
         $this->investmentModel = new Investment($this->database);
@@ -87,7 +84,8 @@ class DashboardController extends BaseController
         $monthComparison = $this->analyticsModel->getThisMonthVsLastMonth();
         $sparkline = $this->analyticsModel->getMiniSparkline(6);
         try {
-            $budgetSummary = $this->budgetModel->getSummaryForMonth((int) date('n'), (int) date('Y'));
+            $budgetModel  = new \Models\Budget($this->database);
+            $budgetSummary = $budgetModel->getSummaryForMonth((int) date('n'), (int) date('Y'));
         } catch (\Throwable $e) {
             $budgetSummary = ['count' => 0, 'total_budgeted' => 0, 'total_spent' => 0, 'over_count' => 0, 'rows' => []];
         }
