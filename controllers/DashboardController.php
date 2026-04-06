@@ -4,6 +4,7 @@ namespace Controllers;
 
 use Models\Account;
 use Models\Analytics;
+use Models\Budget;
 use Models\Category;
 use Models\CreditCard;
 use Models\Investment;
@@ -17,6 +18,7 @@ class DashboardController extends BaseController
 {
     private Account $accountModel;
     private Analytics $analyticsModel;
+    private Budget $budgetModel;
     private Category $categoryModel;
     private CreditCard $creditCardModel;
     private Investment $investmentModel;
@@ -31,6 +33,7 @@ class DashboardController extends BaseController
         parent::__construct();
         $this->accountModel = new Account($this->database);
         $this->analyticsModel = new Analytics($this->database);
+        $this->budgetModel = new Budget($this->database);
         $this->categoryModel = new Category($this->database);
         $this->creditCardModel = new CreditCard($this->database);
         $this->investmentModel = new Investment($this->database);
@@ -83,6 +86,7 @@ class DashboardController extends BaseController
         $upcomingEmis = $this->loanModel->getUpcomingEmis(5);
         $monthComparison = $this->analyticsModel->getThisMonthVsLastMonth();
         $sparkline = $this->analyticsModel->getMiniSparkline(6);
+        $budgetSummary = $this->budgetModel->getSummaryForMonth((int) date('n'), (int) date('Y'));
 
         return $this->render('dashboard.php', [
             'summary' => $summary,
@@ -98,6 +102,7 @@ class DashboardController extends BaseController
             'totalsByType' => $totalsByType,
             'monthComparison' => $monthComparison,
             'sparkline' => $sparkline,
+            'budgetSummary' => $budgetSummary,
         ]);
     }
 

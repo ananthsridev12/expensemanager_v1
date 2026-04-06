@@ -8,6 +8,7 @@
     </div>
     <a href="?module=dashboard" class="<?= $module === 'dashboard' ? 'is-active' : '' ?>">Dashboard</a>
     <a href="?module=analytics" class="<?= $module === 'analytics' ? 'is-active' : '' ?>">Analytics</a>
+    <a href="?module=budget" class="<?= $module === 'budget' ? 'is-active' : '' ?>">Budget</a>
     <a href="?module=accounts" class="<?= $module === 'accounts' ? 'is-active' : '' ?>">Accounts</a>
     <a href="?module=contacts" class="<?= $module === 'contacts' ? 'is-active' : '' ?>">Contacts</a>
     <a href="?module=categories" class="<?= $module === 'categories' ? 'is-active' : '' ?>">Categories</a>

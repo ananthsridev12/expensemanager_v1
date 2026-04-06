@@ -162,6 +162,7 @@ HTML;
 
 use Controllers\AccountController;
 use Controllers\AnalyticsController;
+use Controllers\BudgetController;
 use Controllers\CategoryController;
 use Controllers\ContactController;
 use Controllers\CreditCardController;
@@ -179,6 +180,10 @@ $module = is_string($moduleInput) ? preg_replace('/[^a-z_]/i', '', $moduleInput)
 $module = $module !== '' ? $module : 'dashboard';
 
 switch ($module) {
+    case 'budget':
+        $controller = new BudgetController();
+        echo $controller->index();
+        break;
     case 'accounts':
         $controller = new AccountController();
         echo $controller->index();

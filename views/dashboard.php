@@ -131,6 +131,59 @@ include __DIR__ . '/partials/nav.php';
     </section>
     <?php endif; ?>
 
+    <!-- Budget this month -->
+    <?php
+    $budgetSummary = $budgetSummary ?? ['count' => 0, 'total_budgeted' => 0, 'total_spent' => 0, 'over_count' => 0, 'rows' => []];
+    if ($budgetSummary['count'] > 0):
+        $bgtPct = $budgetSummary['total_budgeted'] > 0
+            ? round($budgetSummary['total_spent'] / $budgetSummary['total_budgeted'] * 100, 1)
+            : 0;
+    ?>
+    <section class="module-panel">
+        <h2>Budget — <?= date('F Y') ?> <a href="?module=budget" style="font-size:0.82rem;font-weight:400;margin-left:0.75rem;color:var(--muted);">View all →</a></h2>
+        <div class="summary-cards" style="margin-bottom:1rem;">
+            <article class="card card--cyan">
+                <h3>Budgeted</h3>
+                <p><?= formatCurrency($budgetSummary['total_budgeted']) ?></p>
+                <small><?= $budgetSummary['count'] ?> budget<?= $budgetSummary['count'] !== 1 ? 's' : '' ?></small>
+            </article>
+            <article class="card <?= $budgetSummary['total_spent'] > $budgetSummary['total_budgeted'] ? 'card--red' : 'card--green' ?>">
+                <h3>Spent</h3>
+                <p><?= formatCurrency($budgetSummary['total_spent']) ?></p>
+                <small><?= $bgtPct ?>% used</small>
+            </article>
+            <?php if ($budgetSummary['over_count'] > 0): ?>
+            <article class="card card--red">
+                <h3>Over budget</h3>
+                <p><?= $budgetSummary['over_count'] ?></p>
+                <small>categor<?= $budgetSummary['over_count'] === 1 ? 'y' : 'ies' ?> exceeded</small>
+            </article>
+            <?php endif; ?>
+        </div>
+        <?php foreach (array_slice($budgetSummary['rows'], 0, 5) as $bRow):
+            $bSpent  = (float) $bRow['spent'];
+            $bAmt    = (float) $bRow['amount'];
+            $bPct    = $bAmt > 0 ? min(100, round($bSpent / $bAmt * 100, 1)) : 0;
+            $bColor  = $bPct >= 100 ? '#f43f5e' : ($bPct >= 75 ? '#f59e0b' : '#22c55e');
+        ?>
+        <div style="margin-bottom:0.6rem;">
+            <div style="display:flex;justify-content:space-between;font-size:0.82rem;margin-bottom:0.25rem;">
+                <span><?= htmlspecialchars($bRow['category_name'] ?? $bRow['name']) ?></span>
+                <span style="color:var(--muted);"><?= formatCurrency($bSpent) ?> / <?= formatCurrency($bAmt) ?></span>
+            </div>
+            <div style="background:rgba(255,255,255,0.07);border-radius:6px;height:7px;">
+                <div style="background:<?= $bColor ?>;border-radius:6px;height:7px;width:<?= $bPct ?>%;max-width:100%;"></div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+        <?php if (count($budgetSummary['rows']) > 5): ?>
+            <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">
+                +<?= count($budgetSummary['rows']) - 5 ?> more — <a href="?module=budget">view all</a>
+            </p>
+        <?php endif; ?>
+    </section>
+    <?php endif; ?>
+
     <?php
     $dashTypeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
     $dashGrouped = [];
