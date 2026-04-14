@@ -59,12 +59,16 @@ class TransactionController extends BaseController
         if (($_GET['action'] ?? '') === 'quick_add_form') {
             header('Content-Type: text/html; charset=utf-8');
             return $this->renderPartial('transactions/quick_add.php', [
-                'accounts'          => $this->accountModel->getList(),
-                'loans'             => $this->loanModel->getAll(),
-                'categories'        => $this->categoryModel->getAllWithSubcategories(),
-                'paymentMethods'    => $this->paymentMethodModel->getAll(),
-                'purchaseChildren'  => $this->purchaseSourceModel->getChildren(),
-                'openLendingRecords'=> $this->lendingModel->getOpenRecords(),
+                'accounts'           => $this->accountModel->getList(),
+                'loans'              => $this->loanModel->getAll(),
+                'categories'         => $this->categoryModel->getAllWithSubcategories(),
+                'paymentMethods'     => $this->paymentMethodModel->getAll(),
+                'purchaseChildren'   => $this->purchaseSourceModel->getChildren(),
+                'openLendingRecords' => $this->lendingModel->getOpenRecords(),
+                'rentalContracts'    => $this->rentalModel->getContracts(),
+                'rentalProperties'   => $this->rentalModel->getProperties(),
+                'rentalTenants'      => $this->rentalModel->getTenants(),
+                'investments'        => $this->investmentModel->getAll(),
             ]);
         }
 

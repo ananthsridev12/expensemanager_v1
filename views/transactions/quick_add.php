@@ -6,8 +6,12 @@ $categories         = $categories         ?? [];
 $paymentMethods     = $paymentMethods     ?? [];
 $purchaseChildren   = $purchaseChildren   ?? [];
 $openLendingRecords = $openLendingRecords ?? [];
+$rentalContracts    = $rentalContracts    ?? [];
+$rentalProperties   = $rentalProperties   ?? [];
+$rentalTenants      = $rentalTenants      ?? [];
+$investments        = $investments        ?? [];
 
-// Build grouped accounts (same logic as main transaction form)
+// Build grouped accounts
 $acctTypeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
 $acctGrouped   = [];
 foreach ($accounts as $acct) {
@@ -82,6 +86,19 @@ foreach ($acctGrouped as $gKey => $accts) {
     </label>
 
     <label>
+        Group spend?
+        <select name="group_spend" id="qa-group-spend">
+            <option value="no" selected>No</option>
+            <option value="yes">Yes (split)</option>
+        </select>
+    </label>
+    <label id="qa-group-share-wrap" style="display:none;">
+        Your share
+        <input type="number" name="group_share_amount" step="0.01" min="0" placeholder="e.g. 150">
+        <small class="muted">The remainder is tracked as receivable in Lending.</small>
+    </label>
+
+    <label>
         Payment method
         <select name="payment_method_id" id="qa-pay-method">
             <option value="">Select method</option>
@@ -103,8 +120,23 @@ foreach ($acctGrouped as $gKey => $accts) {
             <?php foreach ($categories as $cat): ?>
                 <option value="<?= (int) $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?> (<?= $cat['type'] ?>)</option>
             <?php endforeach; ?>
+            <option value="new_category">+ New category</option>
         </select>
     </label>
+    <div id="qa-new-category-wrap" class="module-form" style="display:none;padding:0;margin:0;grid-column:1/-1;">
+        <label>
+            Category name
+            <input type="text" name="new_category_name" placeholder="e.g. Groceries">
+        </label>
+        <label>
+            Type
+            <select name="new_category_type">
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+                <option value="transfer">Transfer</option>
+            </select>
+        </label>
+    </div>
 
     <label>
         Subcategory
@@ -117,7 +149,12 @@ foreach ($acctGrouped as $gKey => $accts) {
                     </option>
                 <?php endforeach; ?>
             <?php endforeach; ?>
+            <option value="new_subcategory">+ New subcategory</option>
         </select>
+    </label>
+    <label id="qa-new-subcategory-wrap" style="display:none;grid-column:1/-1;">
+        Subcategory name
+        <input type="text" name="new_subcategory_name" placeholder="e.g. Vegetables">
     </label>
 
     <label>
@@ -154,9 +191,13 @@ foreach ($acctGrouped as $gKey => $accts) {
                 <select name="transfer_target" id="qa-transfer-target">
                     <option value="account">Account / Loan</option>
                     <option value="lending">Lending (lend / repayment)</option>
+                    <option value="rental">Rental (record rent)</option>
+                    <option value="investment">Investment</option>
                 </select>
             </label>
         </div>
+
+        <!-- Account / Loan sub-panel -->
         <div class="module-form" id="qa-transfer-account-panel" style="padding:0;margin:0;">
             <label>
                 To account
@@ -173,18 +214,21 @@ foreach ($acctGrouped as $gKey => $accts) {
                 </select>
             </label>
         </div>
+
+        <!-- Lending sub-panel -->
         <div id="qa-transfer-lending-panel" style="display:none;">
             <div class="module-form" style="padding:0;margin:0;">
                 <label>
                     Mode
                     <select name="lending_mode" id="qa-lending-mode">
                         <option value="new">New lending record</option>
-                        <option value="repayment">Repayment from contact</option>
                         <option value="topup">Top-up existing record</option>
+                        <option value="repayment">Repayment from contact</option>
                     </select>
                 </label>
             </div>
             <div class="module-form" id="qa-lending-new-fields" style="padding:0;margin:0;">
+                <small class="muted">Contact, amount, and date are taken from the fields above.</small>
                 <label>
                     Interest rate (% p.a.)
                     <input type="number" name="lending_interest_rate" step="0.01" min="0" value="0">
@@ -195,6 +239,7 @@ foreach ($acctGrouped as $gKey => $accts) {
                 </label>
             </div>
             <div class="module-form" id="qa-lending-repayment-fields" style="display:none;padding:0;margin:0;">
+                <small class="muted">Amount is taken from the field above.</small>
                 <label>
                     Lending record
                     <select name="lending_record_id">
@@ -206,6 +251,7 @@ foreach ($acctGrouped as $gKey => $accts) {
                 </label>
             </div>
             <div class="module-form" id="qa-lending-topup-fields" style="display:none;padding:0;margin:0;">
+                <small class="muted">Adds the amount above to the selected record's principal.</small>
                 <label>
                     Lending record
                     <select name="lending_record_id">
@@ -214,6 +260,162 @@ foreach ($acctGrouped as $gKey => $accts) {
                             <option value="<?= (int) $lr['id'] ?>"><?= htmlspecialchars($lr['contact_name']) ?> — Outstanding: <?= formatCurrency((float) $lr['outstanding_amount']) ?></option>
                         <?php endforeach; ?>
                     </select>
+                </label>
+            </div>
+            <div class="module-form" style="padding:0;margin:0;">
+                <label>
+                    Notes
+                    <textarea name="lending_notes" rows="2"></textarea>
+                </label>
+            </div>
+        </div>
+
+        <!-- Rental sub-panel -->
+        <div id="qa-transfer-rental-panel" style="display:none;">
+            <div class="module-form" style="padding:0;margin:0;">
+                <label>
+                    Mode
+                    <select name="rental_mode" id="qa-rental-mode">
+                        <option value="existing">Existing contract</option>
+                        <option value="new_contract">New contract</option>
+                    </select>
+                </label>
+            </div>
+            <div class="module-form" id="qa-rental-existing-fields" style="padding:0;margin:0;">
+                <label>
+                    Contract
+                    <select name="rental_contract_id">
+                        <option value="">Select contract</option>
+                        <?php foreach ($rentalContracts as $contract): ?>
+                            <option value="<?= (int) $contract['id'] ?>">
+                                <?= htmlspecialchars(($contract['property_name'] ?? 'Property') . ' — ' . ($contract['tenant_name'] ?? 'Tenant')) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            </div>
+            <div class="module-form" id="qa-rental-new-fields" style="display:none;padding:0;margin:0;">
+                <label>
+                    Property
+                    <select name="rental_property_id">
+                        <option value="">Select property</option>
+                        <?php foreach ($rentalProperties as $property): ?>
+                            <option value="<?= (int) $property['id'] ?>"><?= htmlspecialchars($property['property_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label>
+                    Tenant
+                    <select name="rental_tenant_id">
+                        <option value="">Select tenant</option>
+                        <?php foreach ($rentalTenants as $tenant): ?>
+                            <option value="<?= (int) $tenant['id'] ?>"><?= htmlspecialchars($tenant['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label>
+                    Contract start date
+                    <input type="date" name="rental_contract_start" value="<?= date('Y-m-d') ?>">
+                </label>
+                <label>
+                    Contract end date
+                    <input type="date" name="rental_contract_end">
+                </label>
+                <label>
+                    Monthly rent amount
+                    <input type="number" name="rental_contract_rent" step="0.01" min="0">
+                </label>
+                <label>
+                    Security deposit
+                    <input type="number" name="rental_contract_deposit" step="0.01" min="0" value="0">
+                </label>
+            </div>
+            <div class="module-form" style="padding:0;margin:0;">
+                <small class="muted">Amount is taken from the field above.</small>
+                <label>
+                    Rent month
+                    <input type="month" name="rental_rent_month" value="<?= date('Y-m') ?>">
+                </label>
+                <label>
+                    Due date
+                    <input type="date" name="rental_due_date" value="<?= date('Y-m-d') ?>">
+                </label>
+                <label>
+                    Payment status
+                    <select name="rental_status">
+                        <option value="paid">Paid</option>
+                        <option value="partial">Partial</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                </label>
+                <label>
+                    Notes
+                    <textarea name="rental_notes" rows="2"></textarea>
+                </label>
+            </div>
+        </div>
+
+        <!-- Investment sub-panel -->
+        <div id="qa-transfer-investment-panel" style="display:none;">
+            <div class="module-form" style="padding:0;margin:0;">
+                <label>
+                    Mode
+                    <select name="investment_mode" id="qa-investment-mode">
+                        <option value="existing">Existing investment</option>
+                        <option value="new">New investment</option>
+                    </select>
+                </label>
+            </div>
+            <div class="module-form" id="qa-investment-existing-fields" style="padding:0;margin:0;">
+                <label>
+                    Investment
+                    <select name="investment_id">
+                        <option value="">Select investment</option>
+                        <?php foreach ($investments as $inv): ?>
+                            <option value="<?= (int) $inv['id'] ?>"><?= htmlspecialchars($inv['name'] . ' (' . $inv['type'] . ')') ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            </div>
+            <div class="module-form" id="qa-investment-new-fields" style="display:none;padding:0;margin:0;">
+                <label>
+                    Type
+                    <select name="investment_type">
+                        <option value="mutual_fund">Mutual Fund</option>
+                        <option value="equity">Equity / Stocks</option>
+                        <option value="fd">Fixed Deposit (FD)</option>
+                        <option value="rd">Recurring Deposit (RD)</option>
+                        <option value="nps">NPS</option>
+                        <option value="ppf">PPF</option>
+                        <option value="other">Other</option>
+                    </select>
+                </label>
+                <label>
+                    Investment name
+                    <input type="text" name="investment_name" placeholder="e.g. HDFC Top 100 Fund">
+                </label>
+                <label>
+                    Notes (optional)
+                    <input type="text" name="investment_notes" placeholder="Optional">
+                </label>
+            </div>
+            <div class="module-form" style="padding:0;margin:0;">
+                <small class="muted">Amount and date are taken from the fields above.</small>
+                <label>
+                    Transaction type
+                    <select name="investment_tx_type">
+                        <option value="buy">Buy / Deposit</option>
+                        <option value="sell">Sell / Withdraw</option>
+                        <option value="dividend">Dividend / Interest</option>
+                    </select>
+                </label>
+                <label>
+                    Units (optional)
+                    <input type="number" name="investment_units" step="0.0001" min="0">
+                </label>
+                <label>
+                    Notes
+                    <textarea name="investment_tx_notes" rows="2"></textarea>
                 </label>
             </div>
         </div>
@@ -235,64 +437,118 @@ foreach ($acctGrouped as $gKey => $accts) {
     const form         = document.getElementById('qa-form');
     const txType       = document.getElementById('qa-tx-type');
     const transferPnl  = document.getElementById('qa-transfer-panel');
-    const acctPnl      = document.getElementById('qa-transfer-account-panel');
-    const lendingPnl   = document.getElementById('qa-transfer-lending-panel');
     const transferTgt  = document.getElementById('qa-transfer-target');
-    const lendingMode  = document.getElementById('qa-lending-mode');
-    const lNewFields   = document.getElementById('qa-lending-new-fields');
-    const lRepFields   = document.getElementById('qa-lending-repayment-fields');
-    const lTopFields   = document.getElementById('qa-lending-topup-fields');
+
+    // Transfer sub-panels
+    const acctPnl        = document.getElementById('qa-transfer-account-panel');
+    const lendingPnl     = document.getElementById('qa-transfer-lending-panel');
+    const rentalPnl      = document.getElementById('qa-transfer-rental-panel');
+    const investmentPnl  = document.getElementById('qa-transfer-investment-panel');
+
+    const lendingMode    = document.getElementById('qa-lending-mode');
+    const lNewFields     = document.getElementById('qa-lending-new-fields');
+    const lRepFields     = document.getElementById('qa-lending-repayment-fields');
+    const lTopFields     = document.getElementById('qa-lending-topup-fields');
+
+    const rentalMode         = document.getElementById('qa-rental-mode');
+    const rentalExisting     = document.getElementById('qa-rental-existing-fields');
+    const rentalNew          = document.getElementById('qa-rental-new-fields');
+
+    const investmentMode     = document.getElementById('qa-investment-mode');
+    const investmentExisting = document.getElementById('qa-investment-existing-fields');
+    const investmentNew      = document.getElementById('qa-investment-new-fields');
+
     const catSel       = document.getElementById('qa-category');
+    const newCatWrap   = document.getElementById('qa-new-category-wrap');
     const subSel       = document.getElementById('qa-subcategory');
+    const newSubWrap   = document.getElementById('qa-new-subcategory-wrap');
+
     const pmSel        = document.getElementById('qa-pay-method');
     const newPmWrap    = document.getElementById('qa-new-pm-wrap');
     const srcSel       = document.getElementById('qa-purchase-source');
     const newSrcWrap   = document.getElementById('qa-new-src-wrap');
+
+    const groupSpend   = document.getElementById('qa-group-spend');
+    const groupShare   = document.getElementById('qa-group-share-wrap');
+
     const submitBtn    = document.getElementById('qa-submit-btn');
     const statusEl     = document.getElementById('qa-status');
 
-    // Set redirect_to to current page (path + query)
+    // Set redirect_to to current page
     const redir = document.getElementById('qa-redirect-to');
     if (redir) redir.value = window.location.pathname + window.location.search;
 
-    // Transaction type → transfer panel
+    // Transaction type → show/hide transfer panel
     function onTxTypeChange() {
-        const isTransfer = txType.value === 'transfer';
-        transferPnl.style.display = isTransfer ? 'block' : 'none';
+        transferPnl.style.display = txType.value === 'transfer' ? 'block' : 'none';
     }
     txType.addEventListener('change', onTxTypeChange);
     onTxTypeChange();
 
-    // Transfer target → sub panels
+    // Transfer target → show correct sub-panel
     function onTransferTargetChange() {
         const v = transferTgt.value;
-        acctPnl.style.display    = v === 'account'  ? 'block' : 'none';
-        lendingPnl.style.display = v === 'lending'  ? 'block' : 'none';
+        acctPnl.style.display       = v === 'account'    ? 'block' : 'none';
+        lendingPnl.style.display    = v === 'lending'    ? 'block' : 'none';
+        rentalPnl.style.display     = v === 'rental'     ? 'block' : 'none';
+        investmentPnl.style.display = v === 'investment' ? 'block' : 'none';
     }
     transferTgt.addEventListener('change', onTransferTargetChange);
     onTransferTargetChange();
 
-    // Lending mode → sub panels
+    // Lending mode → sub-fields
     function onLendingModeChange() {
         const v = lendingMode.value;
-        lNewFields.style.display  = v === 'new'       ? 'block' : 'none';
-        lRepFields.style.display  = v === 'repayment' ? 'block' : 'none';
-        lTopFields.style.display  = v === 'topup'     ? 'block' : 'none';
+        lNewFields.style.display = v === 'new'       ? 'block' : 'none';
+        lRepFields.style.display = v === 'repayment' ? 'block' : 'none';
+        lTopFields.style.display = v === 'topup'     ? 'block' : 'none';
     }
     lendingMode.addEventListener('change', onLendingModeChange);
     onLendingModeChange();
 
-    // Category → filter subcategory
+    // Rental mode → sub-fields
+    function onRentalModeChange() {
+        const v = rentalMode.value;
+        rentalExisting.style.display = v === 'existing'     ? 'block' : 'none';
+        rentalNew.style.display      = v === 'new_contract' ? 'block' : 'none';
+    }
+    rentalMode.addEventListener('change', onRentalModeChange);
+    onRentalModeChange();
+
+    // Investment mode → sub-fields
+    function onInvestmentModeChange() {
+        const v = investmentMode.value;
+        investmentExisting.style.display = v === 'existing' ? 'block' : 'none';
+        investmentNew.style.display      = v === 'new'      ? 'block' : 'none';
+    }
+    investmentMode.addEventListener('change', onInvestmentModeChange);
+    onInvestmentModeChange();
+
+    // Category → new category inline form / filter subcategories
+    catSel.addEventListener('change', function () {
+        newCatWrap.style.display = catSel.value === 'new_category' ? 'block' : 'none';
+        filterSubcategories();
+    });
+
     function filterSubcategories() {
-        const catId = catSel.value;
-        Array.from(subSel.options).forEach(opt => {
-            if (!opt.value || opt.value === '') { opt.style.display = ''; return; }
+        const catId = (catSel.value === 'new_category' || catSel.value === '') ? '' : catSel.value;
+        Array.from(subSel.options).forEach(function(opt) {
+            if (!opt.value || opt.value === '' || opt.value === 'new_subcategory') {
+                opt.style.display = '';
+                return;
+            }
             opt.style.display = (!catId || opt.dataset.category === catId) ? '' : 'none';
         });
-        if (subSel.selectedOptions[0]?.style.display === 'none') subSel.value = '';
+        if (subSel.selectedOptions[0] && subSel.selectedOptions[0].style.display === 'none') {
+            subSel.value = '';
+        }
     }
-    catSel.addEventListener('change', filterSubcategories);
     filterSubcategories();
+
+    // Subcategory → new subcategory inline form
+    subSel.addEventListener('change', function () {
+        newSubWrap.style.display = subSel.value === 'new_subcategory' ? 'block' : 'none';
+    });
 
     // Payment method → new input
     pmSel.addEventListener('change', function () {
@@ -304,6 +560,11 @@ foreach ($acctGrouped as $gKey => $accts) {
         newSrcWrap.style.display = srcSel.value === 'other' ? 'flex' : 'none';
     });
 
+    // Group spend → share amount
+    groupSpend.addEventListener('change', function () {
+        groupShare.style.display = groupSpend.value === 'yes' ? 'block' : 'none';
+    });
+
     // Contact search
     const contactSearch  = document.getElementById('qa-contact-search');
     const contactId      = document.getElementById('qa-contact-id');
@@ -312,14 +573,18 @@ foreach ($acctGrouped as $gKey => $accts) {
 
     function renderContacts(items) {
         contactResults.innerHTML = '';
-        if (!items.length) { contactResults.innerHTML = '<small class="muted">No contacts found.</small>'; return; }
+        if (!items.length) {
+            contactResults.innerHTML = '<small class="muted">No contacts found.</small>';
+            return;
+        }
         items.forEach(function (item) {
             const btn = document.createElement('button');
-            btn.type = 'button'; btn.className = 'secondary';
+            btn.type = 'button';
+            btn.className = 'secondary';
             btn.textContent = item.name + (item.mobile ? ' – ' + item.mobile : '');
             btn.style.cssText = 'margin-right:0.5rem;margin-bottom:0.5rem;font-size:0.82rem;';
             btn.addEventListener('click', function () {
-                contactId.value    = String(item.id);
+                contactId.value     = String(item.id);
                 contactSearch.value = btn.textContent;
                 contactResults.innerHTML = '<small class="muted">Selected: ' + btn.textContent + '</small>';
             });
@@ -331,7 +596,10 @@ foreach ($acctGrouped as $gKey => $accts) {
         contactId.value = '';
         clearTimeout(contactTimer);
         const q = contactSearch.value.trim();
-        if (!q) { contactResults.innerHTML = '<small class="muted">Start typing to search contacts.</small>'; return; }
+        if (!q) {
+            contactResults.innerHTML = '<small class="muted">Start typing to search contacts.</small>';
+            return;
+        }
         contactTimer = setTimeout(async function () {
             try {
                 const res = await fetch('?module=transactions&action=contact_search&q=' + encodeURIComponent(q));
@@ -342,7 +610,7 @@ foreach ($acctGrouped as $gKey => $accts) {
         }, 250);
     });
 
-    // AJAX submit — stay on current page, show toast
+    // AJAX submit
     form.addEventListener('submit', async function (e) {
         e.preventDefault();
         submitBtn.disabled = true;
@@ -352,11 +620,15 @@ foreach ($acctGrouped as $gKey => $accts) {
         try {
             const res = await fetch('?module=transactions', { method: 'POST', body: new FormData(form) });
             if (res.ok || res.redirected) {
-                // Success — fire event so layout can close modal + show toast
                 document.dispatchEvent(new CustomEvent('qa-success'));
                 form.reset();
                 filterSubcategories();
                 onTxTypeChange();
+                newCatWrap.style.display  = 'none';
+                newSubWrap.style.display  = 'none';
+                newPmWrap.style.display   = 'none';
+                newSrcWrap.style.display  = 'none';
+                groupShare.style.display  = 'none';
             } else {
                 throw new Error('Server error ' + res.status);
             }

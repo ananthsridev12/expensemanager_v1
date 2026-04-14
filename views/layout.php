@@ -68,6 +68,16 @@ if (!function_exists('formatCurrency')) {
         var loaded    = false;
         var toastTimer = null;
 
+        // innerHTML does not execute <script> tags — re-create them manually
+        function executeScripts(container) {
+            Array.from(container.querySelectorAll('script')).forEach(function (old) {
+                var s = document.createElement('script');
+                Array.from(old.attributes).forEach(function (a) { s.setAttribute(a.name, a.value); });
+                s.textContent = old.textContent;
+                old.parentNode.replaceChild(s, old);
+            });
+        }
+
         function openModal() {
             overlay.style.display = 'block';
             document.body.style.overflow = 'hidden';
@@ -76,6 +86,7 @@ if (!function_exists('formatCurrency')) {
                     .then(function (r) { return r.text(); })
                     .then(function (html) {
                         modalBody.innerHTML = html;
+                        executeScripts(modalBody);
                         loaded = true;
                     })
                     .catch(function () {
