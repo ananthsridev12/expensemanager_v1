@@ -73,7 +73,15 @@ class DashboardController extends BaseController
                 'outstanding' => array_sum(array_column($loans, 'outstanding_principal')),
             ],
             'credit_cards' => $this->creditCardModel->getSummary(),
-            'lending' => $this->lendingModel->getSummary(),
+            'lending'   => $this->lendingModel->getSummary(),
+            'borrowing' => (function() {
+                try {
+                    $m = new \Models\Borrowing($this->database);
+                    return $m->getSummary();
+                } catch (\Throwable $e) {
+                    return ['count' => 0, 'outstanding' => 0];
+                }
+            })(),
             'investments' => $this->investmentModel->getSummary(),
             'rentals' => $this->rentalModel->getSummary(),
         ];

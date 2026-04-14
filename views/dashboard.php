@@ -51,6 +51,11 @@ include __DIR__ . '/partials/nav.php';
             <p><?= formatCurrency($summary['lending']['outstanding']) ?></p>
             <small><?= $summary['lending']['count'] ?> records</small>
         </article>
+        <article class="card card--red">
+            <h3>I owe (borrowings)</h3>
+            <p><?= formatCurrency($summary['borrowing']['outstanding'] ?? 0) ?></p>
+            <small><?= $summary['borrowing']['count'] ?? 0 ?> records</small>
+        </article>
         <article class="card card--purple">
             <h3>Investments</h3>
             <p><?= $summary['investments']['count'] ?> items</p>
