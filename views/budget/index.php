@@ -1,25 +1,27 @@
 <?php
-$activeModule   = 'budget';
-$categories     = $categories    ?? [];
-$threeMonthAvg  = $threeMonthAvg ?? [];
-$trendData      = $trendData     ?? [];
-$selectedMonth  = $selectedMonth ?? (int) date('n');
-$selectedYear   = $selectedYear  ?? (int) date('Y');
-$prevMonth      = $prevMonth     ?? ($selectedMonth === 1 ? 12 : $selectedMonth - 1);
-$prevYear       = $prevYear      ?? ($selectedMonth === 1 ? $selectedYear - 1 : $selectedYear);
-$nextMonth      = $nextMonth     ?? ($selectedMonth === 12 ? 1 : $selectedMonth + 1);
-$nextYear       = $nextYear      ?? ($selectedMonth === 12 ? $selectedYear + 1 : $selectedYear);
-$totalBudgeted  = $totalBudgeted ?? 0.0;
-$totalSpent     = $totalSpent    ?? 0.0;
+$activeModule      = 'budget';
+$categories        = $categories        ?? [];
+$subcategories     = $subcategories     ?? [];   // [category_id => [sub rows]]
+$threeMonthAvg     = $threeMonthAvg     ?? [];
+$subThreeMonthAvg  = $subThreeMonthAvg  ?? [];
+$trendData         = $trendData         ?? [];
+$selectedMonth     = $selectedMonth     ?? (int) date('n');
+$selectedYear      = $selectedYear      ?? (int) date('Y');
+$prevMonth         = $prevMonth         ?? ($selectedMonth === 1 ? 12 : $selectedMonth - 1);
+$prevYear          = $prevYear          ?? ($selectedMonth === 1 ? $selectedYear - 1 : $selectedYear);
+$nextMonth         = $nextMonth         ?? ($selectedMonth === 12 ? 1 : $selectedMonth + 1);
+$nextYear          = $nextYear          ?? ($selectedMonth === 12 ? $selectedYear + 1 : $selectedYear);
+$totalBudgeted     = $totalBudgeted     ?? 0.0;
+$totalSpent        = $totalSpent        ?? 0.0;
 
 $monthLabel = date('F Y', mktime(0, 0, 0, $selectedMonth, 1, $selectedYear));
 $prevLabel  = date('M Y', mktime(0, 0, 0, $prevMonth, 1, $prevYear));
 
-$budgetedCats  = array_filter($categories, fn($c) => (float)$c['budget_amount'] > 0);
-$overallPct    = $totalBudgeted > 0 ? round($totalSpent / $totalBudgeted * 100, 1) : 0;
-$remaining     = $totalBudgeted - $totalSpent;
-$overCount     = count(array_filter($budgetedCats, fn($c) => (float)$c['spent'] >= (float)$c['budget_amount']));
-$warnCount     = count(array_filter($budgetedCats, fn($c) => (float)$c['budget_amount'] > 0 && (float)$c['spent'] / (float)$c['budget_amount'] >= 0.8 && (float)$c['spent'] < (float)$c['budget_amount']));
+$budgetedCats = array_filter($categories, fn($c) => (float)$c['budget_amount'] > 0);
+$overallPct   = $totalBudgeted > 0 ? round($totalSpent / $totalBudgeted * 100, 1) : 0;
+$remaining    = $totalBudgeted - $totalSpent;
+$overCount    = count(array_filter($budgetedCats, fn($c) => (float)$c['spent'] >= (float)$c['budget_amount']));
+$warnCount    = count(array_filter($budgetedCats, fn($c) => (float)$c['budget_amount'] > 0 && (float)$c['spent'] / (float)$c['budget_amount'] >= 0.8 && (float)$c['spent'] < (float)$c['budget_amount']));
 
 $barColor = function(float $spent, float $amount): string {
     if ($amount <= 0) return '#3b82f6';
@@ -39,11 +41,9 @@ include __DIR__ . '/../partials/nav.php';
             <p>Set spending limits for <?= htmlspecialchars($monthLabel) ?>.</p>
         </div>
         <div style="display:flex;align-items:center;gap:0.5rem;">
-            <a href="?module=budget&bm=<?= $prevMonth ?>&by=<?= $prevYear ?>"
-               style="padding:0.5rem 0.9rem;background:rgba(255,255,255,0.07);border-radius:8px;text-decoration:none;color:var(--muted);">← <?= $prevLabel ?></a>
+            <a href="?module=budget&bm=<?= $prevMonth ?>&by=<?= $prevYear ?>" class="secondary">← <?= $prevLabel ?></a>
             <strong style="padding:0.5rem 0.75rem;background:rgba(59,130,246,0.12);border-radius:8px;color:#93c5fd;white-space:nowrap;"><?= htmlspecialchars($monthLabel) ?></strong>
-            <a href="?module=budget&bm=<?= $nextMonth ?>&by=<?= $nextYear ?>"
-               style="padding:0.5rem 0.9rem;background:rgba(255,255,255,0.07);border-radius:8px;text-decoration:none;color:var(--muted);"><?= date('M Y', mktime(0,0,0,$nextMonth,1,$nextYear)) ?> →</a>
+            <a href="?module=budget&bm=<?= $nextMonth ?>&by=<?= $nextYear ?>" class="secondary"><?= date('M Y', mktime(0,0,0,$nextMonth,1,$nextYear)) ?> →</a>
         </div>
     </header>
 
@@ -54,16 +54,10 @@ include __DIR__ . '/../partials/nav.php';
                 <input type="hidden" name="form"  value="budget_copy_last">
                 <input type="hidden" name="month" value="<?= $selectedMonth ?>">
                 <input type="hidden" name="year"  value="<?= $selectedYear ?>">
-                <button type="submit" style="background:rgba(255,255,255,0.07);color:var(--muted);">
-                    Copy from <?= $prevLabel ?>
-                </button>
+                <button type="submit" class="secondary">Copy from <?= $prevLabel ?></button>
             </form>
-            <button type="button" id="btn-apply-avg" style="background:rgba(99,102,241,0.15);color:#a5b4fc;">
-                Apply 3-month averages
-            </button>
-            <button type="button" id="btn-clear-all" style="background:rgba(255,255,255,0.05);color:var(--muted);">
-                Clear all
-            </button>
+            <button type="button" id="btn-apply-avg" class="secondary">Apply 3-month averages</button>
+            <button type="button" id="btn-clear-all" class="secondary">Clear all</button>
             <span style="margin-left:auto;font-size:0.82rem;color:var(--muted);">
                 <?= count($budgetedCats) ?> of <?= count($categories) ?> categories budgeted
             </span>
@@ -103,12 +97,93 @@ include __DIR__ . '/../partials/nav.php';
         <?php endif; ?>
     </section>
 
+    <!-- Overall progress graph -->
+    <?php if ($totalBudgeted > 0): ?>
+    <section class="module-panel">
+        <h2>Overall Budget Progress — <?= htmlspecialchars($monthLabel) ?></h2>
+        <div style="display:flex;align-items:center;gap:2rem;flex-wrap:wrap;">
+            <div style="position:relative;width:180px;height:180px;flex-shrink:0;">
+                <canvas id="overall-donut" width="180" height="180"></canvas>
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+                    <span style="font-size:1.6rem;font-weight:700;color:<?= $overallPct >= 100 ? '#f43f5e' : ($overallPct >= 80 ? '#f59e0b' : '#22c55e') ?>;"><?= $overallPct ?>%</span>
+                    <span style="font-size:0.72rem;color:var(--muted);">of budget</span>
+                </div>
+            </div>
+            <div style="flex:1;min-width:200px;">
+                <div style="margin-bottom:1.25rem;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;font-size:0.85rem;">
+                        <span>Spent</span>
+                        <strong style="color:<?= $overallPct >= 100 ? '#f43f5e' : ($overallPct >= 80 ? '#f59e0b' : '#22c55e') ?>;"><?= formatCurrency($totalSpent) ?></strong>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.07);border-radius:8px;height:10px;">
+                        <div style="background:<?= $overallPct >= 100 ? '#f43f5e' : ($overallPct >= 80 ? '#f59e0b' : '#22c55e') ?>;border-radius:8px;height:10px;width:<?= min(100,$overallPct) ?>%;transition:width 0.4s ease;"></div>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1.5rem;font-size:0.85rem;">
+                    <div>
+                        <div style="color:var(--muted);font-size:0.75rem;margin-bottom:0.2rem;">Total Budgeted</div>
+                        <div style="font-weight:600;"><?= formatCurrency($totalBudgeted) ?></div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted);font-size:0.75rem;margin-bottom:0.2rem;"><?= $remaining >= 0 ? 'Remaining' : 'Over by' ?></div>
+                        <div style="font-weight:600;color:<?= $remaining >= 0 ? '#22c55e' : '#f43f5e' ?>;"><?= formatCurrency(abs($remaining)) ?></div>
+                    </div>
+                    <?php if ($overCount > 0): ?>
+                    <div>
+                        <div style="color:var(--muted);font-size:0.75rem;margin-bottom:0.2rem;">Over limit</div>
+                        <div style="font-weight:600;color:#f43f5e;"><?= $overCount ?> categor<?= $overCount === 1 ? 'y' : 'ies' ?></div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($warnCount > 0): ?>
+                    <div>
+                        <div style="color:var(--muted);font-size:0.75rem;margin-bottom:0.2rem;">Near limit (80%+)</div>
+                        <div style="font-weight:600;color:#f59e0b;"><?= $warnCount ?> categor<?= $warnCount === 1 ? 'y' : 'ies' ?></div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+        (function() {
+            const spent    = <?= $totalSpent ?>;
+            const budgeted = <?= $totalBudgeted ?>;
+            const rem      = Math.max(0, budgeted - spent);
+            const over     = Math.max(0, spent - budgeted);
+            const pct      = budgeted > 0 ? spent / budgeted * 100 : 0;
+            const color    = pct >= 100 ? '#f43f5e' : pct >= 80 ? '#f59e0b' : '#22c55e';
+
+            new Chart(document.getElementById('overall-donut'), {
+                type: 'doughnut',
+                data: {
+                    labels: over > 0 ? ['Spent (over budget)'] : ['Spent', 'Remaining'],
+                    datasets: [{
+                        data: over > 0 ? [spent] : [spent, rem],
+                        backgroundColor: over > 0 ? [color] : [color, 'rgba(255,255,255,0.07)'],
+                        borderWidth: 0,
+                        hoverOffset: 4,
+                    }]
+                },
+                options: {
+                    cutout: '72%',
+                    responsive: false,
+                    animation: { animateRotate: true, duration: 600 },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => ' ₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } }
+                    }
+                }
+            });
+        })();
+        </script>
+    </section>
+    <?php endif; ?>
+
     <!-- Trend chart -->
     <?php if (count($trendData) >= 2): ?>
     <section class="module-panel">
         <h2>Budget vs Actual — last <?= count($trendData) ?> months</h2>
         <canvas id="trend-chart" height="90"></canvas>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
         (function() {
             const rows = <?= json_encode($trendData, JSON_UNESCAPED_UNICODE) ?>;
@@ -155,7 +230,10 @@ include __DIR__ . '/../partials/nav.php';
                     <span style="font-size:0.82rem;color:var(--muted);">
                         Total: <strong id="live-total" style="color:#93c5fd;"><?= formatCurrency($totalBudgeted) ?></strong>
                     </span>
-                    <button type="submit">Save budgets</button>
+                    <button type="submit"
+                            style="border:none;border-radius:999px;padding:0.6rem 1.4rem;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;font-weight:700;font-size:0.875rem;cursor:pointer;box-shadow:0 4px 14px rgba(59,130,246,0.3);">
+                        Save budgets
+                    </button>
                 </div>
             </div>
 
@@ -163,11 +241,11 @@ include __DIR__ . '/../partials/nav.php';
                 <table>
                     <thead>
                         <tr>
-                            <th>Category</th>
-                            <th style="width:160px;">Budget (₹)</th>
+                            <th>Category / Subcategory</th>
+                            <th style="width:150px;">Budget (₹)</th>
                             <th>Spent</th>
                             <th>3-mo avg</th>
-                            <th style="min-width:160px;">Progress</th>
+                            <th style="min-width:150px;">Progress</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -184,9 +262,19 @@ include __DIR__ . '/../partials/nav.php';
                             elseif ($pct >= 100) $alert = '🔴 Over';
                             elseif ($pct >= 80)  $alert = '🟡 80%+';
                         }
+                        $hasSubs = !empty($subcategories[$catId]);
                     ?>
-                        <tr>
-                            <td><?= htmlspecialchars($cat['category_name']) ?></td>
+                        <!-- Category row -->
+                        <tr class="cat-row" data-cat-id="<?= $catId ?>">
+                            <td>
+                                <?php if ($hasSubs): ?>
+                                    <button type="button" class="toggle-subs secondary"
+                                            data-cat="<?= $catId ?>"
+                                            style="padding:0.15rem 0.45rem;font-size:0.72rem;margin-right:0.4rem;min-width:24px;"
+                                            title="Expand subcategories">▶</button>
+                                <?php endif; ?>
+                                <strong><?= htmlspecialchars($cat['category_name']) ?></strong>
+                            </td>
                             <td>
                                 <input
                                     type="number"
@@ -209,8 +297,8 @@ include __DIR__ . '/../partials/nav.php';
                             <td>
                                 <?php if ($amount > 0): ?>
                                 <div style="display:flex;align-items:center;gap:0.4rem;">
-                                    <div style="flex:1;background:rgba(255,255,255,0.07);border-radius:5px;height:7px;min-width:80px;">
-                                        <div style="background:<?= $color ?>;border-radius:5px;height:7px;width:<?= min(100,$pct) ?>%;max-width:100%;"></div>
+                                    <div style="flex:1;background:rgba(255,255,255,0.07);border-radius:5px;height:7px;min-width:70px;">
+                                        <div style="background:<?= $color ?>;border-radius:5px;height:7px;width:<?= min(100,$pct) ?>%;"></div>
                                     </div>
                                     <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;"><?= $pct ?>%</span>
                                     <?php if ($alert): ?>
@@ -222,6 +310,65 @@ include __DIR__ . '/../partials/nav.php';
                                 <?php endif; ?>
                             </td>
                         </tr>
+
+                        <!-- Subcategory rows (hidden by default) -->
+                        <?php if ($hasSubs): ?>
+                            <?php foreach ($subcategories[$catId] as $sub):
+                                $subId     = (int) $sub['subcategory_id'];
+                                $subAmt    = (float) $sub['budget_amount'];
+                                $subSpent  = (float) $sub['spent'];
+                                $subAvg    = (float) ($subThreeMonthAvg[$subId] ?? 0);
+                                $subPct    = $subAmt > 0 ? min(200, round($subSpent / $subAmt * 100, 1)) : 0;
+                                $subColor  = $barColor($subSpent, $subAmt);
+                                $subAlert  = '';
+                                if ($subAmt > 0) {
+                                    if ($subPct >= 120)     $subAlert = '🔴 120%+';
+                                    elseif ($subPct >= 100) $subAlert = '🔴 Over';
+                                    elseif ($subPct >= 80)  $subAlert = '🟡 80%+';
+                                }
+                            ?>
+                            <tr class="sub-row" data-parent-cat="<?= $catId ?>" style="display:none;background:rgba(0,0,0,0.15);">
+                                <td style="padding-left:2.5rem;color:var(--muted);font-size:0.88rem;">
+                                    ↳ <?= htmlspecialchars($sub['subcategory_name']) ?>
+                                </td>
+                                <td>
+                                    <input
+                                        type="number"
+                                        class="budget-input sub-budget-input"
+                                        name="sub_budget[<?= $subId ?>][amount]"
+                                        data-subcategory-id="<?= $subId ?>"
+                                        data-avg="<?= $subAvg ?>"
+                                        value="<?= $subAmt > 0 ? number_format($subAmt, 2, '.', '') : '' ?>"
+                                        min="0" step="0.01"
+                                        placeholder="—"
+                                        style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.4rem 0.6rem;color:inherit;font-size:0.85rem;">
+                                    <input type="hidden" name="sub_budget[<?= $subId ?>][name]" value="<?= htmlspecialchars($sub['subcategory_name']) ?>">
+                                </td>
+                                <td style="font-size:0.85rem;<?= $subSpent > 0 ? '' : 'color:var(--muted)' ?>">
+                                    <?= $subSpent > 0 ? formatCurrency($subSpent) : '—' ?>
+                                </td>
+                                <td style="color:var(--muted);font-size:0.82rem;">
+                                    <?= $subAvg > 0 ? formatCurrency($subAvg) : '—' ?>
+                                </td>
+                                <td>
+                                    <?php if ($subAmt > 0): ?>
+                                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                                        <div style="flex:1;background:rgba(255,255,255,0.07);border-radius:5px;height:6px;min-width:70px;">
+                                            <div style="background:<?= $subColor ?>;border-radius:5px;height:6px;width:<?= min(100,$subPct) ?>%;"></div>
+                                        </div>
+                                        <span style="font-size:0.72rem;color:var(--muted);white-space:nowrap;"><?= $subPct ?>%</span>
+                                        <?php if ($subAlert): ?>
+                                            <span style="font-size:0.7rem;white-space:nowrap;"><?= $subAlert ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php else: ?>
+                                    <span style="color:rgba(255,255,255,0.12);font-size:0.78rem;">No limit</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+
                     <?php endforeach; ?>
                     </tbody>
                     <tfoot>
@@ -235,13 +382,16 @@ include __DIR__ . '/../partials/nav.php';
                 </table>
             </div>
 
-            <div style="margin-top:1rem;display:flex;justify-content:flex-end;gap:0.75rem;">
-                <button type="submit">Save budgets for <?= htmlspecialchars($monthLabel) ?></button>
+            <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
+                <button type="submit"
+                        style="border:none;border-radius:999px;padding:0.6rem 1.4rem;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;font-weight:700;font-size:0.875rem;cursor:pointer;box-shadow:0 4px 14px rgba(59,130,246,0.3);">
+                    Save budgets for <?= htmlspecialchars($monthLabel) ?>
+                </button>
             </div>
         </section>
     </form>
 
-    <!-- Month-end summary (show when viewing a past month with budgets) -->
+    <!-- Month-end summary (past months only) -->
     <?php
     $isPastMonth = ($selectedYear < (int)date('Y')) || ($selectedYear == (int)date('Y') && $selectedMonth < (int)date('n'));
     if ($isPastMonth && count($budgetedCats) > 0):
@@ -271,7 +421,6 @@ include __DIR__ . '/../partials/nav.php';
             </article>
             <?php endif; ?>
         </div>
-
         <div class="table-wrapper" style="margin-top:1rem;">
             <table>
                 <thead>
@@ -303,30 +452,39 @@ include __DIR__ . '/../partials/nav.php';
 
 <script>
 (function () {
-    const inputs    = document.querySelectorAll('.budget-input');
+    const catInputs = document.querySelectorAll('.budget-input:not(.sub-budget-input)');
     const liveTotal = document.getElementById('live-total');
     const liveFoot  = document.getElementById('live-total-foot');
     const avgMap    = <?= json_encode($threeMonthAvg, JSON_UNESCAPED_UNICODE) ?>;
+    const subAvgMap = <?= json_encode($subThreeMonthAvg, JSON_UNESCAPED_UNICODE) ?>;
 
     function fmt(n) {
-        return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return '₹\u200a' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function updateTotal() {
         let total = 0;
-        inputs.forEach(inp => { total += parseFloat(inp.value) || 0; });
+        catInputs.forEach(inp => { total += parseFloat(inp.value) || 0; });
         const str = fmt(total);
         if (liveTotal) liveTotal.textContent = str;
         if (liveFoot)  liveFoot.textContent  = str;
     }
 
-    inputs.forEach(inp => inp.addEventListener('input', updateTotal));
+    catInputs.forEach(inp => inp.addEventListener('input', updateTotal));
 
-    // Apply 3-month averages to empty inputs
+    // Apply 3-month averages to empty category inputs
     document.getElementById('btn-apply-avg')?.addEventListener('click', function () {
-        inputs.forEach(inp => {
+        catInputs.forEach(inp => {
             const catId = inp.dataset.categoryId;
             const avg   = avgMap[catId];
+            if (avg && avg > 0 && (!inp.value || parseFloat(inp.value) === 0)) {
+                inp.value = Number(avg).toFixed(2);
+            }
+        });
+        // Also apply to subcategory inputs
+        document.querySelectorAll('.sub-budget-input').forEach(inp => {
+            const subId = inp.dataset.subcategoryId;
+            const avg   = subAvgMap[subId];
             if (avg && avg > 0 && (!inp.value || parseFloat(inp.value) === 0)) {
                 inp.value = Number(avg).toFixed(2);
             }
@@ -337,8 +495,20 @@ include __DIR__ . '/../partials/nav.php';
     // Clear all inputs
     document.getElementById('btn-clear-all')?.addEventListener('click', function () {
         if (!confirm('Clear all budget amounts for this month?')) return;
-        inputs.forEach(inp => { inp.value = ''; });
+        document.querySelectorAll('.budget-input').forEach(inp => { inp.value = ''; });
         updateTotal();
+    });
+
+    // Toggle subcategory rows
+    document.querySelectorAll('.toggle-subs').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const catId  = this.dataset.cat;
+            const rows   = document.querySelectorAll('.sub-row[data-parent-cat="' + catId + '"]');
+            const isOpen = this.textContent === '▼';
+            rows.forEach(r => { r.style.display = isOpen ? 'none' : ''; });
+            this.textContent = isOpen ? '▶' : '▼';
+            this.title       = isOpen ? 'Expand subcategories' : 'Collapse subcategories';
+        });
     });
 })();
 </script>
