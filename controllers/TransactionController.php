@@ -56,6 +56,18 @@ class TransactionController extends BaseController
             );
         }
 
+        if (($_GET['action'] ?? '') === 'quick_add_form') {
+            header('Content-Type: text/html; charset=utf-8');
+            return $this->renderPartial('transactions/quick_add.php', [
+                'accounts'          => $this->accountModel->getList(),
+                'loans'             => $this->loanModel->getAll(),
+                'categories'        => $this->categoryModel->getAllWithSubcategories(),
+                'paymentMethods'    => $this->paymentMethodModel->getAll(),
+                'purchaseChildren'  => $this->purchaseSourceModel->getChildren(),
+                'openLendingRecords'=> $this->lendingModel->getOpenRecords(),
+            ]);
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'set_default_account') {
             $id = (int) ($_POST['account_id'] ?? 0);
             if ($id > 0) {
@@ -67,7 +79,13 @@ class TransactionController extends BaseController
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction') {
             $this->handleTransaction($_POST);
-            header('Location: ?module=transactions');
+            $redirectTo = trim((string) ($_POST['redirect_to'] ?? ''));
+            // Only allow relative URLs to prevent open-redirect
+            if ($redirectTo !== '' && strpos($redirectTo, '/') === 0) {
+                header('Location: ' . $redirectTo);
+            } else {
+                header('Location: ?module=transactions');
+            }
             exit;
         }
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction_update') {

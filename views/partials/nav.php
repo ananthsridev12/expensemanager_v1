@@ -20,6 +20,10 @@
     <a href="?module=investments" class="<?= $module === 'investments' ? 'is-active' : '' ?>">Investments</a>
     <a href="?module=sip" class="<?= $module === 'sip' ? 'is-active' : '' ?>">SIP</a>
     <a href="?module=rental" class="<?= $module === 'rental' ? 'is-active' : '' ?>">Rental</a>
+    <button type="button" id="quick-add-nav-btn"
+            style="display:block;width:calc(100% - 2rem);margin:0.75rem 1rem 0.25rem;padding:0.6rem 1rem;background:#22c55e;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:0.95rem;cursor:pointer;text-align:left;letter-spacing:0.01em;">
+        + Add Transaction
+    </button>
     <div class="font-size-btns">
         <span>Text</span>
         <button data-font="normal"    title="Normal size">A</button>
