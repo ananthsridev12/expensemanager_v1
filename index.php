@@ -175,6 +175,7 @@ use Controllers\ReminderController;
 use Controllers\RentalController;
 use Controllers\RentedHomeController;
 use Controllers\SipController;
+use Controllers\NotesController;
 use Controllers\TransactionController;
 
 $moduleInput = filter_input(INPUT_GET, 'module', FILTER_DEFAULT);
@@ -240,6 +241,10 @@ switch ($module) {
         break;
     case 'rented_home':
         $controller = new RentedHomeController();
+        echo $controller->index();
+        break;
+    case 'notes':
+        $controller = new NotesController();
         echo $controller->index();
         break;
     case 'dashboard':
