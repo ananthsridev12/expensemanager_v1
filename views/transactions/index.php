@@ -58,11 +58,14 @@ include __DIR__ . '/../partials/nav.php';
                 Account
                 <select name="account_id">
                     <option value="">All accounts</option>
-                    <?php foreach ($accounts as $account): ?>
-                        <?php $accountType = $account['account_type'] ?? 'bank'; ?>
-                        <option value="<?= (int) $account['id'] ?>" <?= ($filters['account_id'] ?? null) == $account['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name'] . ' (' . $accountType . ')') ?>
-                        </option>
+                    <?php foreach ($acctGroups as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <option value="<?= (int) $account['id'] ?>" <?= ($filters['account_id'] ?? null) == $account['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -383,13 +386,22 @@ include __DIR__ . '/../partials/nav.php';
                         To account
                         <select name="transfer_to_account_id">
                             <option value="">Select target account</option>
-                            <?php foreach ($accounts as $account): ?>
-                                <?php $accountType = $account['account_type'] ?? 'bank'; ?>
-                                <option value="<?= $accountType . ':' . $account['id'] ?>"><?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?></option>
+                            <?php foreach ($acctGroups as $grp): ?>
+                                <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                                    <?php foreach ($grp['accounts'] as $account): ?>
+                                        <option value="<?= $account['account_type'] . ':' . $account['id'] ?>">
+                                            <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </optgroup>
                             <?php endforeach; ?>
-                            <?php foreach ($loans as $loan): ?>
-                                <option value="loan:<?= (int) $loan['id'] ?>"><?= htmlspecialchars('Loan: ' . ($loan['loan_name'] ?? 'Loan #' . $loan['id'])) ?></option>
-                            <?php endforeach; ?>
+                            <?php if (!empty($loans)): ?>
+                                <optgroup label="Loans">
+                                    <?php foreach ($loans as $loan): ?>
+                                        <option value="loan:<?= (int) $loan['id'] ?>"><?= htmlspecialchars('Loan: ' . ($loan['loan_name'] ?? 'Loan #' . $loan['id'])) ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endif; ?>
                         </select>
                     </label>
                 </div>
@@ -657,12 +669,19 @@ include __DIR__ . '/../partials/nav.php';
                     Deposit to account
                     <select name="deposit_account_id" required>
                         <option value="">Select account</option>
-                        <?php foreach ($accounts as $account): ?>
-                            <?php if (($account['account_type'] ?? '') === 'credit_card') { continue; } ?>
-                            <?php $accountType = $account['account_type'] ?? 'bank'; ?>
-                            <option value="<?= $accountType . ':' . $account['id'] ?>">
-                                <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
-                            </option>
+                        <?php foreach ($acctGroups as $grp): ?>
+                            <?php
+                            // Exclude credit card accounts — points can't deposit to a CC
+                            $depositAccounts = array_filter($grp['accounts'], fn($a) => ($a['account_type'] ?? '') !== 'credit_card');
+                            if (empty($depositAccounts)) continue;
+                            ?>
+                            <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                                <?php foreach ($depositAccounts as $account): ?>
+                                    <option value="<?= $account['account_type'] . ':' . $account['id'] ?>">
+                                        <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
                         <?php endforeach; ?>
                     </select>
                 </label>
