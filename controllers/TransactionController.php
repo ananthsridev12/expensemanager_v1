@@ -3,6 +3,7 @@
 namespace Controllers;
 
 use Models\Account;
+use Models\Borrowing;
 use Models\Category;
 use Models\Contact;
 use Models\CreditCard;
@@ -12,6 +13,7 @@ use Models\Loan;
 use Models\PaymentMethod;
 use Models\PurchaseSource;
 use Models\Rental;
+use Models\RentedHome;
 use Models\Transaction;
 use Models\Investment;
 
@@ -23,11 +25,13 @@ class TransactionController extends BaseController
     private CreditCard $creditCardModel;
     private CreditCardReward $rewardModel;
     private Lending $lendingModel;
+    private Borrowing $borrowingModel;
     private Loan $loanModel;
     private PaymentMethod $paymentMethodModel;
     private PurchaseSource $purchaseSourceModel;
     private Contact $contactModel;
     private Rental $rentalModel;
+    private RentedHome $rentedHomeModel;
     private Investment $investmentModel;
 
     public function __construct()
@@ -39,11 +43,13 @@ class TransactionController extends BaseController
         $this->creditCardModel = new CreditCard($this->database);
         $this->rewardModel = new CreditCardReward($this->database);
         $this->lendingModel = new Lending($this->database);
+        $this->borrowingModel = new Borrowing($this->database);
         $this->loanModel = new Loan($this->database);
         $this->paymentMethodModel = new PaymentMethod($this->database);
         $this->purchaseSourceModel = new PurchaseSource($this->database);
         $this->contactModel = new Contact($this->database);
         $this->rentalModel = new Rental($this->database);
+        $this->rentedHomeModel = new RentedHome($this->database);
         $this->investmentModel = new Investment($this->database);
     }
 
@@ -64,11 +70,13 @@ class TransactionController extends BaseController
                 'categories'         => $this->categoryModel->getAllWithSubcategories(),
                 'paymentMethods'     => $this->paymentMethodModel->getAll(),
                 'purchaseChildren'   => $this->purchaseSourceModel->getChildren(),
-                'openLendingRecords' => $this->lendingModel->getOpenRecords(),
-                'rentalContracts'    => $this->rentalModel->getContracts(),
-                'rentalProperties'   => $this->rentalModel->getProperties(),
-                'rentalTenants'      => $this->rentalModel->getTenants(),
-                'investments'        => $this->investmentModel->getAll(),
+                'openLendingRecords'   => $this->lendingModel->getOpenRecords(),
+                'openBorrowingRecords' => $this->borrowingModel->getOpenRecords(),
+                'rentalContracts'      => $this->rentalModel->getContracts(),
+                'rentalProperties'     => $this->rentalModel->getProperties(),
+                'rentalTenants'        => $this->rentalModel->getTenants(),
+                'investments'          => $this->investmentModel->getAll(),
+                'activeRentedHomes'    => $this->rentedHomeModel->getActive(),
             ]);
         }
 
@@ -160,32 +168,36 @@ class TransactionController extends BaseController
         $paymentMethods = $this->paymentMethodModel->getAll();
         $purchaseChildren = $this->purchaseSourceModel->getChildren();
         $creditCards = $this->creditCardModel->getAll();
-        $openLendingRecords = $this->lendingModel->getOpenRecords();
-        $rentalContracts = $this->rentalModel->getContracts();
-        $rentalProperties = $this->rentalModel->getProperties();
-        $rentalTenants = $this->rentalModel->getTenants();
-        $investments = $this->investmentModel->getAll();
-        $recentTransactions = $this->transactionModel->getFiltered($filters);
-        $totalsByType = $this->transactionModel->getTotalsByType();
+        $openLendingRecords  = $this->lendingModel->getOpenRecords();
+        $openBorrowingRecords = $this->borrowingModel->getOpenRecords();
+        $rentalContracts     = $this->rentalModel->getContracts();
+        $rentalProperties    = $this->rentalModel->getProperties();
+        $rentalTenants       = $this->rentalModel->getTenants();
+        $investments         = $this->investmentModel->getAll();
+        $activeRentedHomes   = $this->rentedHomeModel->getActive();
+        $recentTransactions  = $this->transactionModel->getFiltered($filters);
+        $totalsByType        = $this->transactionModel->getTotalsByType();
 
         return $this->render('transactions/index.php', [
-            'accounts' => $accounts,
-            'loans' => $loans,
-            'categories' => $categories,
-            'filters' => $filters,
-            'paymentMethods' => $paymentMethods,
-            'purchaseChildren' => $purchaseChildren,
-            'creditCards' => $creditCards,
-            'openLendingRecords' => $openLendingRecords,
-            'rentalContracts' => $rentalContracts,
-            'rentalProperties' => $rentalProperties,
-            'rentalTenants' => $rentalTenants,
-            'investments' => $investments,
-            'recentTransactions' => $recentTransactions,
-            'totalsByType' => $totalsByType,
-            'imported' => isset($_GET['imported']) ? (int) $_GET['imported'] : null,
-            'failed' => isset($_GET['failed']) ? (int) $_GET['failed'] : null,
-            'editTransaction' => $editTransaction,
+            'accounts'            => $accounts,
+            'loans'               => $loans,
+            'categories'          => $categories,
+            'filters'             => $filters,
+            'paymentMethods'      => $paymentMethods,
+            'purchaseChildren'    => $purchaseChildren,
+            'creditCards'         => $creditCards,
+            'openLendingRecords'  => $openLendingRecords,
+            'openBorrowingRecords'=> $openBorrowingRecords,
+            'rentalContracts'     => $rentalContracts,
+            'rentalProperties'    => $rentalProperties,
+            'rentalTenants'       => $rentalTenants,
+            'investments'         => $investments,
+            'activeRentedHomes'   => $activeRentedHomes,
+            'recentTransactions'  => $recentTransactions,
+            'totalsByType'        => $totalsByType,
+            'imported'            => isset($_GET['imported']) ? (int) $_GET['imported'] : null,
+            'failed'              => isset($_GET['failed']) ? (int) $_GET['failed'] : null,
+            'editTransaction'     => $editTransaction,
         ]);
     }
 
@@ -355,6 +367,14 @@ class TransactionController extends BaseController
             }
             if ($transferTarget === 'investment') {
                 $this->handleTransferToInvestment($input, $fromType, $fromId);
+                return;
+            }
+            if ($transferTarget === 'borrowing') {
+                $this->handleTransferToBorrowing($input, $fromType, $fromId);
+                return;
+            }
+            if ($transferTarget === 'rented_home') {
+                $this->handleTransferToRentedHome($input, $fromType, $fromId);
                 return;
             }
 
@@ -870,6 +890,50 @@ class TransactionController extends BaseController
             'transaction_date' => $input['transaction_date'] ?? date('Y-m-d'),
             'notes' => $input['investment_tx_notes'] ?? null,
         ], $fundingToken);
+    }
+
+    private function handleTransferToBorrowing(array $input, string $fromType, int $fromId): void
+    {
+        $mode         = (string) ($input['borrowing_mode'] ?? 'new');
+        $fundingToken = $fromId > 0 ? $fromType . ':' . $fromId : '';
+        $amount       = is_numeric($input['amount'] ?? null) ? (float) $input['amount'] : 0.0;
+        $date         = $input['transaction_date'] ?? date('Y-m-d');
+
+        if ($mode === 'repayment') {
+            $this->borrowingModel->recordRepayment([
+                'borrowing_record_id' => $input['borrowing_record_id'] ?? null,
+                'repayment_amount'    => $amount,
+                'repayment_date'      => $date,
+                'payment_account'     => $fundingToken,
+                'notes'               => $input['borrowing_notes'] ?? null,
+            ]);
+            return;
+        }
+
+        // New borrowing — money received into account
+        $this->borrowingModel->create([
+            'contact_id'       => !empty($input['borrowing_contact_id']) ? (int) $input['borrowing_contact_id'] : 0,
+            'principal_amount' => $amount,
+            'interest_rate'    => $input['borrowing_interest_rate'] ?? 0,
+            'borrowed_date'    => $date,
+            'due_date'         => !empty($input['borrowing_due_date']) ? $input['borrowing_due_date'] : null,
+            'deposit_account'  => $fundingToken,
+            'notes'            => $input['borrowing_notes'] ?? null,
+        ]);
+    }
+
+    private function handleTransferToRentedHome(array $input, string $fromType, int $fromId): void
+    {
+        $fundingToken = $fromId > 0 ? $fromType . ':' . $fromId : '';
+        $this->rentedHomeModel->recordExpense([
+            'home_id'       => $input['rented_home_id'] ?? 0,
+            'expense_type'  => $input['rented_home_type'] ?? 'rent',
+            'amount'        => is_numeric($input['amount'] ?? null) ? (float) $input['amount'] : 0.0,
+            'expense_date'  => $input['transaction_date'] ?? date('Y-m-d'),
+            'account_token' => $fundingToken,
+            'period_month'  => !empty($input['rented_home_period']) ? $input['rented_home_period'] : null,
+            'notes'         => $input['rented_home_notes'] ?? null,
+        ]);
     }
 
     private function collectFilters(): array

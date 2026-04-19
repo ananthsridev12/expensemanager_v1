@@ -173,6 +173,7 @@ use Controllers\LoanController;
 use Controllers\LendingController;
 use Controllers\ReminderController;
 use Controllers\RentalController;
+use Controllers\RentedHomeController;
 use Controllers\SipController;
 use Controllers\TransactionController;
 
@@ -235,6 +236,10 @@ switch ($module) {
         break;
     case 'rental':
         $controller = new RentalController();
+        echo $controller->index();
+        break;
+    case 'rented_home':
+        $controller = new RentedHomeController();
         echo $controller->index();
         break;
     case 'dashboard':

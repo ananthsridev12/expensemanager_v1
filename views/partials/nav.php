@@ -24,6 +24,7 @@
     <a href="?module=investments" class="<?= $module === 'investments' ? 'is-active' : '' ?>">Investments</a>
     <a href="?module=sip" class="<?= $module === 'sip' ? 'is-active' : '' ?>">SIP</a>
     <a href="?module=rental" class="<?= $module === 'rental' ? 'is-active' : '' ?>">Rental</a>
+    <a href="?module=rented_home" class="<?= $module === 'rented_home' ? 'is-active' : '' ?>">My Rented Home</a>
     <div class="font-size-btns">
         <span>Text</span>
         <button data-font="normal"    title="Normal size">A</button>

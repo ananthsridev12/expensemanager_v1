@@ -12,6 +12,8 @@ $purchaseChildren = $purchaseChildren ?? [];
 $creditCards = $creditCards ?? [];
 $filters = $filters ?? [];
 $editTransaction = $editTransaction ?? null;
+$openBorrowingRecords = $openBorrowingRecords ?? [];
+$activeRentedHomes = $activeRentedHomes ?? [];
 
 // Build grouped account list (used in Filters, From account, To account, Redeem points)
 $acctTypeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
@@ -238,7 +240,7 @@ include __DIR__ . '/../partials/nav.php';
             </label>
             <label>
                 Amount
-                <input type="number" name="amount" step="0.01" min="0" required>
+                <input type="number" name="amount" id="tx-amount" step="0.01" min="0" required>
             </label>
             <label>
                 Group spend?
@@ -377,8 +379,10 @@ include __DIR__ . '/../partials/nav.php';
                         <select name="transfer_target" id="transfer-target">
                             <option value="account">Account / Loan</option>
                             <option value="lending">Lending (lend / repayment)</option>
+                            <option value="borrowing">Borrowing (receive / repay)</option>
                             <option value="rental">Rental (record rent)</option>
                             <option value="investment">Investment</option>
+                            <option value="rented_home">My Rented Home</option>
                         </select>
                     </label>
                 </div>
@@ -617,6 +621,98 @@ include __DIR__ . '/../partials/nav.php';
                         </label>
                     </div>
                 </div>
+
+                <!-- Borrowing sub-panel -->
+                <div id="transfer-borrowing-panel" style="display: none;">
+                    <div class="module-form">
+                        <label>
+                            Mode
+                            <select name="borrowing_mode" id="borrowing-mode">
+                                <option value="new">New borrowing (receive money)</option>
+                                <option value="repayment">Repay existing borrowing</option>
+                            </select>
+                        </label>
+                    </div>
+                    <!-- New borrowing fields -->
+                    <div class="module-form" id="borrowing-new-fields">
+                        <label>
+                            Borrowed from (contact)
+                            <input type="text" id="borrowing-contact-search" placeholder="Type name / mobile" autocomplete="off">
+                            <input type="hidden" name="borrowing_contact_id" id="borrowing-contact-id">
+                        </label>
+                        <div id="borrowing-contact-results" style="margin-top:-0.5rem;margin-bottom:0.5rem;">
+                            <small class="muted">Start typing to search contacts.</small>
+                        </div>
+                        <label>
+                            Interest rate (% p.a.)
+                            <input type="number" name="borrowing_interest_rate" step="0.01" min="0" value="0">
+                        </label>
+                        <label>
+                            Due date
+                            <input type="date" name="borrowing_due_date">
+                        </label>
+                        <label>
+                            Notes
+                            <input type="text" name="borrowing_notes" placeholder="Optional">
+                        </label>
+                    </div>
+                    <!-- Repayment fields -->
+                    <div class="module-form" id="borrowing-repayment-fields" style="display: none;">
+                        <label>
+                            Borrowing record
+                            <select name="borrowing_record_id">
+                                <option value="">Select record</option>
+                                <?php foreach ($openBorrowingRecords ?? [] as $br): ?>
+                                    <option value="<?= (int) $br['id'] ?>">
+                                        <?= htmlspecialchars($br['contact_name']) ?> — <?= formatCurrency((float) $br['outstanding_amount']) ?> outstanding
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Notes
+                            <input type="text" name="borrowing_notes" placeholder="Optional">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Rented Home sub-panel -->
+                <div id="transfer-rented-home-panel" style="display: none;">
+                    <div class="module-form">
+                        <label>
+                            Home
+                            <select name="rented_home_id" id="rh-tx-home">
+                                <option value="">Select home</option>
+                                <?php foreach ($activeRentedHomes ?? [] as $rh): ?>
+                                    <option value="<?= (int) $rh['id'] ?>"
+                                            data-rent="<?= (float) $rh['monthly_rent'] ?>"
+                                            data-maintenance="<?= (float) $rh['maintenance_amount'] ?>"
+                                            data-advance="<?= (float) $rh['advance_amount'] ?>">
+                                        <?= htmlspecialchars($rh['label']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Payment type
+                            <select name="rented_home_type" id="rh-tx-type">
+                                <option value="rent">Monthly Rent</option>
+                                <option value="advance">Advance / Deposit</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="electricity">Electricity Bill</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </label>
+                        <label id="rh-tx-period-wrap">
+                            Period (month)
+                            <input type="month" name="rented_home_period" value="<?= date('Y-m') ?>">
+                        </label>
+                        <label>
+                            Notes
+                            <input type="text" name="rented_home_notes" placeholder="Optional">
+                        </label>
+                    </div>
+                </div>
             </div>
             <label>
                 Reference type
@@ -845,6 +941,18 @@ include __DIR__ . '/../partials/nav.php';
             const transferLendingPanel = document.getElementById('transfer-lending-panel');
             const transferRentalPanel = document.getElementById('transfer-rental-panel');
             const transferInvestmentPanel = document.getElementById('transfer-investment-panel');
+            const transferBorrowingPanel = document.getElementById('transfer-borrowing-panel');
+            const transferRentedHomePanel = document.getElementById('transfer-rented-home-panel');
+            const borrowingModeSelect = document.getElementById('borrowing-mode');
+            const borrowingNewFields = document.getElementById('borrowing-new-fields');
+            const borrowingRepaymentFields = document.getElementById('borrowing-repayment-fields');
+            const borrowingContactSearch = document.getElementById('borrowing-contact-search');
+            const borrowingContactId = document.getElementById('borrowing-contact-id');
+            const borrowingContactResults = document.getElementById('borrowing-contact-results');
+            const rhTransferHomeSelect = document.getElementById('rh-tx-home');
+            const rhTransferTypeSelect = document.getElementById('rh-tx-type');
+            const rhTransferAmount = document.getElementById('tx-amount');
+            const rhTransferPeriodWrap = document.getElementById('rh-tx-period-wrap');
             const lendingModeSelect = document.getElementById('lending-mode');
             const lendingNewFields = document.getElementById('lending-new-fields');
             const lendingRepaymentFields = document.getElementById('lending-repayment-fields');
@@ -906,10 +1014,12 @@ include __DIR__ . '/../partials/nav.php';
 
             function toggleTransferTarget() {
                 const target = transferTargetSelect ? transferTargetSelect.value : 'account';
-                transferAccountPanel.style.display = target === 'account' ? 'grid' : 'none';
-                transferLendingPanel.style.display = target === 'lending' ? 'block' : 'none';
-                transferRentalPanel.style.display = target === 'rental' ? 'block' : 'none';
+                transferAccountPanel.style.display    = target === 'account'    ? 'grid'  : 'none';
+                transferLendingPanel.style.display    = target === 'lending'    ? 'block' : 'none';
+                transferRentalPanel.style.display     = target === 'rental'     ? 'block' : 'none';
                 transferInvestmentPanel.style.display = target === 'investment' ? 'block' : 'none';
+                if (transferBorrowingPanel)  transferBorrowingPanel.style.display  = target === 'borrowing'   ? 'block' : 'none';
+                if (transferRentedHomePanel) transferRentedHomePanel.style.display = target === 'rented_home' ? 'block' : 'none';
             }
 
             const lendingTopupFields = document.getElementById('lending-topup-fields');
@@ -931,6 +1041,30 @@ include __DIR__ . '/../partials/nav.php';
                 const mode = investmentModeSelect ? investmentModeSelect.value : 'existing';
                 investmentExistingFields.style.display = mode === 'existing' ? 'grid' : 'none';
                 investmentNewFields.style.display = mode === 'new' ? 'grid' : 'none';
+            }
+
+            function toggleBorrowingMode() {
+                const mode = borrowingModeSelect ? borrowingModeSelect.value : 'new';
+                if (borrowingNewFields)       borrowingNewFields.style.display       = mode === 'new'       ? 'grid' : 'none';
+                if (borrowingRepaymentFields) borrowingRepaymentFields.style.display = mode === 'repayment' ? 'grid' : 'none';
+            }
+
+            function toggleRhTransferPeriod() {
+                const type = rhTransferTypeSelect ? rhTransferTypeSelect.value : '';
+                if (rhTransferPeriodWrap) {
+                    rhTransferPeriodWrap.style.display = (type === 'rent' || type === 'electricity') ? '' : 'none';
+                }
+            }
+
+            function prefillRhTransferAmount() {
+                if (!rhTransferHomeSelect || !rhTransferTypeSelect || !rhTransferAmount) return;
+                const opt = rhTransferHomeSelect.options[rhTransferHomeSelect.selectedIndex];
+                const type = rhTransferTypeSelect.value;
+                if (!opt || !opt.value) return;
+                if (type === 'rent')             rhTransferAmount.value = opt.dataset.rent        || '';
+                else if (type === 'maintenance') rhTransferAmount.value = opt.dataset.maintenance || '';
+                else if (type === 'advance')     rhTransferAmount.value = opt.dataset.advance     || '';
+                else                             rhTransferAmount.value = '';
             }
 
             function toggleEmiFields() {
@@ -1104,6 +1238,29 @@ include __DIR__ . '/../partials/nav.php';
             if (investmentModeSelect) {
                 investmentModeSelect.addEventListener('change', toggleInvestmentMode);
             }
+            if (borrowingModeSelect) {
+                borrowingModeSelect.addEventListener('change', toggleBorrowingMode);
+            }
+            if (rhTransferHomeSelect) {
+                rhTransferHomeSelect.addEventListener('change', prefillRhTransferAmount);
+            }
+            if (rhTransferTypeSelect) {
+                rhTransferTypeSelect.addEventListener('change', function () {
+                    prefillRhTransferAmount();
+                    toggleRhTransferPeriod();
+                });
+            }
+            if (borrowingContactSearch) {
+                borrowingContactSearch.addEventListener('input', function () {
+                    const query = borrowingContactSearch.value.trim();
+                    if (query.length < 2) {
+                        borrowingContactId.value = '';
+                        borrowingContactResults.innerHTML = '<small class="muted">Start typing to search contacts.</small>';
+                        return;
+                    }
+                    searchContactsFor(query, borrowingContactSearch, borrowingContactId, borrowingContactResults);
+                });
+            }
             typeSelect.addEventListener('change', toggleTransferFields);
             typeSelect.addEventListener('change', toggleEmiFields);
             typeSelect.addEventListener('change', toggleGroupSpendFields);
@@ -1189,6 +1346,8 @@ include __DIR__ . '/../partials/nav.php';
             toggleLendingMode();
             toggleRentalMode();
             toggleInvestmentMode();
+            toggleBorrowingMode();
+            toggleRhTransferPeriod();
             toggleEmiFields();
             toggleGroupSpendFields();
             toggleCategoryOther();
