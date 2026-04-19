@@ -200,6 +200,13 @@ SQL;
         $stmt->execute([':ref_type' => $refType, ':ref_id' => $refId]);
     }
 
+    public function referenceExists(string $refType, int $refId): bool
+    {
+        $stmt = $this->db->prepare('SELECT 1 FROM transactions WHERE reference_type = :ref_type AND reference_id = :ref_id LIMIT 1');
+        $stmt->execute([':ref_type' => $refType, ':ref_id' => $refId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
     public function getTotalsByType(): array
     {
         $stmt = $this->db->query('SELECT transaction_type, SUM(amount) AS total FROM transactions GROUP BY transaction_type');

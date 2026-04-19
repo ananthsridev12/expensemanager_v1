@@ -529,27 +529,34 @@ class TransactionController extends BaseController
             return;
         }
 
+        // Guard against duplicate surcharge entries for the same parent transaction
+        if ($this->transactionModel->referenceExists('fuel_surcharge', $txId)) {
+            return;
+        }
+
         $date = $input['transaction_date'] ?? date('Y-m-d');
 
-        // Surcharge expense (surcharge + GST)
+        // Surcharge expense (surcharge + GST) — category: Fuel (id=14)
         $this->transactionModel->create([
             'transaction_date' => $date,
             'account_type'     => 'credit_card',
             'account_id'       => $accountId,
             'transaction_type' => 'expense',
+            'category_id'      => 14,
             'amount'           => $total,
             'reference_type'   => 'fuel_surcharge',
             'reference_id'     => $txId,
             'notes'            => 'Fuel surcharge: ' . $rate . '% + 18% GST = ' . $total,
         ]);
 
-        // Refund income (surcharge only, GST not refunded) if spend >= min
+        // Refund income (surcharge only, GST not refunded) if spend >= min — category: Fuel (id=14)
         if ($amount >= $minRefund && $surcharge > 0) {
             $this->transactionModel->create([
                 'transaction_date' => $date,
                 'account_type'     => 'credit_card',
                 'account_id'       => $accountId,
                 'transaction_type' => 'income',
+                'category_id'      => 14,
                 'amount'           => $surcharge,
                 'reference_type'   => 'fuel_surcharge_refund',
                 'reference_id'     => $txId,
