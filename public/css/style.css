@@ -267,6 +267,13 @@ table tbody tr:last-child td { border-bottom: none; }
     .module-form { grid-template-columns: repeat(2, 1fr); }
 }
 
+.charts-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
 @media (max-width: 600px) {
     .module-form { grid-template-columns: 1fr; }
     .summary-cards { grid-template-columns: repeat(2, 1fr); }

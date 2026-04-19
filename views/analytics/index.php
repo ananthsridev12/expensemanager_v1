@@ -415,7 +415,7 @@ include __DIR__ . '/../partials/nav.php';
 
         <?php if ($ddType === ''): ?>
         <!-- Side-by-side income / expense when "All transactions" is selected -->
-        <div class="charts-2col" style="align-items:start;">
+        <div class="charts-2col">
 
             <!-- Income column -->
             <?php if (!empty($ddCatIncome)): ?>
@@ -424,7 +424,7 @@ include __DIR__ . '/../partials/nav.php';
                     ▲ Income — <?= formatCurrency($ddTotalIncome) ?> (<?= $ddCountIncome ?> txns)
                 </div>
                 <?php $renderBar($ddCatIncome, $ddTotalIncome); ?>
-                <canvas id="dd-cat-income-chart" style="margin-bottom:0.8rem;"></canvas>
+                <div style="margin-bottom:0.8rem;"><canvas id="dd-cat-income-chart"></canvas></div>
                 <div class="table-wrapper">
                     <table>
                         <thead><tr><th>Category</th><th>Amount</th><th>%</th></tr></thead>
@@ -441,7 +441,7 @@ include __DIR__ . '/../partials/nav.php';
                 </div>
                 <?php if (!empty($ddSubIncome)): ?>
                 <h3 style="font-size:0.8rem;color:var(--muted);margin:1rem 0 0.4rem;text-transform:uppercase;letter-spacing:.05em;">By subcategory</h3>
-                <canvas id="dd-sub-income-chart" style="margin-bottom:0.8rem;"></canvas>
+                <div style="margin-bottom:0.8rem;"><canvas id="dd-sub-income-chart"></canvas></div>
                 <div class="table-wrapper">
                     <table>
                         <thead><tr><th>Subcategory</th><th>Amount</th><th>%</th></tr></thead>
@@ -467,7 +467,7 @@ include __DIR__ . '/../partials/nav.php';
                     ▼ Expense — <?= formatCurrency($ddTotalExpense) ?> (<?= $ddCountExpense ?> txns)
                 </div>
                 <?php $renderBar($ddCatExpense, $ddTotalExpense); ?>
-                <canvas id="dd-cat-expense-chart" style="margin-bottom:0.8rem;"></canvas>
+                <div style="margin-bottom:0.8rem;"><canvas id="dd-cat-expense-chart"></canvas></div>
                 <div class="table-wrapper">
                     <table>
                         <thead><tr><th>Category</th><th>Amount</th><th>%</th></tr></thead>
@@ -484,7 +484,7 @@ include __DIR__ . '/../partials/nav.php';
                 </div>
                 <?php if (!empty($ddSubExpense)): ?>
                 <h3 style="font-size:0.8rem;color:var(--muted);margin:1rem 0 0.4rem;text-transform:uppercase;letter-spacing:.05em;">By subcategory</h3>
-                <canvas id="dd-sub-expense-chart" style="margin-bottom:0.8rem;"></canvas>
+                <div style="margin-bottom:0.8rem;"><canvas id="dd-sub-expense-chart"></canvas></div>
                 <div class="table-wrapper">
                     <table>
                         <thead><tr><th>Subcategory</th><th>Amount</th><th>%</th></tr></thead>
@@ -515,10 +515,10 @@ include __DIR__ . '/../partials/nav.php';
         ?>
         <?php if (!empty($singleCat)): ?>
         <?php $renderBar($singleCat, $singleTotal); ?>
-        <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
+        <div class="charts-2col">
             <div>
                 <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">By category</h3>
-                <canvas id="dd-cat-single-chart"></canvas>
+                <div><canvas id="dd-cat-single-chart"></canvas></div>
                 <div class="table-wrapper" style="margin-top:0.8rem;">
                     <table>
                         <thead><tr><th>Category</th><th>Amount</th><th>%</th></tr></thead>
@@ -537,7 +537,7 @@ include __DIR__ . '/../partials/nav.php';
             <?php if (!empty($singleSub)): ?>
             <div>
                 <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">By subcategory</h3>
-                <canvas id="dd-sub-single-chart"></canvas>
+                <div><canvas id="dd-sub-single-chart"></canvas></div>
                 <div class="table-wrapper" style="margin-top:0.8rem;">
                     <table>
                         <thead><tr><th>Subcategory</th><th>Amount</th><th>%</th></tr></thead>
@@ -684,7 +684,7 @@ include __DIR__ . '/../partials/nav.php';
     <?php if (!empty($monthlyTrend)): ?>
     <section class="module-panel">
         <h2>Monthly income vs expense (last 12 months)</h2>
-        <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start;">
+        <div class="charts-2col">
             <div>
                 <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">Income vs Expense</h3>
                 <canvas id="monthly-bar-chart"></canvas>
@@ -788,12 +788,12 @@ include __DIR__ . '/../partials/nav.php';
     <?php if (!empty($expensesByCategory) || !empty($incomeByCategory)): ?>
     <section class="module-panel">
         <h2>Income &amp; expense breakdown</h2>
-        <?php if (!empty($expensesByCategory)): ?>
-        <div style="margin-bottom:1.4rem;">
-            <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.6rem;text-transform:uppercase;letter-spacing:.05em;">Expense by category</h3>
-            <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1.5fr;gap:1.5rem;align-items:start;">
-                <canvas id="expense-donut-chart"></canvas>
-                <div class="table-wrapper">
+        <div class="charts-2col">
+            <?php if (!empty($expensesByCategory)): ?>
+            <div>
+                <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.6rem;text-transform:uppercase;letter-spacing:.05em;">Expense by category</h3>
+                <div><canvas id="expense-donut-chart"></canvas></div>
+                <div class="table-wrapper" style="margin-top:0.8rem;">
                     <table>
                         <thead><tr><th>Category</th><th>Amount</th></tr></thead>
                         <tbody>
@@ -807,14 +807,12 @@ include __DIR__ . '/../partials/nav.php';
                     </table>
                 </div>
             </div>
-        </div>
-        <?php endif; ?>
-        <?php if (!empty($incomeByCategory)): ?>
-        <div>
-            <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.6rem;text-transform:uppercase;letter-spacing:.05em;">Income by category</h3>
-            <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1.5fr;gap:1.5rem;align-items:start;">
-                <canvas id="income-donut-chart"></canvas>
-                <div class="table-wrapper">
+            <?php endif; ?>
+            <?php if (!empty($incomeByCategory)): ?>
+            <div>
+                <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.6rem;text-transform:uppercase;letter-spacing:.05em;">Income by category</h3>
+                <div><canvas id="income-donut-chart"></canvas></div>
+                <div class="table-wrapper" style="margin-top:0.8rem;">
                     <table>
                         <thead><tr><th>Category</th><th>Amount</th></tr></thead>
                         <tbody>
@@ -828,8 +826,8 @@ include __DIR__ . '/../partials/nav.php';
                     </table>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
         <script>
         (function () {
             const colors = ['#3b82f6','#22d3ee','#a855f7','#f97316','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
@@ -879,7 +877,7 @@ include __DIR__ . '/../partials/nav.php';
     <?php if (!empty($accountWiseExpense) || !empty($dayOfWeekSpend)): ?>
     <section class="module-panel">
         <h2>Spending patterns</h2>
-        <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
+        <div class="charts-2col">
             <?php if (!empty($accountWiseExpense)): ?>
             <div>
                 <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">Expense by account</h3>
@@ -1020,8 +1018,8 @@ include __DIR__ . '/../partials/nav.php';
     <?php if (!empty($expensesBySubcategory)): ?>
     <section class="module-panel">
         <h2>Actual expenses by subcategory</h2>
-        <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1.5fr;gap:1.5rem;align-items:start;">
-            <canvas id="expense-sub-donut-chart"></canvas>
+        <div class="charts-2col">
+            <div><canvas id="expense-sub-donut-chart"></canvas></div>
             <div class="table-wrapper">
                 <table>
                     <thead>
