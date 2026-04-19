@@ -195,32 +195,26 @@ SQL;
         $subIds      = array_values(array_filter(array_map('intval', (array) ($filters['subcategory_ids'] ?? []))));
         $sourceIds   = array_values(array_filter(array_map('intval', (array) ($filters['purchase_source_ids'] ?? []))));
 
-        $where  = [
+        // Base WHERE — no tx_type filter; used for split income/expense queries
+        $baseWhere  = [
             't.transaction_date BETWEEN :start_date AND :end_date',
             '(t.category_id IS NULL OR t.category_id NOT IN (SELECT id FROM categories WHERE exclude_from_analytics = 1))',
         ];
-        $params = [':start_date' => $startDate, ':end_date' => $endDate];
-
-        if (in_array($txType, ['income', 'expense'], true)) {
-            $where[] = 't.transaction_type = :tx_type';
-            $params[':tx_type'] = $txType;
-        } else {
-            $where[] = "t.transaction_type IN ('income','expense')";
-        }
+        $baseParams = [':start_date' => $startDate, ':end_date' => $endDate];
 
         if (!empty($categoryIds)) {
             $includeNull = in_array(0, $categoryIds, true);
             $realIds     = array_values(array_filter($categoryIds, fn($id) => $id > 0));
             if ($realIds && $includeNull) {
                 $ph = [];
-                foreach ($realIds as $i => $id) { $ph[] = ":cat_{$i}"; $params[":cat_{$i}"] = $id; }
-                $where[] = '(t.category_id IS NULL OR t.category_id IN (' . implode(',', $ph) . '))';
+                foreach ($realIds as $i => $id) { $ph[] = ":cat_{$i}"; $baseParams[":cat_{$i}"] = $id; }
+                $baseWhere[] = '(t.category_id IS NULL OR t.category_id IN (' . implode(',', $ph) . '))';
             } elseif ($includeNull) {
-                $where[] = 't.category_id IS NULL';
+                $baseWhere[] = 't.category_id IS NULL';
             } else {
                 $ph = [];
-                foreach ($realIds as $i => $id) { $ph[] = ":cat_{$i}"; $params[":cat_{$i}"] = $id; }
-                $where[] = 't.category_id IN (' . implode(',', $ph) . ')';
+                foreach ($realIds as $i => $id) { $ph[] = ":cat_{$i}"; $baseParams[":cat_{$i}"] = $id; }
+                $baseWhere[] = 't.category_id IN (' . implode(',', $ph) . ')';
             }
         }
 
@@ -229,56 +223,92 @@ SQL;
             $realIds     = array_values(array_filter($subIds, fn($id) => $id > 0));
             if ($realIds && $includeNull) {
                 $ph = [];
-                foreach ($realIds as $i => $id) { $ph[] = ":sub_{$i}"; $params[":sub_{$i}"] = $id; }
-                $where[] = '(t.subcategory_id IS NULL OR t.subcategory_id IN (' . implode(',', $ph) . '))';
+                foreach ($realIds as $i => $id) { $ph[] = ":sub_{$i}"; $baseParams[":sub_{$i}"] = $id; }
+                $baseWhere[] = '(t.subcategory_id IS NULL OR t.subcategory_id IN (' . implode(',', $ph) . '))';
             } elseif ($includeNull) {
-                $where[] = 't.subcategory_id IS NULL';
+                $baseWhere[] = 't.subcategory_id IS NULL';
             } else {
                 $ph = [];
-                foreach ($realIds as $i => $id) { $ph[] = ":sub_{$i}"; $params[":sub_{$i}"] = $id; }
-                $where[] = 't.subcategory_id IN (' . implode(',', $ph) . ')';
+                foreach ($realIds as $i => $id) { $ph[] = ":sub_{$i}"; $baseParams[":sub_{$i}"] = $id; }
+                $baseWhere[] = 't.subcategory_id IN (' . implode(',', $ph) . ')';
             }
         }
 
         if (!empty($sourceIds)) {
             $ph = [];
-            foreach ($sourceIds as $i => $id) { $ph[] = ":src_{$i}"; $params[":src_{$i}"] = $id; }
-            $where[] = 't.purchase_source_id IN (' . implode(',', $ph) . ')';
+            foreach ($sourceIds as $i => $id) { $ph[] = ":src_{$i}"; $baseParams[":src_{$i}"] = $id; }
+            $baseWhere[] = 't.purchase_source_id IN (' . implode(',', $ph) . ')';
         }
 
-        $whereClause = implode(' AND ', $where);
+        // Main WHERE — with tx_type for the summary card and transactions list
+        $mainWhere  = $baseWhere;
+        $mainParams = $baseParams;
+        if (in_array($txType, ['income', 'expense'], true)) {
+            $mainWhere[] = 't.transaction_type = :tx_type';
+            $mainParams[':tx_type'] = $txType;
+        } else {
+            $mainWhere[] = "t.transaction_type IN ('income','expense')";
+        }
+        $mainClause    = implode(' AND ', $mainWhere);
+        $incomeClause  = implode(' AND ', array_merge($baseWhere, ["t.transaction_type = 'income'"]));
+        $expenseClause = implode(' AND ', array_merge($baseWhere, ["t.transaction_type = 'expense'"]));
 
-        // Summary
-        $stmt = $this->db->prepare("SELECT COALESCE(SUM(t.amount),0) AS total, COUNT(*) AS tx_count FROM transactions t WHERE {$whereClause}");
-        $stmt->execute($params);
+        // Summary (respects tx_type filter)
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(t.amount),0) AS total, COUNT(*) AS tx_count FROM transactions t WHERE {$mainClause}");
+        $stmt->execute($mainParams);
         $summary = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'tx_count' => 0];
 
-        // By category
-        $stmt = $this->db->prepare("SELECT COALESCE(c.name,'Uncategorized') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN categories c ON c.id = t.category_id WHERE {$whereClause} GROUP BY c.id, c.name ORDER BY total DESC");
-        $stmt->execute($params);
-        $byCategory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Summary by type (always split)
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(t.amount),0) AS total, COUNT(*) AS tx_count FROM transactions t WHERE {$incomeClause}");
+        $stmt->execute($baseParams);
+        $summaryIncome = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'tx_count' => 0];
 
-        // By subcategory
-        $stmt = $this->db->prepare("SELECT COALESCE(sc.name,'Unspecified') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN subcategories sc ON sc.id = t.subcategory_id WHERE {$whereClause} GROUP BY sc.id, sc.name ORDER BY total DESC");
-        $stmt->execute($params);
-        $bySubcategory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(t.amount),0) AS total, COUNT(*) AS tx_count FROM transactions t WHERE {$expenseClause}");
+        $stmt->execute($baseParams);
+        $summaryExpense = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'tx_count' => 0];
 
-        // By purchase source
-        $stmt = $this->db->prepare("SELECT COALESCE(ps.name,'Unknown') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN purchase_sources ps ON ps.id = t.purchase_source_id WHERE {$whereClause} AND t.purchase_source_id IS NOT NULL GROUP BY ps.id, ps.name ORDER BY total DESC");
-        $stmt->execute($params);
+        // By category — income
+        $stmt = $this->db->prepare("SELECT COALESCE(c.name,'Uncategorized') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN categories c ON c.id = t.category_id WHERE {$incomeClause} GROUP BY c.id, c.name ORDER BY total DESC");
+        $stmt->execute($baseParams);
+        $byCategoryIncome = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // By category — expense
+        $stmt = $this->db->prepare("SELECT COALESCE(c.name,'Uncategorized') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN categories c ON c.id = t.category_id WHERE {$expenseClause} GROUP BY c.id, c.name ORDER BY total DESC");
+        $stmt->execute($baseParams);
+        $byCategoryExpense = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // By subcategory — income
+        $stmt = $this->db->prepare("SELECT COALESCE(sc.name,'Unspecified') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN subcategories sc ON sc.id = t.subcategory_id WHERE {$incomeClause} GROUP BY sc.id, sc.name ORDER BY total DESC");
+        $stmt->execute($baseParams);
+        $bySubcategoryIncome = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // By subcategory — expense
+        $stmt = $this->db->prepare("SELECT COALESCE(sc.name,'Unspecified') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN subcategories sc ON sc.id = t.subcategory_id WHERE {$expenseClause} GROUP BY sc.id, sc.name ORDER BY total DESC");
+        $stmt->execute($baseParams);
+        $bySubcategoryExpense = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // By purchase source — expense only (purchase sources are spending-related)
+        $stmt = $this->db->prepare("SELECT COALESCE(ps.name,'Unknown') AS label, COALESCE(SUM(t.amount),0) AS total FROM transactions t LEFT JOIN purchase_sources ps ON ps.id = t.purchase_source_id WHERE {$expenseClause} AND t.purchase_source_id IS NOT NULL GROUP BY ps.id, ps.name ORDER BY total DESC");
+        $stmt->execute($baseParams);
         $bySource = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Transaction list (latest 100)
-        $stmt = $this->db->prepare("SELECT t.transaction_date, t.transaction_type, t.amount, COALESCE(c.name,'Uncategorized') AS category_name, COALESCE(sc.name,'') AS subcategory_name, COALESCE(ps.name,'') AS source_name, t.notes FROM transactions t LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN subcategories sc ON sc.id = t.subcategory_id LEFT JOIN purchase_sources ps ON ps.id = t.purchase_source_id WHERE {$whereClause} ORDER BY t.transaction_date DESC, t.id DESC LIMIT 100");
-        $stmt->execute($params);
+        // Transaction list (latest 100, respects tx_type filter)
+        $stmt = $this->db->prepare("SELECT t.transaction_date, t.transaction_type, t.amount, COALESCE(c.name,'Uncategorized') AS category_name, COALESCE(sc.name,'') AS subcategory_name, COALESCE(ps.name,'') AS source_name, t.notes FROM transactions t LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN subcategories sc ON sc.id = t.subcategory_id LEFT JOIN purchase_sources ps ON ps.id = t.purchase_source_id WHERE {$mainClause} ORDER BY t.transaction_date DESC, t.id DESC LIMIT 100");
+        $stmt->execute($mainParams);
         $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return [
-            'summary'        => $summary,
-            'by_category'    => $byCategory,
-            'by_subcategory' => $bySubcategory,
-            'by_source'      => $bySource,
-            'transactions'   => $transactions,
+            'summary'              => $summary,
+            'summary_income'       => $summaryIncome,
+            'summary_expense'      => $summaryExpense,
+            'by_category'          => $byCategoryExpense, // kept for insights engine (expense focused)
+            'by_subcategory'       => $bySubcategoryExpense,
+            'by_category_income'   => $byCategoryIncome,
+            'by_category_expense'  => $byCategoryExpense,
+            'by_subcategory_income'  => $bySubcategoryIncome,
+            'by_subcategory_expense' => $bySubcategoryExpense,
+            'by_source'            => $bySource,
+            'transactions'         => $transactions,
         ];
     }
 

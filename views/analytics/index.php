@@ -176,6 +176,15 @@ $ddSource = $drilldown['by_source']      ?? [];
 $ddTotal  = (float) ($drilldown['summary']['total'] ?? 0);
 $ddType   = $drilldownFilters['tx_type'] ?? '';
 
+$ddCatIncome   = $drilldown['by_category_income']    ?? [];
+$ddCatExpense  = $drilldown['by_category_expense']   ?? [];
+$ddSubIncome   = $drilldown['by_subcategory_income']  ?? [];
+$ddSubExpense  = $drilldown['by_subcategory_expense'] ?? [];
+$ddTotalIncome  = (float) ($drilldown['summary_income']['total']  ?? 0);
+$ddTotalExpense = (float) ($drilldown['summary_expense']['total'] ?? 0);
+$ddCountIncome  = (int)   ($drilldown['summary_income']['tx_count']  ?? 0);
+$ddCountExpense = (int)   ($drilldown['summary_expense']['tx_count'] ?? 0);
+
 $insights = buildInsights([
     'summary'           => $summary,
     'expensesByCategory'=> $expensesByCategory,
@@ -320,11 +329,35 @@ include __DIR__ . '/../partials/nav.php';
     $ddTxns     = $drilldown['transactions']   ?? [];
     ?>
     <section class="summary-cards">
-        <article class="card <?= $ddType === 'income' ? 'card--green' : ($ddType === 'expense' ? 'card--red' : 'card--cyan') ?>">
-            <h3><?= $ddType === 'income' ? 'Total income' : ($ddType === 'expense' ? 'Total expense' : 'Total amount') ?></h3>
-            <p><?= formatCurrency($ddTotal) ?></p>
-            <small><?= (int)($ddSummary['tx_count'] ?? 0) ?> transactions</small>
-        </article>
+        <?php if ($ddType === 'income'): ?>
+            <article class="card card--green">
+                <h3>Total income</h3>
+                <p><?= formatCurrency($ddTotalIncome) ?></p>
+                <small><?= $ddCountIncome ?> transactions</small>
+            </article>
+        <?php elseif ($ddType === 'expense'): ?>
+            <article class="card card--red">
+                <h3>Total expense</h3>
+                <p><?= formatCurrency($ddTotalExpense) ?></p>
+                <small><?= $ddCountExpense ?> transactions</small>
+            </article>
+        <?php else: ?>
+            <article class="card card--green">
+                <h3>Total income</h3>
+                <p><?= formatCurrency($ddTotalIncome) ?></p>
+                <small><?= $ddCountIncome ?> transactions</small>
+            </article>
+            <article class="card card--red">
+                <h3>Total expense</h3>
+                <p><?= formatCurrency($ddTotalExpense) ?></p>
+                <small><?= $ddCountExpense ?> transactions</small>
+            </article>
+            <article class="card card--cyan">
+                <h3>Net</h3>
+                <p><?= formatCurrency($ddTotalIncome - $ddTotalExpense) ?></p>
+                <small>Income minus expense</small>
+            </article>
+        <?php endif; ?>
     </section>
 
     <!-- Insights panel -->
@@ -352,75 +385,169 @@ include __DIR__ . '/../partials/nav.php';
     </section>
     <?php endif; ?>
 
-    <?php if (!empty($ddCat) || !empty($ddSub) || !empty($ddSource)): ?>
+    <?php
+    $showIncome  = $ddType === '' || $ddType === 'income';
+    $showExpense = $ddType === '' || $ddType === 'expense';
+    $hasAny = (!empty($ddCatIncome) && $showIncome) || (!empty($ddCatExpense) && $showExpense) || !empty($ddSource);
+    ?>
+    <?php if ($hasAny): ?>
     <section class="module-panel">
-        <h2>Filter breakdown <small style="font-size:0.75rem;color:var(--muted);font-weight:400;">· <?= $ddType ? ucfirst($ddType) . 's' : 'All transactions' ?> · <?= htmlspecialchars($startDate) ?> → <?= htmlspecialchars($endDate) ?></small></h2>
+        <h2>Filter breakdown <small style="font-size:0.75rem;color:var(--muted);font-weight:400;">· <?= $ddType ? ucfirst($ddType) . 's' : 'Income &amp; Expense' ?> · <?= htmlspecialchars($startDate) ?> → <?= htmlspecialchars($endDate) ?></small></h2>
 
-        <?php if (!empty($ddCat)): ?>
-        <!-- Horizontal stacked bar showing category proportions -->
-        <div style="margin-bottom:1.5rem;">
-            <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.5rem;">Category share</div>
-            <div style="display:flex;height:28px;border-radius:6px;overflow:hidden;gap:2px;">
-                <?php
-                $barColors = ['#3b82f6','#f97316','#a855f7','#22d3ee','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
-                foreach ($ddCat as $i => $row):
-                    $w = $ddTotal > 0 ? round((float)$row['total'] / $ddTotal * 100, 2) : 0;
-                    if ($w <= 0) continue;
-                    $col = $barColors[$i % count($barColors)];
-                ?>
-                <div title="<?= htmlspecialchars($row['label']) ?>: <?= formatCurrency((float)$row['total']) ?> (<?= $w ?>%)"
-                     style="background:<?= $col ?>;width:<?= $w ?>%;min-width:3px;transition:opacity .2s;cursor:default;"
-                     onmouseenter="this.style.opacity='.7'" onmouseleave="this.style.opacity='1'"></div>
-                <?php endforeach; ?>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:0.4rem 1rem;margin-top:0.5rem;">
-                <?php foreach ($ddCat as $i => $row):
-                    $col = $barColors[$i % count($barColors)];
-                ?>
-                <span style="font-size:0.75rem;display:flex;align-items:center;gap:0.3rem;color:var(--muted);">
-                    <span style="width:10px;height:10px;border-radius:2px;background:<?= $col ?>;display:inline-block;flex-shrink:0;"></span>
-                    <?= htmlspecialchars($row['label']) ?>
-                </span>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endif; ?>
+        <?php
+        $barColors = ['#3b82f6','#f97316','#a855f7','#22d3ee','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
 
+        // Helper: stacked bar for a dataset
+        $renderBar = function(array $rows, float $total) use ($barColors): void {
+            if (empty($rows) || $total <= 0) return;
+            echo '<div style="display:flex;height:22px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:0.4rem;">';
+            foreach ($rows as $i => $row) {
+                $w = round((float)$row['total'] / $total * 100, 2);
+                if ($w <= 0) continue;
+                $col = $barColors[$i % count($barColors)];
+                echo '<div title="' . htmlspecialchars($row['label']) . ': ' . formatCurrency((float)$row['total']) . ' (' . $w . '%)"'
+                   . ' style="background:' . $col . ';width:' . $w . '%;min-width:3px;cursor:default;"'
+                   . ' onmouseenter="this.style.opacity=\'.7\'" onmouseleave="this.style.opacity=\'1\'"></div>';
+            }
+            echo '</div>';
+        };
+        ?>
+
+        <?php if ($ddType === ''): ?>
+        <!-- Side-by-side income / expense when "All transactions" is selected -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
+
+            <!-- Income column -->
+            <?php if (!empty($ddCatIncome)): ?>
+            <div>
+                <div style="font-size:0.78rem;font-weight:600;color:#10b981;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.6rem;">
+                    ▲ Income — <?= formatCurrency($ddTotalIncome) ?> (<?= $ddCountIncome ?> txns)
+                </div>
+                <?php $renderBar($ddCatIncome, $ddTotalIncome); ?>
+                <canvas id="dd-cat-income-chart" style="margin-bottom:0.8rem;"></canvas>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Category</th><th>Amount</th><th>%</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($ddCatIncome as $row): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($row['label']) ?></td>
+                                <td style="color:var(--green)"><?= formatCurrency((float)$row['total']) ?></td>
+                                <td><?= $ddTotalIncome > 0 ? number_format((float)$row['total'] / $ddTotalIncome * 100, 1) . '%' : '—' ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php if (!empty($ddSubIncome)): ?>
+                <h3 style="font-size:0.8rem;color:var(--muted);margin:1rem 0 0.4rem;text-transform:uppercase;letter-spacing:.05em;">By subcategory</h3>
+                <canvas id="dd-sub-income-chart" style="margin-bottom:0.8rem;"></canvas>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Subcategory</th><th>Amount</th><th>%</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($ddSubIncome as $row): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($row['label']) ?></td>
+                                <td style="color:var(--green)"><?= formatCurrency((float)$row['total']) ?></td>
+                                <td><?= $ddTotalIncome > 0 ? number_format((float)$row['total'] / $ddTotalIncome * 100, 1) . '%' : '—' ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Expense column -->
+            <?php if (!empty($ddCatExpense)): ?>
+            <div>
+                <div style="font-size:0.78rem;font-weight:600;color:#ef4444;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.6rem;">
+                    ▼ Expense — <?= formatCurrency($ddTotalExpense) ?> (<?= $ddCountExpense ?> txns)
+                </div>
+                <?php $renderBar($ddCatExpense, $ddTotalExpense); ?>
+                <canvas id="dd-cat-expense-chart" style="margin-bottom:0.8rem;"></canvas>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Category</th><th>Amount</th><th>%</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($ddCatExpense as $row): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($row['label']) ?></td>
+                                <td style="color:var(--red,#f43f5e)"><?= formatCurrency((float)$row['total']) ?></td>
+                                <td><?= $ddTotalExpense > 0 ? number_format((float)$row['total'] / $ddTotalExpense * 100, 1) . '%' : '—' ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php if (!empty($ddSubExpense)): ?>
+                <h3 style="font-size:0.8rem;color:var(--muted);margin:1rem 0 0.4rem;text-transform:uppercase;letter-spacing:.05em;">By subcategory</h3>
+                <canvas id="dd-sub-expense-chart" style="margin-bottom:0.8rem;"></canvas>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Subcategory</th><th>Amount</th><th>%</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($ddSubExpense as $row): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($row['label']) ?></td>
+                                <td style="color:var(--red,#f43f5e)"><?= formatCurrency((float)$row['total']) ?></td>
+                                <td><?= $ddTotalExpense > 0 ? number_format((float)$row['total'] / $ddTotalExpense * 100, 1) . '%' : '—' ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+        </div><!-- end side-by-side -->
+
+        <?php else: ?>
+        <!-- Single-type view (Income only or Expense only) -->
+        <?php
+        $singleCat   = $ddType === 'income' ? $ddCatIncome   : $ddCatExpense;
+        $singleSub   = $ddType === 'income' ? $ddSubIncome   : $ddSubExpense;
+        $singleTotal = $ddType === 'income' ? $ddTotalIncome : $ddTotalExpense;
+        $singleColor = $ddType === 'income' ? 'var(--green)' : 'var(--red,#f43f5e)';
+        ?>
+        <?php if (!empty($singleCat)): ?>
+        <?php $renderBar($singleCat, $singleTotal); ?>
         <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
-            <?php if (!empty($ddCat)): ?>
             <div>
                 <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">By category</h3>
-                <canvas id="dd-cat-chart"></canvas>
+                <canvas id="dd-cat-single-chart"></canvas>
                 <div class="table-wrapper" style="margin-top:0.8rem;">
                     <table>
                         <thead><tr><th>Category</th><th>Amount</th><th>%</th></tr></thead>
                         <tbody>
-                            <?php foreach ($ddCat as $row): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($row['label']) ?></td>
-                                    <td><?= formatCurrency((float)$row['total']) ?></td>
-                                    <td><?= $ddTotal > 0 ? number_format((float)$row['total'] / $ddTotal * 100, 1) . '%' : '—' ?></td>
-                                </tr>
+                            <?php foreach ($singleCat as $row): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($row['label']) ?></td>
+                                <td style="color:<?= $singleColor ?>"><?= formatCurrency((float)$row['total']) ?></td>
+                                <td><?= $singleTotal > 0 ? number_format((float)$row['total'] / $singleTotal * 100, 1) . '%' : '—' ?></td>
+                            </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
-            <?php endif; ?>
-            <?php if (!empty($ddSub)): ?>
+            <?php if (!empty($singleSub)): ?>
             <div>
                 <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">By subcategory</h3>
-                <canvas id="dd-sub-chart"></canvas>
+                <canvas id="dd-sub-single-chart"></canvas>
                 <div class="table-wrapper" style="margin-top:0.8rem;">
                     <table>
                         <thead><tr><th>Subcategory</th><th>Amount</th><th>%</th></tr></thead>
                         <tbody>
-                            <?php foreach ($ddSub as $row): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($row['label']) ?></td>
-                                    <td><?= formatCurrency((float)$row['total']) ?></td>
-                                    <td><?= $ddTotal > 0 ? number_format((float)$row['total'] / $ddTotal * 100, 1) . '%' : '—' ?></td>
-                                </tr>
+                            <?php foreach ($singleSub as $row): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($row['label']) ?></td>
+                                <td style="color:<?= $singleColor ?>"><?= formatCurrency((float)$row['total']) ?></td>
+                                <td><?= $singleTotal > 0 ? number_format((float)$row['total'] / $singleTotal * 100, 1) . '%' : '—' ?></td>
+                            </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
@@ -428,9 +555,12 @@ include __DIR__ . '/../partials/nav.php';
             </div>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
+        <?php endif; ?>
+
         <?php if (!empty($ddSource)): ?>
         <div style="margin-top:1.2rem;">
-            <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">By purchased from</h3>
+            <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">By purchased from (expense)</h3>
             <canvas id="dd-source-chart" style="max-height:220px;"></canvas>
             <div class="table-wrapper" style="margin-top:0.8rem;">
                 <table>
@@ -440,7 +570,7 @@ include __DIR__ . '/../partials/nav.php';
                             <tr>
                                 <td><?= htmlspecialchars($row['label']) ?></td>
                                 <td><?= formatCurrency((float)$row['total']) ?></td>
-                                <td><?= $ddTotal > 0 ? number_format((float)$row['total'] / $ddTotal * 100, 1) . '%' : '—' ?></td>
+                                <td><?= $ddTotalExpense > 0 ? number_format((float)$row['total'] / $ddTotalExpense * 100, 1) . '%' : '—' ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -448,28 +578,34 @@ include __DIR__ . '/../partials/nav.php';
             </div>
         </div>
         <?php endif; ?>
+
         <script>
         (function () {
-            const colors = ['#3b82f6','#22d3ee','#a855f7','#f97316','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
-            const donutOpts = { responsive: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ctx.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } } } };
+            const incomeColors  = ['#10b981','#22d3ee','#6ee7b7','#34d399','#059669','#14b8a6','#a7f3d0','#6366f1','#93c5fd','#bbf7d0'];
+            const expenseColors = ['#ef4444','#f97316','#eab308','#a855f7','#3b82f6','#ec4899','#f43f5e','#fb923c','#facc15','#c084fc'];
+            const mixedColors   = ['#3b82f6','#22d3ee','#a855f7','#f97316','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
+            const donutOpts = (colors) => ({ responsive: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ctx.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } } } });
             const barOpts   = { indexAxis: 'y', responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.07)' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.07)' } } } };
+            const makeDonut = (id, rows, colors) => {
+                const el = document.getElementById(id);
+                if (!el || !rows.length) return;
+                new Chart(el, { type: 'doughnut', data: { labels: rows.map(r => r.label), datasets: [{ data: rows.map(r => Number(r.total)), backgroundColor: rows.map((_, i) => colors[i % colors.length]), borderColor: '#0f172a', borderWidth: 2 }] }, options: donutOpts(colors) });
+            };
 
-            <?php if (!empty($ddCat)): ?>
-            (function () {
-                const rows = <?= json_encode($ddCat, JSON_UNESCAPED_UNICODE) ?>;
-                new Chart(document.getElementById('dd-cat-chart'), { type: 'doughnut', data: { labels: rows.map(r => r.label), datasets: [{ data: rows.map(r => Number(r.total)), backgroundColor: rows.map((_, i) => colors[i % colors.length]), borderColor: '#0f172a', borderWidth: 2 }] }, options: donutOpts });
-            })();
+            <?php if ($ddType === ''): ?>
+            makeDonut('dd-cat-income-chart',  <?= json_encode($ddCatIncome,  JSON_UNESCAPED_UNICODE) ?>, incomeColors);
+            makeDonut('dd-sub-income-chart',  <?= json_encode($ddSubIncome,  JSON_UNESCAPED_UNICODE) ?>, incomeColors);
+            makeDonut('dd-cat-expense-chart', <?= json_encode($ddCatExpense, JSON_UNESCAPED_UNICODE) ?>, expenseColors);
+            makeDonut('dd-sub-expense-chart', <?= json_encode($ddSubExpense, JSON_UNESCAPED_UNICODE) ?>, expenseColors);
+            <?php else: ?>
+            makeDonut('dd-cat-single-chart', <?= json_encode($ddType === 'income' ? $ddCatIncome : $ddCatExpense, JSON_UNESCAPED_UNICODE) ?>, <?= $ddType === 'income' ? 'incomeColors' : 'expenseColors' ?>);
+            makeDonut('dd-sub-single-chart', <?= json_encode($ddType === 'income' ? $ddSubIncome : $ddSubExpense, JSON_UNESCAPED_UNICODE) ?>, <?= $ddType === 'income' ? 'incomeColors' : 'expenseColors' ?>);
             <?php endif; ?>
-            <?php if (!empty($ddSub)): ?>
-            (function () {
-                const rows = <?= json_encode($ddSub, JSON_UNESCAPED_UNICODE) ?>;
-                new Chart(document.getElementById('dd-sub-chart'), { type: 'doughnut', data: { labels: rows.map(r => r.label), datasets: [{ data: rows.map(r => Number(r.total)), backgroundColor: rows.map((_, i) => colors[i % colors.length]), borderColor: '#0f172a', borderWidth: 2 }] }, options: donutOpts });
-            })();
-            <?php endif; ?>
+
             <?php if (!empty($ddSource)): ?>
             (function () {
                 const rows = <?= json_encode($ddSource, JSON_UNESCAPED_UNICODE) ?>;
-                new Chart(document.getElementById('dd-source-chart'), { type: 'bar', data: { labels: rows.map(r => r.label), datasets: [{ data: rows.map(r => Number(r.total)), backgroundColor: rows.map((_, i) => colors[i % colors.length]), borderRadius: 4 }] }, options: barOpts });
+                new Chart(document.getElementById('dd-source-chart'), { type: 'bar', data: { labels: rows.map(r => r.label), datasets: [{ data: rows.map(r => Number(r.total)), backgroundColor: rows.map((_, i) => expenseColors[i % expenseColors.length]), borderRadius: 4 }] }, options: barOpts });
             })();
             <?php endif; ?>
         })();
