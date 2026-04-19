@@ -217,6 +217,7 @@ SQL;
 
             $this->createRepaymentLedgerTransactions(
                 $recordId,
+                (int) ($record['contact_id'] ?? 0),
                 $record['contact_name'] ?? ('Contact #' . $record['contact_id']),
                 $payAmount,
                 $repaymentDate,
@@ -318,41 +319,27 @@ SQL;
         }
 
         $entryNote = $notes !== '' ? $notes : 'Lending disbursal to contact #' . $contactId;
-        $stmt = $this->db->prepare(
-            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, amount, reference_type, reference_id, notes)
-             VALUES (:transaction_date, :account_type, :account_id, :transaction_type, :category_id, :amount, :reference_type, :reference_id, :notes)'
-        );
 
         // Money moved from selected account to lending exposure.
-        $stmt->execute([
+        $this->db->prepare(
+            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, contact_id, amount, reference_type, reference_id, notes)
+             VALUES (:transaction_date, :account_type, :account_id, \'expense\', :category_id, :contact_id, :amount, \'lending\', :reference_id, :notes)'
+        )->execute([
             ':transaction_date' => $lendingDate,
-            ':account_type' => $accountType,
-            ':account_id' => $accountId,
-            ':transaction_type' => 'expense',
-            ':category_id' => self::LENDING_CATEGORY_ID,
-            ':amount' => $principal,
-            ':reference_type' => 'lending',
-            ':reference_id' => $recordId,
-            ':notes' => $entryNote,
+            ':account_type'     => $accountType,
+            ':account_id'       => $accountId,
+            ':category_id'      => self::LENDING_CATEGORY_ID,
+            ':contact_id'       => $contactId > 0 ? $contactId : null,
+            ':amount'           => $principal,
+            ':reference_id'     => $recordId,
+            ':notes'            => $entryNote,
         ]);
         $this->applyCreditCardDeltaIfNeeded($accountType, $accountId, 'expense', $principal);
-
-        // Mirror transfer entry for lending module.
-        $stmt->execute([
-            ':transaction_date' => $lendingDate,
-            ':account_type' => 'lending',
-            ':account_id' => null,
-            ':transaction_type' => 'transfer',
-            ':category_id' => self::LENDING_CATEGORY_ID,
-            ':amount' => $principal,
-            ':reference_type' => 'lending',
-            ':reference_id' => $recordId,
-            ':notes' => $entryNote,
-        ]);
     }
 
     private function createRepaymentLedgerTransactions(
         int $recordId,
+        int $contactId,
         string $contactName,
         float $amount,
         string $repaymentDate,
@@ -371,37 +358,22 @@ SQL;
         }
 
         $entryNote = $notes !== '' ? $notes : ('Repayment from ' . $contactName);
-        $stmt = $this->db->prepare(
-            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, amount, reference_type, reference_id, notes)
-             VALUES (:transaction_date, :account_type, :account_id, :transaction_type, :category_id, :amount, :reference_type, :reference_id, :notes)'
-        );
 
         // Money moved from lending exposure into selected account.
-        $stmt->execute([
+        $this->db->prepare(
+            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, contact_id, amount, reference_type, reference_id, notes)
+             VALUES (:transaction_date, :account_type, :account_id, \'income\', :category_id, :contact_id, :amount, \'lending\', :reference_id, :notes)'
+        )->execute([
             ':transaction_date' => $repaymentDate,
-            ':account_type' => $accountType,
-            ':account_id' => $accountId,
-            ':transaction_type' => 'income',
-            ':category_id' => self::LENDING_CATEGORY_ID,
-            ':amount' => $amount,
-            ':reference_type' => 'lending',
-            ':reference_id' => $recordId,
-            ':notes' => $entryNote,
+            ':account_type'     => $accountType,
+            ':account_id'       => $accountId,
+            ':category_id'      => self::LENDING_CATEGORY_ID,
+            ':contact_id'       => $contactId > 0 ? $contactId : null,
+            ':amount'           => $amount,
+            ':reference_id'     => $recordId,
+            ':notes'            => $entryNote,
         ]);
         $this->applyCreditCardDeltaIfNeeded($accountType, $accountId, 'income', $amount);
-
-        // Mirror transfer entry for lending module.
-        $stmt->execute([
-            ':transaction_date' => $repaymentDate,
-            ':account_type' => 'lending',
-            ':account_id' => null,
-            ':transaction_type' => 'transfer',
-            ':category_id' => self::LENDING_CATEGORY_ID,
-            ':amount' => $amount,
-            ':reference_type' => 'lending',
-            ':reference_id' => $recordId,
-            ':notes' => $entryNote,
-        ]);
     }
 
     private function applyCreditCardDeltaIfNeeded(string $accountType, int $accountId, string $transactionType, float $amount): void

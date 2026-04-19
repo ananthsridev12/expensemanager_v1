@@ -102,6 +102,7 @@ class Borrowing extends BaseModel
 
             $this->createRepaymentLedger(
                 $recordId,
+                (int) ($record['contact_id'] ?? 0),
                 (string) ($record['contact_name'] ?? ''),
                 $payAmount,
                 $repaymentDate,
@@ -241,28 +242,28 @@ SQL;
         if ($acctId <= 0 || !in_array($acctType, $allowed, true)) return;
 
         $note = $notes !== '' ? $notes : 'Borrowed from contact #' . $contactId;
-        $stmt = $this->db->prepare(
-            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, amount, reference_type, reference_id, notes)
-             VALUES (:date, :acct_type, :acct_id, :tx_type, :amount, :ref_type, :ref_id, :notes)'
-        );
 
         // Income into user's account
-        $stmt->execute([':date' => $date, ':acct_type' => $acctType, ':acct_id' => $acctId,
-            ':tx_type' => 'income', ':amount' => $amount,
-            ':ref_type' => 'borrowing', ':ref_id' => $recordId, ':notes' => $note]);
+        $this->db->prepare(
+            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, contact_id, amount, reference_type, reference_id, notes)
+             VALUES (:date, :acct_type, :acct_id, \'income\', 33, :contact_id, :amount, \'borrowing\', :ref_id, :notes)'
+        )->execute([
+            ':date'       => $date,
+            ':acct_type'  => $acctType,
+            ':acct_id'    => $acctId,
+            ':contact_id' => $contactId > 0 ? $contactId : null,
+            ':amount'     => $amount,
+            ':ref_id'     => $recordId,
+            ':notes'      => $note,
+        ]);
         $this->applyCreditCardDeltaIfNeeded($acctType, $acctId, 'income', $amount);
-
-        // Mirror transfer for borrowing ledger
-        $stmt->execute([':date' => $date, ':acct_type' => 'borrowing', ':acct_id' => null,
-            ':tx_type' => 'transfer', ':amount' => $amount,
-            ':ref_type' => 'borrowing', ':ref_id' => $recordId, ':notes' => $note]);
     }
 
     /**
      * When repaying: money paid out → expense on user's account.
      */
     private function createRepaymentLedger(
-        int $recordId, string $contactName, float $amount,
+        int $recordId, int $contactId, string $contactName, float $amount,
         string $date, string $payAccount, string $notes
     ): void {
         if ($recordId <= 0 || $amount <= 0 || $payAccount === '' || strpos($payAccount, ':') === false) return;
@@ -273,21 +274,21 @@ SQL;
         if ($acctId <= 0 || !in_array($acctType, $allowed, true)) return;
 
         $note = $notes !== '' ? $notes : 'Repayment to ' . $contactName;
-        $stmt = $this->db->prepare(
-            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, amount, reference_type, reference_id, notes)
-             VALUES (:date, :acct_type, :acct_id, :tx_type, :amount, :ref_type, :ref_id, :notes)'
-        );
 
         // Expense from user's account
-        $stmt->execute([':date' => $date, ':acct_type' => $acctType, ':acct_id' => $acctId,
-            ':tx_type' => 'expense', ':amount' => $amount,
-            ':ref_type' => 'borrowing', ':ref_id' => $recordId, ':notes' => $note]);
+        $this->db->prepare(
+            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, contact_id, amount, reference_type, reference_id, notes)
+             VALUES (:date, :acct_type, :acct_id, \'expense\', 32, :contact_id, :amount, \'borrowing\', :ref_id, :notes)'
+        )->execute([
+            ':date'       => $date,
+            ':acct_type'  => $acctType,
+            ':acct_id'    => $acctId,
+            ':contact_id' => $contactId > 0 ? $contactId : null,
+            ':amount'     => $amount,
+            ':ref_id'     => $recordId,
+            ':notes'      => $note,
+        ]);
         $this->applyCreditCardDeltaIfNeeded($acctType, $acctId, 'expense', $amount);
-
-        // Mirror transfer for borrowing ledger
-        $stmt->execute([':date' => $date, ':acct_type' => 'borrowing', ':acct_id' => null,
-            ':tx_type' => 'transfer', ':amount' => $amount,
-            ':ref_type' => 'borrowing', ':ref_id' => $recordId, ':notes' => $note]);
     }
 
     private function applyCreditCardDeltaIfNeeded(string $accountType, int $accountId, string $transactionType, float $amount): void

@@ -130,9 +130,9 @@ SQL;
 
             $this->db->prepare(
                 'INSERT INTO transactions
-                    (transaction_date, account_type, account_id, transaction_type, amount, reference_type, reference_id, notes)
+                    (transaction_date, account_type, account_id, transaction_type, category_id, amount, reference_type, reference_id, notes)
                  VALUES
-                    (:date, :account_type, :account_id, \'expense\', :amount, \'loan\', :loan_id, :notes)'
+                    (:date, :account_type, :account_id, \'expense\', 32, :amount, \'loan\', :loan_id, :notes)'
             )->execute([
                 ':date'         => $paymentDate,
                 ':account_type' => $accountType,
@@ -330,33 +330,18 @@ SQL;
         }
 
         $notes = 'Loan disbursal - ' . $loanName;
-        $stmt = $this->db->prepare(
-            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, amount, reference_type, reference_id, notes)
-             VALUES (:transaction_date, :account_type, :account_id, :transaction_type, :amount, :reference_type, :reference_id, :notes)'
-        );
-
-        // Loan ledger side (debt increases).
-        $stmt->execute([
-            ':transaction_date' => $transferDate,
-            ':account_type' => 'loan',
-            ':account_id' => null,
-            ':transaction_type' => 'expense',
-            ':amount' => $principal,
-            ':reference_type' => 'loan',
-            ':reference_id' => $loanId,
-            ':notes' => $notes,
-        ]);
 
         // Destination account side (cash/bank increases).
-        $stmt->execute([
+        $this->db->prepare(
+            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, amount, reference_type, reference_id, notes)
+             VALUES (:transaction_date, :account_type, :account_id, \'income\', 33, :amount, \'loan\', :reference_id, :notes)'
+        )->execute([
             ':transaction_date' => $transferDate,
-            ':account_type' => $accountType,
-            ':account_id' => $accountId,
-            ':transaction_type' => 'income',
-            ':amount' => $principal,
-            ':reference_type' => 'loan',
-            ':reference_id' => $loanId,
-            ':notes' => $notes,
+            ':account_type'     => $accountType,
+            ':account_id'       => $accountId,
+            ':amount'           => $principal,
+            ':reference_id'     => $loanId,
+            ':notes'            => $notes,
         ]);
     }
 
