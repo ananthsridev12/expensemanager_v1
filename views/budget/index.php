@@ -119,7 +119,7 @@ include __DIR__ . '/../partials/nav.php';
                         <div style="background:<?= $overallPct >= 100 ? '#f43f5e' : ($overallPct >= 80 ? '#f59e0b' : '#22c55e') ?>;border-radius:8px;height:10px;width:<?= min(100,$overallPct) ?>%;transition:width 0.4s ease;"></div>
                     </div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1.5rem;font-size:0.85rem;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem 1.5rem;font-size:0.85rem;">
                     <div>
                         <div style="color:var(--muted);font-size:0.75rem;margin-bottom:0.2rem;">Total Budgeted</div>
                         <div style="font-weight:600;"><?= formatCurrency($totalBudgeted) ?></div>

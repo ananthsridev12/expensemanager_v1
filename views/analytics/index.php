@@ -364,7 +364,7 @@ include __DIR__ . '/../partials/nav.php';
     <?php if (!empty($insights)): ?>
     <section class="module-panel">
         <h2>Spending insights <small style="font-size:0.75rem;color:var(--muted);font-weight:400;">· <?= htmlspecialchars($startDate) ?> to <?= htmlspecialchars($endDate) ?></small></h2>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
             <?php
             $insightColors = [
                 'warning'  => ['bg' => 'rgba(251,146,60,0.12)', 'border' => '#f97316', 'text' => '#fdba74'],
@@ -415,7 +415,7 @@ include __DIR__ . '/../partials/nav.php';
 
         <?php if ($ddType === ''): ?>
         <!-- Side-by-side income / expense when "All transactions" is selected -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
+        <div class="charts-2col" style="align-items:start;">
 
             <!-- Income column -->
             <?php if (!empty($ddCatIncome)): ?>

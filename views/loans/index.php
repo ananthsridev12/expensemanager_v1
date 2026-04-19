@@ -48,7 +48,7 @@ include __DIR__ . '/../partials/nav.php';
                             onclick="return confirm('Unlink this pair?')">Unlink</button>
                     </form>
                 </div>
-                <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:0.5rem 1.5rem;">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:0.5rem 1.5rem;">
                     <div>
                         <small class="muted">Total EMI paid by you</small>
                         <div style="font-size:1.1rem; font-weight:600;"><?= formatCurrency($emiPaid) ?></div>
@@ -117,7 +117,7 @@ include __DIR__ . '/../partials/nav.php';
                 <small class="muted">Total paid to the bank before this loan was added to the system. Used for the Loan-Lending tracker gap.</small>
             </label>
             <!-- Auto-calculator -->
-            <div style="grid-column:1/-1; background:var(--surface-alt,#f5f5f5); border-radius:6px; padding:0.75rem; display:grid; grid-template-columns:repeat(2,1fr); gap:0.5rem;">
+            <div style="grid-column:1/-1; background:var(--surface-alt,#f5f5f5); border-radius:6px; padding:0.75rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.5rem;">
                 <div style="grid-column:1/-1;"><small><strong>Auto-calculate from first EMI date</strong></small></div>
                 <label style="margin:0;">
                     First EMI date
