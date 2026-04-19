@@ -308,7 +308,11 @@ include __DIR__ . '/../partials/nav.php';
             </label>
             <label>
                 To whom (Contact)
-                <input type="text" id="transaction-contact-search" placeholder="Type name/mobile/email" autocomplete="off">
+                <span style="display:flex;align-items:center;gap:0.35rem;">
+                    <input type="text" id="transaction-contact-search" placeholder="Type name/mobile/email" autocomplete="off" style="flex:1;min-width:0;">
+                    <button type="button" id="contact-clear-btn" title="Clear contact"
+                        style="display:none;background:none;border:1px solid var(--line);border-radius:50%;width:1.5rem;height:1.5rem;line-height:1;cursor:pointer;color:var(--muted);font-size:0.75rem;flex-shrink:0;padding:0;">✕</button>
+                </span>
                 <input type="hidden" name="contact_id" id="transaction-contact-id">
                 <small class="muted">For group spend, this contact is used for the receivable entry.</small>
             </label>
@@ -1074,6 +1078,8 @@ include __DIR__ . '/../partials/nav.php';
                         idInput.value = item.id;
                         searchInput.value = item.name + (item.mobile ? ' - ' + item.mobile : '');
                         resultsWrap.innerHTML = '<small class="muted">Selected: ' + button.textContent + '</small>';
+                        const clearBtn = document.getElementById('contact-clear-btn');
+                        if (clearBtn) clearBtn.style.display = '';
                     });
                     resultsWrap.appendChild(button);
                 });
@@ -1126,6 +1132,56 @@ include __DIR__ . '/../partials/nav.php';
                     return;
                 }
                 searchContactsFor(query, contactSearchInput, contactIdInput, contactResultsWrap);
+            });
+
+            // Clear contact X button
+            const contactClearBtn = document.getElementById('contact-clear-btn');
+            if (contactClearBtn) {
+                contactClearBtn.addEventListener('click', function () {
+                    contactIdInput.value = '';
+                    contactSearchInput.value = '';
+                    contactResultsWrap.innerHTML = '<small class="muted">Start typing to search contacts.</small>';
+                    contactClearBtn.style.display = 'none';
+                    contactSearchInput.focus();
+                });
+            }
+            // Also hide clear btn when user starts typing again (new search)
+            contactSearchInput.addEventListener('focus', function () {
+                if (!contactIdInput.value) contactClearBtn && (contactClearBtn.style.display = 'none');
+            });
+
+            // Smart defaults: remember last-used payment method, category, purchased from
+            const pmSelect  = document.getElementById('payment-method-select');
+            const catSelect = document.getElementById('category-select');
+            const srcSelect = document.getElementById('purchase-source-select');
+
+            // Pre-select saved defaults on load
+            (function applyDefaults() {
+                const savedPM  = localStorage.getItem('tx_default_pm');
+                const savedCat = localStorage.getItem('tx_default_cat');
+                const savedSrc = localStorage.getItem('tx_default_src');
+                if (savedPM  && pmSelect  && pmSelect.querySelector('option[value="' + savedPM  + '"]')) pmSelect.value  = savedPM;
+                if (savedCat && catSelect && catSelect.querySelector('option[value="' + savedCat + '"]')) {
+                    catSelect.value = savedCat;
+                    catSelect.dispatchEvent(new Event('change'));
+                }
+                if (savedSrc && srcSelect && srcSelect.querySelector('option[value="' + savedSrc + '"]')) srcSelect.value = savedSrc;
+            })();
+
+            // Save on change
+            if (pmSelect) pmSelect.addEventListener('change', function () {
+                const v = pmSelect.value;
+                if (v && v !== 'other') localStorage.setItem('tx_default_pm', v);
+            });
+            if (catSelect) catSelect.addEventListener('change', function () {
+                const v = catSelect.value;
+                if (v && v !== 'new_category') localStorage.setItem('tx_default_cat', v);
+                else localStorage.removeItem('tx_default_cat');
+            });
+            if (srcSelect) srcSelect.addEventListener('change', function () {
+                const v = srcSelect.value;
+                if (v && v !== 'other') localStorage.setItem('tx_default_src', v);
+                else localStorage.removeItem('tx_default_src');
             });
 
             toggleTransferFields();
