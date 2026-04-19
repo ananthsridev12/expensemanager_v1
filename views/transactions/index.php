@@ -13,6 +13,30 @@ $creditCards = $creditCards ?? [];
 $filters = $filters ?? [];
 $editTransaction = $editTransaction ?? null;
 
+// Build grouped account list (used in Filters, From account, To account, Redeem points)
+$acctTypeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
+$acctGrouped = [];
+foreach ($accounts as $acct) {
+    $sysKey   = $acct['account_type_system_key'] ?? null;
+    $typeId   = $acct['account_type_id'] ?? null;
+    $isCustom = ($sysKey === null || $sysKey === '') && !empty($typeId);
+    $gKey     = $isCustom ? 'custom_' . (int) $typeId : ($acct['account_type'] ?? 'other');
+    $acctGrouped[$gKey][] = $acct;
+}
+$acctGroups = [];
+foreach ($acctTypeOrder as $typeKey => $typeLabel) {
+    if (!empty($acctGrouped[$typeKey])) {
+        $acctGroups[] = ['label' => $typeLabel, 'accounts' => $acctGrouped[$typeKey]];
+    }
+}
+foreach ($acctGrouped as $gKey => $accts) {
+    if (!isset($acctTypeOrder[$gKey])) {
+        $first = $accts[0];
+        $label = !empty($first['account_type_name']) ? $first['account_type_name'] : ucfirst(str_replace('_', ' ', $gKey));
+        $acctGroups[] = ['label' => $label, 'accounts' => $accts];
+    }
+}
+
 include __DIR__ . '/../partials/nav.php';
 ?>
 <main class="module-content">
@@ -172,31 +196,6 @@ include __DIR__ . '/../partials/nav.php';
             </label>
             <label>
                 From account
-                <?php
-                $acctTypeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
-                $acctGrouped = [];
-                foreach ($accounts as $acct) {
-                    $sysKey   = $acct['account_type_system_key'] ?? null;
-                    $typeId   = $acct['account_type_id'] ?? null;
-                    $isCustom = ($sysKey === null || $sysKey === '') && !empty($typeId);
-                    $gKey     = $isCustom ? 'custom_' . (int) $typeId : ($acct['account_type'] ?? 'other');
-                    $acctGrouped[$gKey][] = $acct;
-                }
-                // Build ordered groups with label
-                $acctGroups = [];
-                foreach ($acctTypeOrder as $typeKey => $typeLabel) {
-                    if (!empty($acctGrouped[$typeKey])) {
-                        $acctGroups[] = ['label' => $typeLabel, 'accounts' => $acctGrouped[$typeKey]];
-                    }
-                }
-                foreach ($acctGrouped as $gKey => $accts) {
-                    if (!isset($acctTypeOrder[$gKey])) {
-                        $first = $accts[0];
-                        $label = !empty($first['account_type_name']) ? $first['account_type_name'] : ucfirst(str_replace('_', ' ', $gKey));
-                        $acctGroups[] = ['label' => $label, 'accounts' => $accts];
-                    }
-                }
-                ?>
                 <select name="account_id" id="from-account-select" required>
                     <?php foreach ($acctGroups as $grp): ?>
                         <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
