@@ -15,6 +15,143 @@ class Loan extends BaseModel
         return $stmt->fetchAll();
     }
 
+    public function linkToLending(int $loanId, ?int $lendingId): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE loans SET linked_lending_id = :lending_id WHERE id = :loan_id'
+        );
+        return $stmt->execute([
+            ':lending_id' => $lendingId > 0 ? $lendingId : null,
+            ':loan_id'    => $loanId,
+        ]);
+    }
+
+    public function getLinkedPairs(): array
+    {
+        $sql = <<<SQL
+SELECT
+    l.id                        AS loan_id,
+    l.loan_name,
+    l.outstanding_principal     AS loan_outstanding,
+    l.linked_lending_id,
+    l.prior_payments,
+    lr.id                       AS lending_id,
+    lr.principal_amount         AS lending_principal,
+    c.name                      AS contact_name,
+    COALESCE(l.prior_payments, 0) + COALESCE((
+        SELECT SUM(s.principal_component + s.interest_component)
+        FROM loan_emi_schedule s
+        WHERE s.loan_id = l.id AND s.status = 'paid'
+    ), 0)                       AS total_emi_paid,
+    COALESCE((
+        SELECT SUM(lrp.amount)
+        FROM lending_repayments lrp
+        WHERE lrp.lending_record_id = lr.id
+    ), 0)                       AS total_recovered,
+    GREATEST(0, lr.principal_amount - COALESCE((
+        SELECT SUM(lrp.amount)
+        FROM lending_repayments lrp
+        WHERE lrp.lending_record_id = lr.id
+    ), 0))                      AS lending_outstanding
+FROM loans l
+JOIN lending_records lr ON lr.id = l.linked_lending_id
+JOIN contacts c ON c.id = lr.contact_id
+WHERE l.linked_lending_id IS NOT NULL
+ORDER BY l.start_date DESC
+SQL;
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAllLendingOptions(): array
+    {
+        $sql = <<<SQL
+SELECT
+    lr.id,
+    c.name AS contact_name,
+    lr.principal_amount,
+    GREATEST(0, lr.principal_amount - COALESCE((
+        SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id
+    ), 0)) AS outstanding_amount
+FROM lending_records lr
+JOIN contacts c ON c.id = lr.contact_id
+WHERE lr.status = 'ongoing'
+ORDER BY c.name ASC
+SQL;
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function markEmiPaid(array $input): bool
+    {
+        $emiId  = (int) ($input['emi_id']  ?? 0);
+        $loanId = (int) ($input['loan_id'] ?? 0);
+        $paymentDate  = !empty($input['payment_date']) ? (string) $input['payment_date'] : date('Y-m-d');
+        $accountToken = (string) ($input['payment_account'] ?? '');
+
+        if ($emiId <= 0 || $loanId <= 0 || $accountToken === '' || strpos($accountToken, ':') === false) {
+            return false;
+        }
+
+        [$accountType, $accountIdRaw] = explode(':', $accountToken, 2);
+        $accountId = (int) $accountIdRaw;
+        $allowedTypes = ['savings', 'current', 'cash', 'wallet', 'other'];
+        if ($accountId <= 0 || !in_array($accountType, $allowedTypes, true)) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT s.*, l.loan_name FROM loan_emi_schedule s
+             JOIN loans l ON l.id = s.loan_id
+             WHERE s.id = :emi_id AND s.loan_id = :loan_id AND s.status != \'paid\'
+             LIMIT 1'
+        );
+        $stmt->execute([':emi_id' => $emiId, ':loan_id' => $loanId]);
+        $emi = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$emi) {
+            return false;
+        }
+
+        $totalAmount      = (float) $emi['principal_component'] + (float) $emi['interest_component'];
+        $principalComponent = (float) $emi['principal_component'];
+        $loanName         = (string) ($emi['loan_name'] ?? 'Loan #' . $loanId);
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare('UPDATE loan_emi_schedule SET status = \'paid\' WHERE id = :id')
+                ->execute([':id' => $emiId]);
+
+            $this->db->prepare(
+                'UPDATE loans
+                 SET outstanding_principal = GREATEST(0, outstanding_principal - :amount),
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = :loan_id'
+            )->execute([':amount' => $principalComponent, ':loan_id' => $loanId]);
+
+            $this->db->prepare(
+                'INSERT INTO transactions
+                    (transaction_date, account_type, account_id, transaction_type, category_id, amount, reference_type, reference_id, notes)
+                 VALUES
+                    (:date, :account_type, :account_id, \'expense\', 32, :amount, \'loan\', :loan_id, :notes)'
+            )->execute([
+                ':date'         => $paymentDate,
+                ':account_type' => $accountType,
+                ':account_id'   => $accountId,
+                ':amount'       => $totalAmount,
+                ':loan_id'      => $loanId,
+                ':notes'        => 'EMI payment — ' . $loanName,
+            ]);
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return false;
+        }
+    }
+
     public function getUpcomingEmis(int $limit = 5): array
     {
         $sql = <<<SQL
@@ -160,7 +297,7 @@ SQL;
         $name = trim((string) ($input['loan_name'] ?? ''));
         if ($name === '') return false;
         $stmt = $this->db->prepare(
-            'UPDATE loans SET loan_name=:loan_name, loan_type=:loan_type, interest_rate=:interest_rate, emi_amount=:emi_amount, outstanding_principal=:outstanding_principal WHERE id=:id'
+            'UPDATE loans SET loan_name=:loan_name, loan_type=:loan_type, interest_rate=:interest_rate, emi_amount=:emi_amount, outstanding_principal=:outstanding_principal, prior_payments=:prior_payments WHERE id=:id'
         );
         return $stmt->execute([
             ':loan_name' => $name,
@@ -168,6 +305,7 @@ SQL;
             ':interest_rate' => (float) ($input['interest_rate'] ?? 0),
             ':emi_amount' => (float) ($input['emi_amount'] ?? 0),
             ':outstanding_principal' => (float) ($input['outstanding_principal'] ?? 0),
+            ':prior_payments' => max(0, (float) ($input['prior_payments'] ?? 0)),
             ':id' => $id,
         ]);
     }
@@ -192,33 +330,18 @@ SQL;
         }
 
         $notes = 'Loan disbursal - ' . $loanName;
-        $stmt = $this->db->prepare(
-            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, amount, reference_type, reference_id, notes)
-             VALUES (:transaction_date, :account_type, :account_id, :transaction_type, :amount, :reference_type, :reference_id, :notes)'
-        );
-
-        // Loan ledger side (debt increases).
-        $stmt->execute([
-            ':transaction_date' => $transferDate,
-            ':account_type' => 'loan',
-            ':account_id' => null,
-            ':transaction_type' => 'expense',
-            ':amount' => $principal,
-            ':reference_type' => 'loan',
-            ':reference_id' => $loanId,
-            ':notes' => $notes,
-        ]);
 
         // Destination account side (cash/bank increases).
-        $stmt->execute([
+        $this->db->prepare(
+            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, amount, reference_type, reference_id, notes)
+             VALUES (:transaction_date, :account_type, :account_id, \'income\', 33, :amount, \'loan\', :reference_id, :notes)'
+        )->execute([
             ':transaction_date' => $transferDate,
-            ':account_type' => $accountType,
-            ':account_id' => $accountId,
-            ':transaction_type' => 'income',
-            ':amount' => $principal,
-            ':reference_type' => 'loan',
-            ':reference_id' => $loanId,
-            ':notes' => $notes,
+            ':account_type'     => $accountType,
+            ':account_id'       => $accountId,
+            ':amount'           => $principal,
+            ':reference_id'     => $loanId,
+            ':notes'            => $notes,
         ]);
     }
 

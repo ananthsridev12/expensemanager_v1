@@ -1,0 +1,29 @@
+name: Deploy to cPanel
+
+on:
+  push:
+    branches:
+      - master
+      - feature/analytics-phase2-3
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger cPanel Git Version Control deployment
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+            -X POST \
+            "https://${{ secrets.CPANEL_DOMAIN }}:2083/execute/VersionControlDeployment/create" \
+            --data-urlencode "repository_root=${{ secrets.CPANEL_REPO_ROOT }}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Deploy failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "Deployment triggered successfully"

@@ -21,3 +21,6 @@ cgi-bin/
 
 # Python scripts (one-off utilities)
 replace_snippet.py
+
+# FTP deploy sync state
+.ftp-deploy-sync-state.json

@@ -37,6 +37,20 @@ class LoanController extends BaseController
             exit;
         }
 
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'emi_pay') {
+            $this->loanModel->markEmiPaid($_POST);
+            header('Location: ?module=loans');
+            exit;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'loan_link') {
+            $loanId     = (int) ($_POST['loan_id'] ?? 0);
+            $lendingId  = (int) ($_POST['lending_record_id'] ?? 0);
+            $this->loanModel->linkToLending($loanId, $lendingId ?: null);
+            header('Location: ?module=loans');
+            exit;
+        }
+
         $editLoan = null;
         if (!empty($_GET['edit'])) {
             $editLoan = $this->loanModel->getById((int) $_GET['edit']);
@@ -47,18 +61,22 @@ class LoanController extends BaseController
             $this->accountModel->getList(),
             static fn (array $account): bool => ($account['account_type'] ?? '') !== 'credit_card'
         ));
-        $upcomingEmis = $this->loanModel->getUpcomingEmis(8);
+        $upcomingEmis  = $this->loanModel->getUpcomingEmis(8);
+        $linkedPairs   = $this->loanModel->getLinkedPairs();
+        $lendingOptions = $this->loanModel->getAllLendingOptions();
         $summary = [
             'count' => count($loans),
             'total_outstanding' => array_sum(array_column($loans, 'outstanding_principal')),
         ];
 
         return $this->render('loans/index.php', [
-            'loans' => $loans,
-            'accounts' => $accounts,
-            'upcomingEmis' => $upcomingEmis,
-            'summary' => $summary,
-            'editLoan' => $editLoan,
+            'loans'          => $loans,
+            'accounts'       => $accounts,
+            'upcomingEmis'   => $upcomingEmis,
+            'linkedPairs'    => $linkedPairs,
+            'lendingOptions' => $lendingOptions,
+            'summary'        => $summary,
+            'editLoan'       => $editLoan,
         ]);
     }
 }

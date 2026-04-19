@@ -12,17 +12,27 @@ class Account extends BaseModel
 SELECT
     a.*,
     at.name AS account_type_name,
+    at.system_key AS account_type_system_key,
     cc.id AS credit_card_id,
     cc.credit_limit,
     cc.outstanding_balance,
     cc.outstanding_principal,
+    cc.points_balance,
     COALESCE(a.opening_balance + SUM(CASE
         WHEN t.transaction_type = 'income' THEN t.amount
         WHEN t.transaction_type = 'expense' THEN -t.amount
         ELSE 0
     END), a.opening_balance) AS balance,
     COALESCE(SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END), 0) AS total_income,
-    COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) AS total_expense
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) AS total_expense,
+    GREATEST(0, COALESCE(
+        cc.outstanding_balance + SUM(CASE
+            WHEN t.transaction_type = 'expense' THEN t.amount
+            WHEN t.transaction_type = 'income'  THEN -t.amount
+            ELSE 0
+        END),
+        cc.outstanding_balance
+    )) AS live_cc_outstanding
 FROM accounts a
 LEFT JOIN account_types at ON at.id = a.account_type_id
 LEFT JOIN transactions t ON t.account_id = a.id
@@ -57,8 +67,8 @@ SQL;
             $accountId = (int) $this->db->lastInsertId();
 
             if ($accountType === 'credit_card') {
-                $cardSql = 'INSERT INTO credit_cards (account_id, bank_name, card_name, credit_limit, billing_date, due_date, outstanding_balance, outstanding_principal, interest_rate, tenure_months, processing_fee, gst_rate, emi_amount, emi_start_date)
-                            VALUES (:account_id, :bank_name, :card_name, :credit_limit, :billing_date, :due_date, :outstanding_balance, :outstanding_principal, :interest_rate, :tenure_months, :processing_fee, :gst_rate, :emi_amount, :emi_start_date)';
+                $cardSql = 'INSERT INTO credit_cards (account_id, bank_name, card_name, credit_limit, billing_date, due_date, outstanding_balance, outstanding_principal, interest_rate, tenure_months, processing_fee, gst_rate, emi_amount, emi_start_date, fuel_surcharge_rate, fuel_surcharge_min_refund)
+                            VALUES (:account_id, :bank_name, :card_name, :credit_limit, :billing_date, :due_date, :outstanding_balance, :outstanding_principal, :interest_rate, :tenure_months, :processing_fee, :gst_rate, :emi_amount, :emi_start_date, :fuel_surcharge_rate, :fuel_surcharge_min_refund)';
                 $cardStmt = $this->db->prepare($cardSql);
                 $cardStmt->execute([
                     ':account_id' => $accountId,
@@ -75,6 +85,8 @@ SQL;
                     ':gst_rate' => is_numeric($input['gst_rate'] ?? null) ? (float) $input['gst_rate'] : 0.0,
                     ':emi_amount' => is_numeric($input['emi_amount'] ?? null) ? (float) $input['emi_amount'] : 0.0,
                     ':emi_start_date' => !empty($input['emi_start_date']) ? $input['emi_start_date'] : null,
+                    ':fuel_surcharge_rate' => is_numeric($input['fuel_surcharge_rate'] ?? null) ? (float) $input['fuel_surcharge_rate'] : 1.0,
+                    ':fuel_surcharge_min_refund' => is_numeric($input['fuel_surcharge_min_refund'] ?? null) ? (float) $input['fuel_surcharge_min_refund'] : 400.0,
                 ]);
 
                 $points = is_numeric($input['points_balance'] ?? null) ? (float) $input['points_balance'] : 0.0;
@@ -136,6 +148,11 @@ SQL;
 
         $this->db->beginTransaction();
         try {
+            $isDefault = isset($input['is_default']) && $input['is_default'] ? 1 : 0;
+            if ($isDefault) {
+                $this->db->exec('UPDATE accounts SET is_default = 0');
+            }
+
             $stmt = $this->db->prepare(
                 'UPDATE accounts
                  SET bank_name = :bank_name,
@@ -145,6 +162,7 @@ SQL;
                      account_number = :account_number,
                      ifsc = :ifsc,
                      opening_balance = :opening_balance,
+                     is_default = :is_default,
                      updated_at = CURRENT_TIMESTAMP
                  WHERE id = :id'
             );
@@ -156,6 +174,7 @@ SQL;
                 ':account_number' => !empty($input['account_number']) ? trim((string) $input['account_number']) : ($existing['account_number'] ?? null),
                 ':ifsc' => !empty($input['ifsc']) ? trim((string) $input['ifsc']) : ($existing['ifsc'] ?? null),
                 ':opening_balance' => is_numeric($input['opening_balance'] ?? null) ? (float) $input['opening_balance'] : (float) ($existing['opening_balance'] ?? 0),
+                ':is_default' => $isDefault,
                 ':id' => $accountId,
             ]);
 
@@ -199,6 +218,8 @@ SQL;
                              emi_amount = :emi_amount,
                              emi_start_date = :emi_start_date,
                              points_balance = :points_balance,
+                             fuel_surcharge_rate = :fuel_surcharge_rate,
+                             fuel_surcharge_min_refund = :fuel_surcharge_min_refund,
                              updated_at = CURRENT_TIMESTAMP
                          WHERE id = :id'
                     )->execute([
@@ -216,6 +237,8 @@ SQL;
                         ':emi_amount' => is_numeric($input['emi_amount'] ?? null) ? (float) $input['emi_amount'] : (float) ($existing['emi_amount'] ?? 0),
                         ':emi_start_date' => !empty($input['emi_start_date']) ? $input['emi_start_date'] : ($existing['emi_start_date'] ?? null),
                         ':points_balance' => is_numeric($input['points_balance'] ?? null) ? (float) $input['points_balance'] : (float) ($existing['points_balance'] ?? 0),
+                        ':fuel_surcharge_rate' => is_numeric($input['fuel_surcharge_rate'] ?? null) ? (float) $input['fuel_surcharge_rate'] : (float) ($existing['fuel_surcharge_rate'] ?? 1.0),
+                        ':fuel_surcharge_min_refund' => is_numeric($input['fuel_surcharge_min_refund'] ?? null) ? (float) $input['fuel_surcharge_min_refund'] : (float) ($existing['fuel_surcharge_min_refund'] ?? 400.0),
                         ':id' => $cardId,
                     ]);
                 }
@@ -245,10 +268,18 @@ SQL;
         ];
     }
 
+    public function setDefault(int $accountId): void
+    {
+        $this->db->exec('UPDATE accounts SET is_default = 0');
+        $this->db->prepare('UPDATE accounts SET is_default = 1 WHERE id = :id')
+            ->execute([':id' => $accountId]);
+    }
+
     public function getList(): array
     {
         $stmt = $this->db->query(
-            'SELECT a.id, a.bank_name, a.account_name, a.account_type, at.name AS account_type_name
+            'SELECT a.id, a.bank_name, a.account_name, a.account_type, a.account_type_id, a.is_default,
+                    at.name AS account_type_name, at.system_key AS account_type_system_key
              FROM accounts a
              LEFT JOIN account_types at ON at.id = a.account_type_id
              ORDER BY a.created_at DESC'
@@ -259,7 +290,7 @@ SQL;
     public function getAccountTypes(): array
     {
         $stmt = $this->db->query(
-            'SELECT id, name, system_key
+            'SELECT id, name, system_key, template
              FROM account_types
              ORDER BY system_key IS NULL, name ASC'
         );
@@ -273,13 +304,19 @@ SQL;
         $accountTypeId = null;
 
         if (strpos($accountTypeRaw, 'custom:') === 0) {
-            $accountType = 'other';
             $accountTypeId = (int) substr($accountTypeRaw, 7);
+            $accountType = $this->getTemplateForAccountType($accountTypeId) ?? 'other';
         } elseif ($accountTypeRaw === 'new') {
-            $accountType = 'other';
             $customName = trim((string) ($input['new_account_type'] ?? ''));
+            $customTemplate = trim((string) ($input['new_account_type_template'] ?? 'other'));
+            if (!in_array($customTemplate, self::SYSTEM_TYPES, true)) {
+                $customTemplate = 'other';
+            }
             if ($customName !== '') {
-                $accountTypeId = $this->findOrCreateAccountType($customName);
+                $accountTypeId = $this->findOrCreateAccountType($customName, $customTemplate);
+                $accountType = $customTemplate;
+            } else {
+                $accountType = $fallbackType ?? 'savings';
             }
         } elseif (!in_array($accountTypeRaw, self::SYSTEM_TYPES, true)) {
             $accountType = $fallbackType ?? 'savings';
@@ -292,7 +329,7 @@ SQL;
         return [$accountType, $accountTypeId];
     }
 
-    private function findOrCreateAccountType(string $name): ?int
+    private function findOrCreateAccountType(string $name, string $template = 'other'): ?int
     {
         $cleanName = trim($name);
         if ($cleanName === '') {
@@ -306,9 +343,21 @@ SQL;
             return (int) $row['id'];
         }
 
-        $insert = $this->db->prepare('INSERT INTO account_types (name) VALUES (:name)');
-        $insert->execute([':name' => $cleanName]);
+        $insert = $this->db->prepare('INSERT INTO account_types (name, template) VALUES (:name, :template)');
+        $insert->execute([':name' => $cleanName, ':template' => $template]);
         return (int) $this->db->lastInsertId();
+    }
+
+    private function getTemplateForAccountType(int $id): ?string
+    {
+        $stmt = $this->db->prepare('SELECT template FROM account_types WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return null;
+        }
+        $template = $row['template'] ?? null;
+        return ($template !== null && $template !== '') ? $template : 'other';
     }
 
     private function getAccountTypeIdBySystemKey(string $systemKey): ?int

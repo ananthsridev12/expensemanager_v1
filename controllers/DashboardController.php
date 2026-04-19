@@ -3,6 +3,7 @@
 namespace Controllers;
 
 use Models\Account;
+use Models\Analytics;
 use Models\Category;
 use Models\CreditCard;
 use Models\Investment;
@@ -15,6 +16,7 @@ use Models\Transaction;
 class DashboardController extends BaseController
 {
     private Account $accountModel;
+    private Analytics $analyticsModel;
     private Category $categoryModel;
     private CreditCard $creditCardModel;
     private Investment $investmentModel;
@@ -28,6 +30,7 @@ class DashboardController extends BaseController
     {
         parent::__construct();
         $this->accountModel = new Account($this->database);
+        $this->analyticsModel = new Analytics($this->database);
         $this->categoryModel = new Category($this->database);
         $this->creditCardModel = new CreditCard($this->database);
         $this->investmentModel = new Investment($this->database);
@@ -70,7 +73,15 @@ class DashboardController extends BaseController
                 'outstanding' => array_sum(array_column($loans, 'outstanding_principal')),
             ],
             'credit_cards' => $this->creditCardModel->getSummary(),
-            'lending' => $this->lendingModel->getSummary(),
+            'lending'   => $this->lendingModel->getSummary(),
+            'borrowing' => (function() {
+                try {
+                    $m = new \Models\Borrowing($this->database);
+                    return $m->getSummary();
+                } catch (\Throwable $e) {
+                    return ['count' => 0, 'outstanding' => 0];
+                }
+            })(),
             'investments' => $this->investmentModel->getSummary(),
             'rentals' => $this->rentalModel->getSummary(),
         ];
@@ -78,6 +89,14 @@ class DashboardController extends BaseController
         $recentTransactions = $this->transactionModel->getRecent(5);
         $upcomingReminders = $this->reminderModel->getUpcoming(3);
         $upcomingEmis = $this->loanModel->getUpcomingEmis(5);
+        $monthComparison = $this->analyticsModel->getThisMonthVsLastMonth();
+        $sparkline = $this->analyticsModel->getMiniSparkline(6);
+        try {
+            $budgetModel  = new \Models\Budget($this->database);
+            $budgetSummary = $budgetModel->getSummaryForMonth((int) date('n'), (int) date('Y'));
+        } catch (\Throwable $e) {
+            $budgetSummary = ['count' => 0, 'total_budgeted' => 0, 'total_spent' => 0, 'over_count' => 0, 'rows' => []];
+        }
 
         return $this->render('dashboard.php', [
             'summary' => $summary,
@@ -91,6 +110,9 @@ class DashboardController extends BaseController
             'creditCardEmiSchedule' => $creditCardEmiSchedule,
             'categories' => $categoriesWithSubs,
             'totalsByType' => $totalsByType,
+            'monthComparison' => $monthComparison,
+            'sparkline' => $sparkline,
+            'budgetSummary' => $budgetSummary,
         ]);
     }
 

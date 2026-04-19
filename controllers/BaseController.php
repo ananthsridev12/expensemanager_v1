@@ -24,4 +24,13 @@ class BaseController
         include __DIR__ . '/../views/layout.php';
         return ob_get_clean();
     }
+
+    /** Render a view without the layout wrapper — for AJAX partial responses. */
+    protected function renderPartial(string $viewPath, array $params = []): string
+    {
+        extract($params, EXTR_SKIP);
+        ob_start();
+        include __DIR__ . '/../views/' . $viewPath;
+        return ob_get_clean();
+    }
 }

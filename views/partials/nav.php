@@ -6,16 +6,30 @@
         <span class="brand">Easi7 Finance</span>
         <button type="button" class="nav-close" id="nav-close" aria-label="Close menu">Close</button>
     </div>
+    <button type="button" id="quick-add-nav-btn"
+            style="display:block;width:calc(100% - 2rem);margin:0.5rem 1rem 0.75rem;padding:0.6rem 1rem;background:#22c55e;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:0.95rem;cursor:pointer;text-align:left;letter-spacing:0.01em;">
+        + Add Transaction
+    </button>
     <a href="?module=dashboard" class="<?= $module === 'dashboard' ? 'is-active' : '' ?>">Dashboard</a>
     <a href="?module=analytics" class="<?= $module === 'analytics' ? 'is-active' : '' ?>">Analytics</a>
+    <a href="?module=budget" class="<?= $module === 'budget' ? 'is-active' : '' ?>">Budget</a>
     <a href="?module=accounts" class="<?= $module === 'accounts' ? 'is-active' : '' ?>">Accounts</a>
     <a href="?module=contacts" class="<?= $module === 'contacts' ? 'is-active' : '' ?>">Contacts</a>
     <a href="?module=categories" class="<?= $module === 'categories' ? 'is-active' : '' ?>">Categories</a>
     <a href="?module=transactions" class="<?= $module === 'transactions' ? 'is-active' : '' ?>">Transactions</a>
     <a href="?module=reminders" class="<?= $module === 'reminders' ? 'is-active' : '' ?>">Reminders</a>
     <a href="?module=loans" class="<?= $module === 'loans' ? 'is-active' : '' ?>">Loans</a>
-    <a href="?module=lending" class="<?= $module === 'lending' ? 'is-active' : '' ?>">Lending</a>
+    <a href="?module=lending"   class="<?= $module === 'lending'   ? 'is-active' : '' ?>">Lending</a>
+    <a href="?module=borrowing" class="<?= $module === 'borrowing' ? 'is-active' : '' ?>">Borrowing</a>
     <a href="?module=investments" class="<?= $module === 'investments' ? 'is-active' : '' ?>">Investments</a>
     <a href="?module=sip" class="<?= $module === 'sip' ? 'is-active' : '' ?>">SIP</a>
     <a href="?module=rental" class="<?= $module === 'rental' ? 'is-active' : '' ?>">Rental</a>
+    <a href="?module=rented_home" class="<?= $module === 'rented_home' ? 'is-active' : '' ?>">My Rented Home</a>
+    <a href="?module=notes" class="<?= $module === 'notes' ? 'is-active' : '' ?>">Notes</a>
+    <div class="font-size-btns">
+        <span>Text</span>
+        <button data-font="normal"    title="Normal size">A</button>
+        <button data-font="compact"   title="Compact">A</button>
+        <button data-font="tiny"      title="Tiny">A</button>
+    </div>
 </nav>
