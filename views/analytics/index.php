@@ -5,6 +5,7 @@ $endDate = $endDate ?? date('Y-m-d');
 $summary = $summary ?? ['total_income' => 0, 'total_expense' => 0, 'total_transfer' => 0, 'net_cashflow' => 0];
 $earningsSummary = $earningsSummary ?? ['total_earnings' => 0, 'entries' => 0];
 $earningsBySubcategory = $earningsBySubcategory ?? [];
+$expensesBySubcategory = $expensesBySubcategory ?? [];
 $expensesByCategory = $expensesByCategory ?? [];
 $incomeByCategory = $incomeByCategory ?? [];
 $monthlyTrend = $monthlyTrend ?? [];
@@ -877,6 +878,60 @@ include __DIR__ . '/../partials/nav.php';
                 </tbody>
             </table>
         </div>
+    </section>
+    <?php endif; ?>
+
+    <!-- Expenses by subcategory -->
+    <?php if (!empty($expensesBySubcategory)): ?>
+    <section class="module-panel">
+        <h2>Actual expenses by subcategory</h2>
+        <div class="charts-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
+            <div style="max-width:340px;margin:0 auto;">
+                <canvas id="expense-sub-donut-chart"></canvas>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Subcategory</th><th>Category</th><th>Amount</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($expensesBySubcategory as $row): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($row['subcategory_name']) ?></td>
+                                <td style="color:var(--muted);font-size:0.85rem;"><?= htmlspecialchars($row['category_name']) ?></td>
+                                <td><?= formatCurrency((float)($row['total_amount'] ?? 0)) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <script>
+        (function () {
+            const rows = <?= json_encode($expensesBySubcategory, JSON_UNESCAPED_UNICODE) ?>;
+            const colors = ['#ef4444','#f97316','#eab308','#a855f7','#3b82f6','#22d3ee','#10b981','#ec4899','#6366f1','#14b8a6'];
+            new Chart(document.getElementById('expense-sub-donut-chart'), {
+                type: 'doughnut',
+                data: {
+                    labels: rows.map(r => r.subcategory_name),
+                    datasets: [{
+                        data: rows.map(r => Number(r.total_amount)),
+                        backgroundColor: rows.map((_, i) => colors[i % colors.length]),
+                        borderColor: '#0f172a',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '55%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12 } },
+                        tooltip: { callbacks: { label: ctx => ctx.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } }
+                    }
+                }
+            });
+        })();
+        </script>
     </section>
     <?php endif; ?>
 

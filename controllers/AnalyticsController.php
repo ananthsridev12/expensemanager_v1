@@ -36,11 +36,12 @@ class AnalyticsController extends BaseController
             'purchase_source_ids' => array_values(array_filter(array_map('intval', (array) ($_GET['purchase_source_id'] ?? [])))),
         ];
 
-        $summary              = $this->analyticsModel->getSummary($startDate, $endDate);
-        $earningsSummary      = $this->analyticsModel->getEarningsSummary($startDate, $endDate);
-        $earningsBySubcategory= $this->analyticsModel->getEarningsBySubcategory($startDate, $endDate);
-        $expensesByCategory   = $this->analyticsModel->getExpensesByCategory($startDate, $endDate);
-        $incomeByCategory     = $this->analyticsModel->getIncomeByCategory($startDate, $endDate);
+        $summary                = $this->analyticsModel->getSummary($startDate, $endDate);
+        $earningsSummary        = $this->analyticsModel->getEarningsSummary($startDate, $endDate);
+        $earningsBySubcategory  = $this->analyticsModel->getEarningsBySubcategory($startDate, $endDate);
+        $expensesByCategory     = $this->analyticsModel->getExpensesByCategory($startDate, $endDate);
+        $expensesBySubcategory  = $this->analyticsModel->getExpensesBySubcategory($startDate, $endDate);
+        $incomeByCategory       = $this->analyticsModel->getIncomeByCategory($startDate, $endDate);
         $monthlyTrend         = $this->analyticsModel->getMonthlyIncomeVsExpense(12);
         $accountWiseExpense   = $this->analyticsModel->getAccountWiseExpense($startDate, $endDate);
         $dayOfWeekSpend       = $this->analyticsModel->getDayOfWeekSpend($startDate, $endDate);
@@ -50,14 +51,15 @@ class AnalyticsController extends BaseController
         $excludedCategories   = array_values(array_filter($categoriesWithSubs, fn($c) => !empty($c['exclude_from_analytics'])));
 
         return $this->render('analytics/index.php', [
-            'startDate'            => $startDate,
-            'endDate'              => $endDate,
-            'drilldownFilters'     => $drilldownFilters,
-            'summary'              => $summary,
-            'earningsSummary'      => $earningsSummary,
-            'earningsBySubcategory'=> $earningsBySubcategory,
-            'expensesByCategory'   => $expensesByCategory,
-            'incomeByCategory'     => $incomeByCategory,
+            'startDate'             => $startDate,
+            'endDate'               => $endDate,
+            'drilldownFilters'      => $drilldownFilters,
+            'summary'               => $summary,
+            'earningsSummary'       => $earningsSummary,
+            'earningsBySubcategory' => $earningsBySubcategory,
+            'expensesByCategory'    => $expensesByCategory,
+            'expensesBySubcategory' => $expensesBySubcategory,
+            'incomeByCategory'      => $incomeByCategory,
             'monthlyTrend'         => $monthlyTrend,
             'accountWiseExpense'   => $accountWiseExpense,
             'dayOfWeekSpend'       => $dayOfWeekSpend,

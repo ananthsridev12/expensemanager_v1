@@ -373,6 +373,31 @@ SQL;
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getExpensesBySubcategory(string $startDate, string $endDate): array
+    {
+        $sql = <<<SQL
+SELECT
+    COALESCE(sc.name, 'Unspecified') AS subcategory_name,
+    COALESCE(c.name, 'Uncategorized') AS category_name,
+    COALESCE(SUM(t.amount), 0) AS total_amount
+FROM transactions t
+LEFT JOIN categories c ON c.id = t.category_id
+LEFT JOIN subcategories sc ON sc.id = t.subcategory_id
+WHERE t.transaction_date BETWEEN :start_date AND :end_date
+  AND t.transaction_type = 'expense'
+  AND (c.exclude_from_analytics = 0 OR c.id IS NULL)
+GROUP BY sc.id, sc.name, c.id, c.name
+ORDER BY total_amount DESC
+SQL;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            ':start_date' => $startDate,
+            ':end_date'   => $endDate,
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function getDayOfWeekSpend(string $startDate, string $endDate): array
     {
         $sql = <<<SQL
