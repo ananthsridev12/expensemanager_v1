@@ -584,7 +584,7 @@ include __DIR__ . '/../partials/nav.php';
             const incomeColors  = ['#10b981','#22d3ee','#6ee7b7','#34d399','#059669','#14b8a6','#a7f3d0','#6366f1','#93c5fd','#bbf7d0'];
             const expenseColors = ['#ef4444','#f97316','#eab308','#a855f7','#3b82f6','#ec4899','#f43f5e','#fb923c','#facc15','#c084fc'];
             const mixedColors   = ['#3b82f6','#22d3ee','#a855f7','#f97316','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
-            const donutOpts = (colors) => ({ responsive: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ctx.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } } } });
+            const donutOpts = (colors) => ({ responsive: true, aspectRatio: 2, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ctx.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } } } });
             const barOpts   = { indexAxis: 'y', responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.07)' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.07)' } } } };
             const makeDonut = (id, rows, colors) => {
                 const el = document.getElementById(id);
@@ -792,9 +792,7 @@ include __DIR__ . '/../partials/nav.php';
             <?php if (!empty($expensesByCategory)): ?>
             <div>
                 <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">Expense by category</h3>
-                <div style="max-width:340px;margin:0 auto;">
-                    <canvas id="expense-donut-chart"></canvas>
-                </div>
+                <canvas id="expense-donut-chart"></canvas>
                 <div class="table-wrapper" style="margin-top:0.8rem;">
                     <table>
                         <thead><tr><th>Category</th><th>Amount</th></tr></thead>
@@ -813,9 +811,7 @@ include __DIR__ . '/../partials/nav.php';
             <?php if (!empty($incomeByCategory)): ?>
             <div>
                 <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">Income by category</h3>
-                <div style="max-width:340px;margin:0 auto;">
-                    <canvas id="income-donut-chart"></canvas>
-                </div>
+                <canvas id="income-donut-chart"></canvas>
                 <div class="table-wrapper" style="margin-top:0.8rem;">
                     <table>
                         <thead><tr><th>Category</th><th>Amount</th></tr></thead>
@@ -837,6 +833,7 @@ include __DIR__ . '/../partials/nav.php';
             const colors = ['#3b82f6','#22d3ee','#a855f7','#f97316','#10b981','#eab308','#ec4899','#6366f1','#14b8a6','#ef4444'];
             const donutOptions = (title) => ({
                 responsive: true,
+                aspectRatio: 2,
                 cutout: '55%',
                 plugins: {
                     legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12 } },
@@ -1059,6 +1056,7 @@ include __DIR__ . '/../partials/nav.php';
                 },
                 options: {
                     responsive: true,
+                    aspectRatio: 2,
                     cutout: '55%',
                     plugins: {
                         legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12 } },
