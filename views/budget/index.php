@@ -391,6 +391,140 @@ include __DIR__ . '/../partials/nav.php';
         </section>
     </form>
 
+    <!-- Spend ranking section -->
+    <?php
+    $rankedCategories = $categories;
+    usort($rankedCategories, fn($a, $b) => (float)$b['spent'] <=> (float)$a['spent']);
+    $hasAnySpend = array_sum(array_column($rankedCategories, 'spent')) > 0;
+    if ($hasAnySpend):
+    ?>
+    <section class="module-panel">
+        <h2 style="margin-bottom:1rem;">Spend Ranking — <?= htmlspecialchars($monthLabel) ?></h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Category / Subcategory</th>
+                        <th>Spent</th>
+                        <th>Budget (₹)</th>
+                        <th>3-mo avg</th>
+                        <th style="min-width:150px;">Progress</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($rankedCategories as $rank => $cat):
+                    $catId   = (int) $cat['category_id'];
+                    $amount  = (float) $cat['budget_amount'];
+                    $spent   = (float) $cat['spent'];
+                    $avg     = (float) ($threeMonthAvg[$catId] ?? 0);
+                    $pct     = $amount > 0 ? min(200, round($spent / $amount * 100, 1)) : 0;
+                    $color   = $barColor($spent, $amount);
+                    $alert   = '';
+                    if ($amount > 0) {
+                        if ($pct >= 120)     $alert = '🔴 120%+';
+                        elseif ($pct >= 100) $alert = '🔴 Over';
+                        elseif ($pct >= 80)  $alert = '🟡 80%+';
+                    }
+
+                    $hasSubs = !empty($subcategories[$catId]);
+                    $rankedSubs = $hasSubs ? $subcategories[$catId] : [];
+                    if ($hasSubs) {
+                        usort($rankedSubs, fn($a, $b) => (float)$b['spent'] <=> (float)$a['spent']);
+                    }
+                ?>
+                    <tr class="cat-row">
+                        <td style="color:var(--muted);font-size:0.85rem;width:2rem;"><?= $rank + 1 ?></td>
+                        <td>
+                            <?php if ($hasSubs): ?>
+                                <button type="button" class="toggle-subs-rank secondary"
+                                        data-cat="rank-<?= $catId ?>"
+                                        style="padding:0.15rem 0.45rem;font-size:0.72rem;margin-right:0.4rem;min-width:24px;"
+                                        title="Expand subcategories">▶</button>
+                            <?php endif; ?>
+                            <strong><?= htmlspecialchars($cat['category_name']) ?></strong>
+                        </td>
+                        <td style="<?= $spent > 0 ? 'color:inherit' : 'color:var(--muted)' ?>">
+                            <?= $spent > 0 ? formatCurrency($spent) : '—' ?>
+                        </td>
+                        <td style="color:var(--muted);">
+                            <?= $amount > 0 ? formatCurrency($amount) : '—' ?>
+                        </td>
+                        <td style="color:var(--muted);font-size:0.85rem;">
+                            <?= $avg > 0 ? formatCurrency($avg) : '—' ?>
+                        </td>
+                        <td>
+                            <?php if ($amount > 0): ?>
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <div style="flex:1;background:rgba(255,255,255,0.07);border-radius:5px;height:7px;min-width:70px;">
+                                    <div style="background:<?= $color ?>;border-radius:5px;height:7px;width:<?= min(100,$pct) ?>%;"></div>
+                                </div>
+                                <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;"><?= $pct ?>%</span>
+                                <?php if ($alert): ?>
+                                    <span style="font-size:0.72rem;white-space:nowrap;"><?= $alert ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php else: ?>
+                            <span style="color:rgba(255,255,255,0.15);font-size:0.78rem;">No limit</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+
+                    <?php if ($hasSubs): ?>
+                        <?php foreach ($rankedSubs as $sub):
+                            $subId     = (int) $sub['subcategory_id'];
+                            $subAmt    = (float) $sub['budget_amount'];
+                            $subSpent  = (float) $sub['spent'];
+                            $subAvg    = (float) ($subThreeMonthAvg[$subId] ?? 0);
+                            $subPct    = $subAmt > 0 ? min(200, round($subSpent / $subAmt * 100, 1)) : 0;
+                            $subColor  = $barColor($subSpent, $subAmt);
+                            $subAlert  = '';
+                            if ($subAmt > 0) {
+                                if ($subPct >= 120)     $subAlert = '🔴 120%+';
+                                elseif ($subPct >= 100) $subAlert = '🔴 Over';
+                                elseif ($subPct >= 80)  $subAlert = '🟡 80%+';
+                            }
+                        ?>
+                        <tr class="sub-row-rank" data-parent-cat="rank-<?= $catId ?>" style="display:none;background:rgba(0,0,0,0.15);">
+                            <td style="color:var(--muted);font-size:0.78rem;"></td>
+                            <td style="padding-left:2.5rem;color:var(--muted);font-size:0.88rem;">
+                                ↳ <?= htmlspecialchars($sub['subcategory_name']) ?>
+                            </td>
+                            <td style="font-size:0.85rem;<?= $subSpent > 0 ? '' : 'color:var(--muted)' ?>">
+                                <?= $subSpent > 0 ? formatCurrency($subSpent) : '—' ?>
+                            </td>
+                            <td style="color:var(--muted);font-size:0.85rem;">
+                                <?= $subAmt > 0 ? formatCurrency($subAmt) : '—' ?>
+                            </td>
+                            <td style="color:var(--muted);font-size:0.82rem;">
+                                <?= $subAvg > 0 ? formatCurrency($subAvg) : '—' ?>
+                            </td>
+                            <td>
+                                <?php if ($subAmt > 0): ?>
+                                <div style="display:flex;align-items:center;gap:0.4rem;">
+                                    <div style="flex:1;background:rgba(255,255,255,0.07);border-radius:5px;height:6px;min-width:70px;">
+                                        <div style="background:<?= $subColor ?>;border-radius:5px;height:6px;width:<?= min(100,$subPct) ?>%;"></div>
+                                    </div>
+                                    <span style="font-size:0.72rem;color:var(--muted);white-space:nowrap;"><?= $subPct ?>%</span>
+                                    <?php if ($subAlert): ?>
+                                        <span style="font-size:0.7rem;white-space:nowrap;"><?= $subAlert ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php else: ?>
+                                <span style="color:rgba(255,255,255,0.12);font-size:0.78rem;">No limit</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <?php endif; ?>
+
     <!-- Month-end summary (past months only) -->
     <?php
     $isPastMonth = ($selectedYear < (int)date('Y')) || ($selectedYear == (int)date('Y') && $selectedMonth < (int)date('n'));
@@ -504,6 +638,18 @@ include __DIR__ . '/../partials/nav.php';
         btn.addEventListener('click', function () {
             const catId  = this.dataset.cat;
             const rows   = document.querySelectorAll('.sub-row[data-parent-cat="' + catId + '"]');
+            const isOpen = this.textContent === '▼';
+            rows.forEach(r => { r.style.display = isOpen ? 'none' : ''; });
+            this.textContent = isOpen ? '▶' : '▼';
+            this.title       = isOpen ? 'Expand subcategories' : 'Collapse subcategories';
+        });
+    });
+
+    // Toggle subcategory rows in spend ranking section
+    document.querySelectorAll('.toggle-subs-rank').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const catId  = this.dataset.cat;
+            const rows   = document.querySelectorAll('.sub-row-rank[data-parent-cat="' + catId + '"]');
             const isOpen = this.textContent === '▼';
             rows.forEach(r => { r.style.display = isOpen ? 'none' : ''; });
             this.textContent = isOpen ? '▶' : '▼';
