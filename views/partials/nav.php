@@ -25,7 +25,8 @@
     <a href="?module=sip" class="<?= $module === 'sip' ? 'is-active' : '' ?>">SIP</a>
     <a href="?module=rental" class="<?= $module === 'rental' ? 'is-active' : '' ?>">Rental</a>
     <a href="?module=rented_home" class="<?= $module === 'rented_home' ? 'is-active' : '' ?>">My Rented Home</a>
-    <a href="?module=notes" class="<?= $module === 'notes' ? 'is-active' : '' ?>">Notes</a>
+    <a href="?module=notes"    class="<?= $module === 'notes'    ? 'is-active' : '' ?>">Notes</a>
+    <a href="?module=reports" class="<?= $module === 'reports' ? 'is-active' : '' ?>">Reports</a>
     <div class="font-size-btns">
         <span>Text</span>
         <button data-font="normal"    title="Normal size">A</button>
