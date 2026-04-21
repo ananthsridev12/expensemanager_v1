@@ -8,14 +8,28 @@ namespace Models;
  */
 class Mailer
 {
+    private string $host;
+    private int    $port;
+    private string $user;
+    private string $pass;
+    private string $fromEmail;
+    private string $fromName;
+
     public function __construct(
-        private string $host,
-        private int    $port,
-        private string $user,
-        private string $pass,
-        private string $fromEmail,
-        private string $fromName
-    ) {}
+        string $host,
+        int    $port,
+        string $user,
+        string $pass,
+        string $fromEmail,
+        string $fromName
+    ) {
+        $this->host      = $host;
+        $this->port      = $port;
+        $this->user      = $user;
+        $this->pass      = $pass;
+        $this->fromEmail = $fromEmail;
+        $this->fromName  = $fromName;
+    }
 
     public function send(string $toEmail, string $subject, string $htmlBody): bool
     {
