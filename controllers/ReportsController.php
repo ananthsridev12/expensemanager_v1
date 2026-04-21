@@ -59,6 +59,7 @@ class ReportsController extends BaseController
 
         [$startDate, $endDate, $periodLabel] = $this->resolvePeriod($period);
 
+        try {
         $pdo = $this->database->connect();
 
         $totalsStmt = $pdo->prepare("
@@ -98,7 +99,7 @@ class ReportsController extends BaseController
         $categories = $catStmt->fetchAll(\PDO::FETCH_ASSOC);
 
         $txStmt = $pdo->prepare("
-            SELECT t.transaction_date, t.description, t.amount,
+            SELECT t.transaction_date, t.notes, t.amount,
                    COALESCE(c.name,'Uncategorized') AS category_name
             FROM transactions t
             LEFT JOIN categories c ON c.id = t.category_id
@@ -128,6 +129,11 @@ class ReportsController extends BaseController
             return ['type' => 'success', 'msg' => 'Report for ' . $periodLabel . ' sent to ' . $email . '.'];
         }
         return ['type' => 'error', 'msg' => 'Failed to send. Check SMTP credentials and server error log.'];
+
+        } catch (\Throwable $e) {
+            error_log('[Reports] ' . $e->getMessage());
+            return ['type' => 'error', 'msg' => 'Error: ' . $e->getMessage()];
+        }
     }
 
     private function resolvePeriod(string $period): array
@@ -218,7 +224,7 @@ class ReportsController extends BaseController
         $txRows = '';
         foreach ($topTx as $tx) {
             $txDate = date('d M', strtotime($tx['transaction_date']));
-            $txDesc = htmlspecialchars($tx['description'] ?? '—');
+            $txDesc = htmlspecialchars($tx['notes'] ?? '—');
             $txCat  = htmlspecialchars($tx['category_name']);
             $txAmt  = $this->fmt((float) $tx['amount']);
             $txRows .= '<tr>'
