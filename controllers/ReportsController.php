@@ -128,7 +128,7 @@ class ReportsController extends BaseController
         if ($ok) {
             return ['type' => 'success', 'msg' => 'Report for ' . $periodLabel . ' sent to ' . $email . '.'];
         }
-        return ['type' => 'error', 'msg' => 'Failed to send. Check SMTP credentials and server error log.'];
+        return ['type' => 'error', 'msg' => $mailer->getLastError() ?: 'Send failed — check server error log.'];
 
         } catch (\Throwable $e) {
             error_log('[Reports] ' . $e->getMessage());
