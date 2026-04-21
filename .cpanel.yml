@@ -2,6 +2,8 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home1/de2shrnx/personalfin.easi7.in/
+
+    # App files — safe to overwrite on every deploy
     - /bin/cp -R autoload.php helpers.php index.php $DEPLOYPATH
     - /bin/cp -R .htaccess 404.html $DEPLOYPATH
     - /bin/cp -R controllers/ $DEPLOYPATH
@@ -11,5 +13,12 @@ deployment:
     - /bin/cp -R api/ $DEPLOYPATH
     - /bin/cp -R migrations/ $DEPLOYPATH
     - /bin/cp -R cron/ $DEPLOYPATH
+
+    # Config — deploy only the repo templates, never touch server-only credential files.
+    # Files intentionally NOT deployed (managed manually on server):
+    #   config/database.php      — DB host/user/pass
+    #   config/pin.override.php  — actual PIN hash
+    #   config/report.override.php — SMTP credentials (future override pattern)
+    - mkdir -p $DEPLOYPATH/config
     - /bin/cp config/pin.php $DEPLOYPATH/config/
     - test -f $DEPLOYPATH/config/report.php || /bin/cp config/report.php $DEPLOYPATH/config/

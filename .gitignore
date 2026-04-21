@@ -1,6 +1,8 @@
 
-# Database config (contains credentials — manage manually on server)
+# Server-only config files — credentials managed manually on server, never commit
 config/database.php
+config/pin.override.php
+config/report.override.php
 
 # Database exports
 db/
