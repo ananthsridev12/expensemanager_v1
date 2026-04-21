@@ -1,27 +1,30 @@
 <?php
 /**
  * Daily report configuration.
- * Fill in your credentials before enabling.
+ *
+ * SMTP setup (cPanel shared hosting):
+ *   1. cPanel → Email Accounts → create an email like reports@yourdomain.com
+ *   2. cPanel → Email Accounts → Connect Devices → note the SMTP host/port
+ *      Typically:  host = mail.yourdomain.com  port = 465 (SSL)
+ *   3. Fill in smtp_user + smtp_pass below with that email's credentials
+ *   4. Set smtp_from to the same email address (required by most hosts)
  */
 return [
 
-    // ── Email ────────────────────────────────────────────────────────────────
-    'email_enabled' => false,
-    'email_to'      => 'you@example.com',        // recipient
-    'email_from'    => 'reports@yourdomain.com',  // sender (must be valid on your host)
-    'email_name'    => 'Easi7 Finance',
+    // ── SMTP ─────────────────────────────────────────────────────────────────
+    'smtp_host' => '',                      // e.g. mail.yourdomain.com
+    'smtp_port' => 465,                     // 465 = SSL  |  587 = STARTTLS
+    'smtp_user' => '',                      // full email: reports@yourdomain.com
+    'smtp_pass' => '',                      // email account password
+    'smtp_from' => '',                      // same as smtp_user (most hosts require this)
+    'smtp_name' => 'Easi7 Finance',         // display name in inbox
 
-    // ── WhatsApp via CallMeBot (free, personal use) ───────────────────────────
-    // Setup steps:
-    //   1. Save this number in your phone contacts: +34 644 59 21 83  (CallMeBot)
-    //   2. Send them a WhatsApp message: "I allow callmebot to send me messages"
-    //   3. You will receive an API key via WhatsApp — paste it below.
+    // ── WhatsApp (future) ─────────────────────────────────────────────────────
     'whatsapp_enabled' => false,
-    'whatsapp_phone'   => '91XXXXXXXXXX',  // your number with country code, no + or spaces
+    'whatsapp_phone'   => '',
     'whatsapp_apikey'  => '',
 
-    // ── Database ─────────────────────────────────────────────────────────────
-    // Same credentials as your main app DB.
+    // ── Database (for cron/daily_report.php only) ─────────────────────────────
     'db_host'    => 'localhost',
     'db_name'    => 'de2shrnx_expensemanager',
     'db_user'    => '',
