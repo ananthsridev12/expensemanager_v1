@@ -9,4 +9,7 @@ deployment:
     - /bin/cp -R views/ $DEPLOYPATH
     - /bin/cp -R public/ $DEPLOYPATH
     - /bin/cp -R api/ $DEPLOYPATH
+    - /bin/cp -R migrations/ $DEPLOYPATH
+    - /bin/cp -R cron/ $DEPLOYPATH
     - /bin/cp config/pin.php $DEPLOYPATH/config/
+    - test -f $DEPLOYPATH/config/report.php || /bin/cp config/report.php $DEPLOYPATH/config/
