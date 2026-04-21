@@ -45,6 +45,7 @@ class AnalyticsController extends BaseController
         $monthlyTrend         = $this->analyticsModel->getMonthlyIncomeVsExpense(12);
         $accountWiseExpense   = $this->analyticsModel->getAccountWiseExpense($startDate, $endDate);
         $dayOfWeekSpend       = $this->analyticsModel->getDayOfWeekSpend($startDate, $endDate);
+        $dailyExpenses        = $this->analyticsModel->getDailyExpenses($startDate, $endDate);
         $drilldown            = $this->analyticsModel->getDrilldown($drilldownFilters);
         $categoriesWithSubs   = $this->categoryModel->getAllWithSubcategories();
         $purchaseSources      = $this->purchaseSourceModel->getChildren();
@@ -63,6 +64,7 @@ class AnalyticsController extends BaseController
             'monthlyTrend'         => $monthlyTrend,
             'accountWiseExpense'   => $accountWiseExpense,
             'dayOfWeekSpend'       => $dayOfWeekSpend,
+            'dailyExpenses'        => $dailyExpenses,
             'drilldown'            => $drilldown,
             'categoriesWithSubs'   => $categoriesWithSubs,
             'purchaseSources'      => $purchaseSources,

@@ -11,6 +11,7 @@ $incomeByCategory = $incomeByCategory ?? [];
 $monthlyTrend = $monthlyTrend ?? [];
 $accountWiseExpense = $accountWiseExpense ?? [];
 $dayOfWeekSpend = $dayOfWeekSpend ?? [];
+$dailyExpenses  = $dailyExpenses  ?? [];
 $drilldown = $drilldown ?? [];
 $drilldownFilters = $drilldownFilters ?? [];
 $categoriesWithSubs = $categoriesWithSubs ?? [];
@@ -987,6 +988,71 @@ include __DIR__ . '/../partials/nav.php';
                 });
             })();
             <?php endif; ?>
+        })();
+        </script>
+    </section>
+    <?php endif; ?>
+
+    <!-- Per-day expenses -->
+    <?php
+    $dailyWithSpend = array_filter($dailyExpenses, fn($r) => $r['tx_count'] > 0);
+    if (!empty($dailyWithSpend)):
+        $maxDay = array_reduce($dailyExpenses, fn($carry, $r) => (float)$r['total_amount'] > (float)($carry['total_amount'] ?? 0) ? $r : $carry, []);
+        $avgDay = count($dailyWithSpend) > 0 ? array_sum(array_column(array_values($dailyWithSpend), 'total_amount')) / count($dailyWithSpend) : 0;
+    ?>
+    <section class="module-panel">
+        <h2>Daily expenses <small style="font-size:0.75rem;color:var(--muted);font-weight:400;">· <?= htmlspecialchars($startDate) ?> to <?= htmlspecialchars($endDate) ?></small></h2>
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem;font-size:0.85rem;">
+            <div><span style="color:var(--muted);">Peak day:</span> <strong style="color:#f43f5e;"><?= htmlspecialchars(date('d M Y', strtotime($maxDay['tx_date']))) ?></strong> — <?= formatCurrency((float)$maxDay['total_amount']) ?></div>
+            <div><span style="color:var(--muted);">Avg on spend days:</span> <strong><?= formatCurrency($avgDay) ?></strong></div>
+            <div><span style="color:var(--muted);">Days with spend:</span> <strong><?= count($dailyWithSpend) ?></strong></div>
+        </div>
+        <canvas id="daily-expense-chart" height="<?= count($dailyExpenses) > 20 ? '70' : '90' ?>"></canvas>
+        <div class="table-wrapper" style="margin-top:1rem;">
+            <table>
+                <thead><tr><th>Date</th><th>Spent</th><th>Transactions</th></tr></thead>
+                <tbody>
+                <?php foreach (array_reverse(array_values($dailyWithSpend)) as $row): ?>
+                    <tr>
+                        <td><?= date('d M Y (D)', strtotime($row['tx_date'])) ?></td>
+                        <td><?= formatCurrency((float)$row['total_amount']) ?></td>
+                        <td><?= (int)$row['tx_count'] ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <script>
+        (function () {
+            const rows    = <?= json_encode($dailyExpenses, JSON_UNESCAPED_UNICODE) ?>;
+            const amounts = rows.map(r => Number(r.total_amount));
+            const maxAmt  = Math.max(...amounts);
+            new Chart(document.getElementById('daily-expense-chart'), {
+                type: 'bar',
+                data: {
+                    labels: rows.map(r => {
+                        const d = new Date(r.tx_date + 'T00:00:00');
+                        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                    }),
+                    datasets: [{
+                        label: 'Expense',
+                        data: amounts,
+                        backgroundColor: amounts.map(v => v > 0 && v === maxAmt ? 'rgba(244,63,94,0.85)' : 'rgba(99,102,241,0.65)'),
+                        borderRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => '₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) + ' · ' + rows[ctx.dataIndex].tx_count + ' txn' } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 20 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#94a3b8', callback: v => '₹' + Number(v).toLocaleString('en-IN') }, grid: { color: 'rgba(255,255,255,0.07)' } }
+                    }
+                }
+            });
         })();
         </script>
     </section>

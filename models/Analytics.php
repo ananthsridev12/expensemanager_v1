@@ -463,4 +463,42 @@ SQL;
 
         return $result;
     }
+
+    public function getDailyExpenses(string $startDate, string $endDate): array
+    {
+        $sql = <<<SQL
+SELECT
+    DATE(t.transaction_date)     AS tx_date,
+    COALESCE(SUM(t.amount), 0)  AS total_amount,
+    COUNT(*)                     AS tx_count
+FROM transactions t
+WHERE t.transaction_date BETWEEN :start_date AND :end_date
+  AND t.transaction_type = 'expense'
+  AND (t.category_id IS NULL OR t.category_id NOT IN (SELECT id FROM categories WHERE exclude_from_analytics = 1))
+GROUP BY DATE(t.transaction_date)
+ORDER BY tx_date ASC
+SQL;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
+
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $map[$row['tx_date']] = $row;
+        }
+
+        $result  = [];
+        $current = new \DateTime($startDate);
+        $end     = new \DateTime($endDate);
+        while ($current <= $end) {
+            $d        = $current->format('Y-m-d');
+            $result[] = [
+                'tx_date'      => $d,
+                'total_amount' => (float) ($map[$d]['total_amount'] ?? 0),
+                'tx_count'     => (int)   ($map[$d]['tx_count']     ?? 0),
+            ];
+            $current->modify('+1 day');
+        }
+
+        return $result;
+    }
 }
