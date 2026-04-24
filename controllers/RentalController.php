@@ -56,6 +56,7 @@ class RentalController extends BaseController
 
             if ($form === 'transaction') {
                 $ok = $this->rentalModel->recordPayment($_POST);
+                $flashMsg = $ok ? 'Payment recorded.' : 'Failed to save payment.';
                 if ($ok && ($_POST['send_email'] ?? '') === '1' && ($_POST['payment_status'] ?? '') === 'paid') {
                     $contractId = (int) ($_POST['contract_id'] ?? 0);
                     $pdo  = $this->database->connect();
@@ -69,7 +70,11 @@ class RentalController extends BaseController
                     );
                     $stmt->execute([':id' => $contractId]);
                     $info = $stmt->fetch(\PDO::FETCH_ASSOC);
-                    if ($info && !empty($info['tenant_email'])) {
+                    if (!$info) {
+                        $flashMsg .= ' (Contract not found — email not sent.)';
+                    } elseif (empty($info['tenant_email'])) {
+                        $flashMsg .= ' (No email on file for tenant — receipt not sent.)';
+                    } else {
                         $mailer = $this->buildMailer();
                         if ($mailer) {
                             $amt   = 'Rs.' . number_format((float) ($_POST['paid_amount'] ?? 0), 2, '.', ',');
@@ -80,10 +85,16 @@ class RentalController extends BaseController
                                 'We acknowledge receipt of rent of ' . $amt . ' for ' . $info['property_name'] . ' for the month of ' . $month . '. Thank you.',
                                 ['Property' => $info['property_name'], 'Month' => $month, 'Amount received' => $amt]
                             );
-                            $mailer->send($info['tenant_email'], 'Rent received – ' . $info['property_name'] . ' – ' . $month, $html);
+                            $sent = $mailer->send($info['tenant_email'], 'Rent received – ' . $info['property_name'] . ' – ' . $month, $html);
+                            $flashMsg .= $sent
+                                ? ' Receipt sent to ' . $info['tenant_name'] . '.'
+                                : ' Email failed: ' . $mailer->getLastError();
+                        } else {
+                            $flashMsg .= ' (SMTP not configured — receipt not sent.)';
                         }
                     }
                 }
+                $_SESSION['rental_flash'] = ['type' => $ok ? 'success' : 'error', 'msg' => $flashMsg];
                 header('Location: ?module=rental');
                 exit;
             }

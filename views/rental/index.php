@@ -208,12 +208,10 @@ include __DIR__ . '/../partials/nav.php';
                 <textarea name="notes" rows="2"></textarea>
             </label>
             <?php if ($smtpReady): ?>
-            <div id="rental-email-opt" style="display:none;">
-                <label style="display:flex;align-items:center;gap:0.5rem;">
-                    <input type="checkbox" name="send_email" value="1" checked>
-                    Send receipt email to tenant
-                </label>
-            </div>
+            <label style="display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" name="send_email" value="1" checked>
+                Send receipt email to tenant (when status is Paid)
+            </label>
             <?php endif; ?>
             <button type="submit">Save rent</button>
         </form>
@@ -394,22 +392,6 @@ include __DIR__ . '/../partials/nav.php';
             </div>
         <?php endif; ?>
     </section>
-
-    <?php if ($smtpReady): ?>
-    <script>
-        (function () {
-            const statusSelect = document.querySelector('select[name="payment_status"]');
-            const emailOpt     = document.getElementById('rental-email-opt');
-            if (statusSelect && emailOpt) {
-                function toggleEmailOpt() {
-                    emailOpt.style.display = statusSelect.value === 'paid' ? '' : 'none';
-                }
-                statusSelect.addEventListener('change', toggleEmailOpt);
-                toggleEmailOpt();
-            }
-        })();
-    </script>
-    <?php endif; ?>
 
     <?php if (!$editTenant): ?>
     <script>
