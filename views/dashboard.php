@@ -11,6 +11,16 @@ $totalsByType = $totalsByType ?? [];
 $recentTransactions = $recentTransactions ?? [];
 $upcomingReminders = $upcomingReminders ?? [];
 $upcomingEmis = $upcomingEmis ?? [];
+$monthComparison = $monthComparison ?? [];
+$sparkline = $sparkline ?? [];
+
+$fmtPct = function (?float $pct, bool $invertColor = false): string {
+    if ($pct === null) return '';
+    $up = $pct >= 0;
+    $color = $invertColor ? ($up ? 'var(--red)' : 'var(--green)') : ($up ? 'var(--green)' : 'var(--red)');
+    $arrow = $up ? '▲' : '▼';
+    return ' <span style="font-size:0.78rem;color:' . $color . '">' . $arrow . ' ' . abs($pct) . '%</span>';
+};
 
 include __DIR__ . '/partials/nav.php';
 ?>
@@ -41,6 +51,11 @@ include __DIR__ . '/partials/nav.php';
             <p><?= formatCurrency($summary['lending']['outstanding']) ?></p>
             <small><?= $summary['lending']['count'] ?> records</small>
         </article>
+        <article class="card card--red">
+            <h3>I owe (borrowings)</h3>
+            <p><?= formatCurrency($summary['borrowing']['outstanding'] ?? 0) ?></p>
+            <small><?= $summary['borrowing']['count'] ?? 0 ?> records</small>
+        </article>
         <article class="card card--purple">
             <h3>Investments</h3>
             <p><?= $summary['investments']['count'] ?> items</p>
@@ -63,47 +78,212 @@ include __DIR__ . '/partials/nav.php';
         </article>
     </section>
 
+    <!-- This month at a glance -->
+    <?php if (!empty($monthComparison)): ?>
     <section class="module-panel">
-        <h2>Accounts & credit cards</h2>
-        <?php if (empty($accounts) && empty($creditCards)): ?>
-            <p class="muted">Add accounts or credit cards to start tracking balances.</p>
-        <?php else: ?>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Bank</th>
-                            <th>Name</th>
-                            <th>Balance / Limit</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($accounts as $account): ?>
-                            <?php if (($account['account_type'] ?? '') === 'credit_card') { continue; } ?>
-                            <tr>
-                                <td>Bank</td>
-                                <td><?= htmlspecialchars($account['bank_name'] ?? '-') ?></td>
-                                <td><?= htmlspecialchars($account['account_name'] ?? '-') ?></td>
-                                <td><?= formatCurrency((float) ($account['balance'] ?? $account['opening_balance'] ?? 0)) ?></td>
-                                <td><span class="pill">Active</span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        <?php foreach ($creditCards as $card): ?>
-                            <tr>
-                                <td>Credit Card</td>
-                                <td><?= htmlspecialchars($card['bank_name'] ?? '—') ?></td>
-                                <td><?= htmlspecialchars($card['card_name'] ?? '—') ?></td>
-                                <td><?= formatCurrency((float) ($card['outstanding_balance'] ?? 0)) ?> / <?= formatCurrency((float) ($card['credit_limit'] ?? 0)) ?></td>
-                                <td><span class="pill"><?= $card['outstanding_balance'] > 0 ? 'Active EMIs' : 'Clear' ?></span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
+        <h2>This month at a glance</h2>
+        <div class="summary-cards" style="margin-bottom:1rem;">
+            <article class="card card--green">
+                <h3>Income <?= $fmtPct($monthComparison['income_pct'] ?? null) ?></h3>
+                <p><?= formatCurrency((float)($monthComparison['this_income'] ?? 0)) ?></p>
+                <small>Last month <?= formatCurrency((float)($monthComparison['last_income'] ?? 0)) ?></small>
+            </article>
+            <article class="card card--red">
+                <h3>Expense <?= $fmtPct($monthComparison['expense_pct'] ?? null, true) ?></h3>
+                <p><?= formatCurrency((float)($monthComparison['this_expense'] ?? 0)) ?></p>
+                <small>Last month <?= formatCurrency((float)($monthComparison['last_expense'] ?? 0)) ?></small>
+            </article>
+            <?php $net = (float)($monthComparison['this_net'] ?? 0); ?>
+            <article class="card <?= $net >= 0 ? 'card--cyan' : 'card--orange' ?>">
+                <h3>Net cashflow</h3>
+                <p><?= formatCurrency($net) ?></p>
+                <small>Income minus expense</small>
+            </article>
+        </div>
+        <?php if (!empty($sparkline)): ?>
+        <div style="max-width:520px;">
+            <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:.05em;">6-month income vs expense</p>
+            <canvas id="dashboard-sparkline" height="80"></canvas>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+        (function () {
+            const rows = <?= json_encode($sparkline, JSON_UNESCAPED_UNICODE) ?>;
+            new Chart(document.getElementById('dashboard-sparkline'), {
+                type: 'bar',
+                data: {
+                    labels: rows.map(r => r.period),
+                    datasets: [
+                        { label: 'Income',  data: rows.map(r => Number(r.income)),  backgroundColor: 'rgba(34,197,94,0.7)',  borderRadius: 3 },
+                        { label: 'Expense', data: rows.map(r => Number(r.expense)), backgroundColor: 'rgba(244,63,94,0.7)', borderRadius: 3 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', boxWidth: 10, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+        })();
+        </script>
         <?php endif; ?>
     </section>
+    <?php endif; ?>
+
+    <!-- Budget this month -->
+    <?php
+    $budgetSummary = $budgetSummary ?? ['count' => 0, 'total_budgeted' => 0, 'total_spent' => 0, 'over_count' => 0, 'rows' => []];
+    if ($budgetSummary['count'] > 0):
+        $bgtPct = $budgetSummary['total_budgeted'] > 0
+            ? round($budgetSummary['total_spent'] / $budgetSummary['total_budgeted'] * 100, 1)
+            : 0;
+    ?>
+    <section class="module-panel">
+        <h2>Budget — <?= date('F Y') ?> <a href="?module=budget" style="font-size:0.82rem;font-weight:400;margin-left:0.75rem;color:var(--muted);">View all →</a></h2>
+        <div class="summary-cards" style="margin-bottom:1rem;">
+            <article class="card card--cyan">
+                <h3>Budgeted</h3>
+                <p><?= formatCurrency($budgetSummary['total_budgeted']) ?></p>
+                <small><?= $budgetSummary['count'] ?> budget<?= $budgetSummary['count'] !== 1 ? 's' : '' ?></small>
+            </article>
+            <article class="card <?= $budgetSummary['total_spent'] > $budgetSummary['total_budgeted'] ? 'card--red' : 'card--green' ?>">
+                <h3>Spent</h3>
+                <p><?= formatCurrency($budgetSummary['total_spent']) ?></p>
+                <small><?= $bgtPct ?>% used</small>
+            </article>
+            <?php if ($budgetSummary['over_count'] > 0): ?>
+            <article class="card card--red">
+                <h3>Over budget</h3>
+                <p><?= $budgetSummary['over_count'] ?></p>
+                <small>categor<?= $budgetSummary['over_count'] === 1 ? 'y' : 'ies' ?> exceeded</small>
+            </article>
+            <?php endif; ?>
+        </div>
+        <?php foreach (array_slice($budgetSummary['rows'], 0, 5) as $bRow):
+            $bSpent  = (float) $bRow['spent'];
+            $bAmt    = (float) $bRow['amount'];
+            $bPct    = $bAmt > 0 ? min(100, round($bSpent / $bAmt * 100, 1)) : 0;
+            $bColor  = $bPct >= 100 ? '#f43f5e' : ($bPct >= 75 ? '#f59e0b' : '#22c55e');
+        ?>
+        <div style="margin-bottom:0.6rem;">
+            <div style="display:flex;justify-content:space-between;font-size:0.82rem;margin-bottom:0.25rem;">
+                <span><?= htmlspecialchars($bRow['category_name'] ?? $bRow['name']) ?></span>
+                <span style="color:var(--muted);"><?= formatCurrency($bSpent) ?> / <?= formatCurrency($bAmt) ?></span>
+            </div>
+            <div style="background:rgba(255,255,255,0.07);border-radius:6px;height:7px;">
+                <div style="background:<?= $bColor ?>;border-radius:6px;height:7px;width:<?= $bPct ?>%;max-width:100%;"></div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+        <?php if (count($budgetSummary['rows']) > 5): ?>
+            <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">
+                +<?= count($budgetSummary['rows']) - 5 ?> more — <a href="?module=budget">view all</a>
+            </p>
+        <?php endif; ?>
+    </section>
+    <?php endif; ?>
+
+    <?php
+    $dashTypeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
+    $dashGrouped = [];
+    foreach ($accounts as $account) {
+        $sysKey   = $account['account_type_system_key'] ?? null;
+        $typeId   = $account['account_type_id'] ?? null;
+        $isCustom = ($sysKey === null || $sysKey === '') && !empty($typeId);
+        $groupKey = $isCustom ? 'custom_' . (int) $typeId : ($account['account_type'] ?? 'other');
+        $dashGrouped[$groupKey][] = $account;
+    }
+    $dashOrdered = [];
+    foreach ($dashTypeOrder as $typeKey => $typeLabel) {
+        if (!empty($dashGrouped[$typeKey])) {
+            $dashOrdered[$typeKey] = ['label' => $typeLabel, 'template' => $typeKey, 'accounts' => $dashGrouped[$typeKey]];
+        }
+    }
+    foreach ($dashGrouped as $groupKey => $accs) {
+        if (!isset($dashOrdered[$groupKey])) {
+            $first    = $accs[0];
+            $label    = !empty($first['account_type_name']) ? $first['account_type_name'] : ucfirst(str_replace('_', ' ', $groupKey));
+            $template = $first['account_type'] ?? 'other';
+            $dashOrdered[$groupKey] = ['label' => $label, 'template' => $template, 'accounts' => $accs];
+        }
+    }
+    ?>
+
+    <?php foreach ($dashOrdered as $typeKey => $group): ?>
+    <section class="module-panel">
+        <h2><?= htmlspecialchars($group['label']) ?></h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bank</th>
+                        <th>Name</th>
+                        <?php if ($group['template'] === 'credit_card'): ?>
+                            <th>Outstanding</th>
+                            <th>Limit</th>
+                            <th>Available</th>
+                            <th>Points</th>
+                        <?php else: ?>
+                            <th>Balance</th>
+                        <?php endif; ?>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($group['accounts'] as $account): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($account['bank_name'] ?? '—') ?></td>
+                            <td><?= htmlspecialchars($account['account_name'] ?? '—') ?></td>
+                            <?php if ($group['template'] === 'credit_card'): ?>
+                                <?php
+                                $ccOut   = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0);
+                                $ccLim   = (float) ($account['credit_limit'] ?? 0);
+                                $ccAvail = max(0, $ccLim - $ccOut);
+                                $ccPts   = (float) ($account['points_balance'] ?? 0);
+                                ?>
+                                <td><?= formatCurrency($ccOut) ?></td>
+                                <td><?= formatCurrency($ccLim) ?></td>
+                                <td><?= formatCurrency($ccAvail) ?></td>
+                                <td><?= $ccPts > 0 ? number_format($ccPts, 2) : '<span class="muted">—</span>' ?></td>
+                            <?php else: ?>
+                                <td><?= formatCurrency((float) ($account['balance'] ?? $account['opening_balance'] ?? 0)) ?></td>
+                            <?php endif; ?>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <?php if (count($group['accounts']) > 1): ?>
+                <tfoot>
+                    <?php if ($group['template'] === 'credit_card'): ?>
+                        <?php
+                        $tOut   = array_sum(array_map(fn($a) => (float)($a['live_cc_outstanding'] ?? $a['outstanding_balance'] ?? 0), $group['accounts']));
+                        $tLim   = array_sum(array_map(fn($a) => (float)($a['credit_limit'] ?? 0), $group['accounts']));
+                        $tAvail = max(0, $tLim - $tOut);
+                        ?>
+                        <tr>
+                            <td colspan="2"><strong>Total</strong></td>
+                            <td><strong><?= formatCurrency($tOut) ?></strong></td>
+                            <td><strong><?= formatCurrency($tLim) ?></strong></td>
+                            <td><strong><?= formatCurrency($tAvail) ?></strong></td>
+                            <td></td>
+                        </tr>
+                    <?php else: ?>
+                        <?php $tBal = array_sum(array_map(fn($a) => (float)($a['balance'] ?? $a['opening_balance'] ?? 0), $group['accounts'])); ?>
+                        <tr>
+                            <td colspan="2"><strong>Total</strong></td>
+                            <td><strong><?= formatCurrency($tBal) ?></strong></td>
+                        </tr>
+                    <?php endif; ?>
+                </tfoot>
+                <?php endif; ?>
+            </table>
+        </div>
+    </section>
+    <?php endforeach; ?>
 
     <section class="module-panel">
         <h2>Record a transaction</h2>

@@ -23,6 +23,30 @@
     --transition: 0.18s ease;
 }
 
+/* Font size variants — applied via data-font on <html> */
+html[data-font="compact"] body { font-size: 0.82rem; }
+html[data-font="tiny"]    body { font-size: 0.72rem; }
+
+/* Font size toggle in sidebar */
+.font-size-btns {
+    margin-top: auto; padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+    display: flex; gap: 0.3rem; align-items: center;
+}
+.font-size-btns span {
+    font-size: 0.7rem; color: var(--muted); margin-right: 0.15rem;
+}
+.font-size-btns button {
+    border: 1px solid var(--line); background: transparent; color: var(--muted);
+    border-radius: 6px; cursor: pointer; line-height: 1; padding: 0.28rem 0.5rem;
+    transition: all var(--transition);
+}
+.font-size-btns button:hover { color: var(--text); border-color: var(--accent); }
+.font-size-btns button.is-active { color: var(--accent); border-color: var(--accent); background: rgba(59,130,246,0.12); }
+.font-size-btns button:nth-child(2) { font-size: 1rem; }
+.font-size-btns button:nth-child(3) { font-size: 0.85rem; }
+.font-size-btns button:nth-child(4) { font-size: 0.72rem; }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -100,9 +124,10 @@ main { margin-left: var(--sidebar-width); padding: 2rem clamp(1rem, 3vw, 2.5rem)
 .module-header h1 { font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 700; color: #fff; letter-spacing: -0.02em; }
 .module-header p { margin-top: 0.35rem; color: var(--muted); font-size: 0.88rem; }
 
-/* Summary cards */
+/* Summary cards — max 4 columns, min 2 on most screens */
 .summary-cards {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
     gap: 0.85rem; margin-bottom: 1.5rem;
 }
 
@@ -140,8 +165,8 @@ main { margin-left: var(--sidebar-width); padding: 2rem clamp(1rem, 3vw, 2.5rem)
     text-transform: uppercase; letter-spacing: 0.05em;
 }
 
-/* Forms */
-.module-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; }
+/* Forms — max 2 columns; full-width on mobile */
+.module-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
 .module-form label { display: flex; flex-direction: column; font-size: 0.75rem; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
 .module-form input,
 .module-form select,
@@ -214,6 +239,7 @@ table tbody tr:last-child td { border-bottom: none; }
 .pill--orange { background: rgba(249,115,22,0.13);  color: #fdba74; }
 .pill--yellow { background: rgba(234,179,8,0.13);   color: #fde047; }
 .pill--purple { background: rgba(168,85,247,0.13);  color: #d8b4fe; }
+.pill--muted  { background: rgba(148,163,184,0.13); color: #94a3b8; }
 
 /* Misc */
 .muted { color: var(--muted); font-size: 0.85rem; }
@@ -238,16 +264,65 @@ table tbody tr:last-child td { border-bottom: none; }
     .main-nav { transform: translateX(-110%); transition: transform 0.22s cubic-bezier(0.4,0,0.2,1); }
     body.nav-open .main-nav { transform: translateX(0); box-shadow: 8px 0 40px rgba(0,0,0,0.5); }
     main { margin-left: 0; padding-top: 4rem; }
+    .module-form { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 700px) {
-    .summary-cards { grid-template-columns: repeat(2, 1fr); }
+.charts-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 600px) {
     .module-form { grid-template-columns: 1fr; }
-    table th, table td { padding: 0.58rem 0.65rem; font-size: 0.82rem; }
-    .module-panel { padding: 1rem; }
+    .summary-cards { grid-template-columns: repeat(2, 1fr); }
+    table th, table td { padding: 0.5rem 0.6rem; font-size: 0.8rem; }
+    .module-panel { padding: 0.9rem; }
     .charts-2col { grid-template-columns: 1fr !important; }
+    .module-header h1 { font-size: 1.4rem; }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 380px) {
     .summary-cards { grid-template-columns: 1fr; }
 }
+
+/* Inline sub-form (nested inside .module-form, spans full width) */
+.inline-sub-form {
+    display: none;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+.inline-sub-form.visible { display: grid; }
+.inline-sub-form label {
+    display: flex; flex-direction: column;
+    font-size: 0.75rem; font-weight: 600; color: var(--muted);
+    letter-spacing: 0.04em; text-transform: uppercase;
+}
+.inline-sub-form input,
+.inline-sub-form select {
+    margin-top: 0.4rem; border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: rgba(6,11,22,0.7); color: var(--text);
+    padding: 0.65rem 0.75rem; font-size: 0.9rem; font-family: inherit;
+    outline: none; width: 100%;
+}
+@media (max-width: 600px) {
+    .inline-sub-form { grid-template-columns: 1fr; }
+}
+
+/* Checkbox filter groups */
+.check-group-wrap { display: flex; flex-direction: column; gap: 1rem; }
+.check-group { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.check-group-header { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.85rem; cursor: pointer; user-select: none; font-size: 0.82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.check-group-header:hover { color: var(--text); }
+.check-group-header .cg-arrow { transition: transform .2s; }
+.check-group.open .cg-arrow { transform: rotate(180deg); }
+.check-group-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+.check-group.open .check-group-body { max-height: 260px; overflow-y: auto; }
+.check-group-body label { display: flex; align-items: center; gap: 0.55rem; padding: 0.45rem 0.85rem; font-size: 0.88rem; color: var(--text); cursor: pointer; text-transform: none; letter-spacing: normal; border-top: 1px solid var(--line); }
+.check-group-body label:first-child { border-top: none; }
+.check-group-body label:hover { background: var(--panel-hover); }
+.check-group-body input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
+.check-group-body label.hidden { display: none; }
+.check-sel-count { font-size: 0.75rem; background: var(--accent); color: #fff; border-radius: 999px; padding: 0.1rem 0.45rem; margin-left: 0.35rem; }

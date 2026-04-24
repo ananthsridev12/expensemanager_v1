@@ -62,11 +62,12 @@ class Lending extends BaseModel
         $sql = <<<SQL
 SELECT
     lr.id,
-    lr.outstanding_amount,
+    GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) AS outstanding_amount,
     c.name AS contact_name
 FROM lending_records lr
 JOIN contacts c ON c.id = lr.contact_id
-WHERE lr.status = 'ongoing' AND lr.outstanding_amount > 0
+WHERE lr.status = 'ongoing'
+  AND GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) > 0
 ORDER BY lr.lending_date DESC
 SQL;
         $stmt = $this->db->query($sql);
@@ -77,9 +78,14 @@ SQL;
     {
         $sql = <<<SQL
 SELECT
-    lr.*, c.name AS contact_name, c.mobile, c.email
+    lr.*,
+    COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0) AS total_repaid,
+    GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) AS outstanding_amount,
+    c.name AS contact_name, c.mobile, c.email,
+    ln.id AS linked_loan_id, ln.loan_name AS linked_loan_name
 FROM lending_records lr
 JOIN contacts c ON c.id = lr.contact_id
+LEFT JOIN loans ln ON ln.linked_lending_id = lr.id
 ORDER BY lr.lending_date DESC
 SQL;
         $stmt = $this->db->query($sql);
@@ -89,13 +95,62 @@ SQL;
 
     public function getSummary(): array
     {
-        $stmt = $this->db->query('SELECT COUNT(*) AS total_records, COALESCE(SUM(outstanding_amount),0) AS total_outstanding FROM lending_records');
+        $sql = <<<SQL
+SELECT
+    COUNT(*) AS total_records,
+    COALESCE(SUM(GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0))), 0) AS total_outstanding
+FROM lending_records lr
+SQL;
+        $stmt = $this->db->query($sql);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return [
             'count' => (int) $row['total_records'],
             'outstanding' => (float) $row['total_outstanding'],
         ];
+    }
+
+    public function topUp(array $input): bool
+    {
+        $recordId      = (int) ($input['lending_record_id'] ?? 0);
+        $amount        = max(0, (float) ($input['amount'] ?? 0));
+        $topUpDate     = !empty($input['topup_date']) ? (string) $input['topup_date'] : date('Y-m-d');
+        $fundingAccount = (string) ($input['funding_account'] ?? '');
+        $notes         = trim((string) ($input['notes'] ?? ''));
+
+        if ($recordId <= 0 || $amount <= 0) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare('SELECT lr.*, c.name AS contact_name FROM lending_records lr JOIN contacts c ON c.id = lr.contact_id WHERE lr.id = :id LIMIT 1');
+        $stmt->execute([':id' => $recordId]);
+        $record = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$record) {
+            return false;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare(
+                'UPDATE lending_records
+                 SET principal_amount   = principal_amount + :amount,
+                     outstanding_amount = outstanding_amount + :amount,
+                     status             = CASE WHEN status = \'closed\' THEN \'ongoing\' ELSE status END,
+                     updated_at         = CURRENT_TIMESTAMP
+                 WHERE id = :id'
+            )->execute([':amount' => $amount, ':id' => $recordId]);
+
+            $entryNote = $notes !== '' ? $notes : 'Top-up lending — ' . ($record['contact_name'] ?? 'Contact');
+            $this->createLedgerTransactions($recordId, (int) $record['contact_id'], $amount, $topUpDate, $fundingAccount, $entryNote);
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return false;
+        }
     }
 
     public function recordRepayment(array $input): bool
@@ -111,7 +166,10 @@ SQL;
         }
 
         $stmt = $this->db->prepare(
-            'SELECT lr.id, lr.contact_id, lr.total_repaid, lr.outstanding_amount, c.name AS contact_name
+            'SELECT lr.id, lr.contact_id, lr.principal_amount,
+                    COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0) AS total_repaid,
+                    GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) AS outstanding_amount,
+                    c.name AS contact_name
              FROM lending_records lr
              JOIN contacts c ON c.id = lr.contact_id
              WHERE lr.id = :id
@@ -128,29 +186,38 @@ SQL;
             return false;
         }
 
-        $newTotalRepaid = round((float) $record['total_repaid'] + $payAmount, 2);
-        $newOutstanding = round(max(0, (float) $record['outstanding_amount'] - $payAmount), 2);
-        $newStatus = $newOutstanding <= 0 ? 'closed' : 'ongoing';
-
         $this->db->beginTransaction();
         try {
-            $update = $this->db->prepare(
-                'UPDATE lending_records
-                 SET total_repaid = :total_repaid,
-                     outstanding_amount = :outstanding_amount,
-                     status = :status,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = :id'
-            );
-            $update->execute([
-                ':total_repaid' => $newTotalRepaid,
-                ':outstanding_amount' => $newOutstanding,
-                ':status' => $newStatus,
-                ':id' => $recordId,
+            // Insert repayment row first so the sync query below counts it
+            [$depType, $depId] = $depositAccount !== '' && strpos($depositAccount, ':') !== false
+                ? explode(':', $depositAccount, 2)
+                : [null, null];
+
+            $this->db->prepare(
+                'INSERT INTO lending_repayments (lending_record_id, amount, repayment_date, deposit_account_type, deposit_account_id, notes)
+                 VALUES (:lending_record_id, :amount, :repayment_date, :deposit_account_type, :deposit_account_id, :notes)'
+            )->execute([
+                ':lending_record_id'    => $recordId,
+                ':amount'               => $payAmount,
+                ':repayment_date'       => $repaymentDate,
+                ':deposit_account_type' => $depType,
+                ':deposit_account_id'   => $depId !== null ? (int) $depId : null,
+                ':notes'                => $notes !== '' ? $notes : null,
             ]);
+
+            // Sync stored columns from live sum
+            $this->db->prepare(
+                'UPDATE lending_records
+                 SET total_repaid      = COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = id), 0),
+                     outstanding_amount = GREATEST(0, principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = id), 0)),
+                     status             = CASE WHEN GREATEST(0, principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = id), 0)) <= 0 THEN \'closed\' ELSE status END,
+                     updated_at         = CURRENT_TIMESTAMP
+                 WHERE id = :id'
+            )->execute([':id' => $recordId]);
 
             $this->createRepaymentLedgerTransactions(
                 $recordId,
+                (int) ($record['contact_id'] ?? 0),
                 $record['contact_name'] ?? ('Contact #' . $record['contact_id']),
                 $payAmount,
                 $repaymentDate,
@@ -171,11 +238,48 @@ SQL;
     public function getById(int $id): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT lr.*, c.name AS contact_name FROM lending_records lr JOIN contacts c ON c.id = lr.contact_id WHERE lr.id = :id LIMIT 1'
+            'SELECT lr.*,
+                    COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0) AS total_repaid,
+                    GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) AS outstanding_amount,
+                    c.name AS contact_name, c.email
+             FROM lending_records lr
+             JOIN contacts c ON c.id = lr.contact_id
+             WHERE lr.id = :id LIMIT 1'
         );
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
+    }
+
+    public function getRepaymentsByRecord(int $recordId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT * FROM lending_repayments WHERE lending_record_id = :id ORDER BY repayment_date DESC, created_at DESC'
+        );
+        $stmt->execute([':id' => $recordId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAllRepayments(): array
+    {
+        $sql = <<<SQL
+SELECT
+    lr2.id AS repayment_id,
+    lr2.lending_record_id,
+    lr2.amount,
+    lr2.repayment_date,
+    lr2.deposit_account_type,
+    lr2.deposit_account_id,
+    lr2.notes,
+    lr2.created_at,
+    c.name AS contact_name
+FROM lending_repayments lr2
+JOIN lending_records lr ON lr.id = lr2.lending_record_id
+JOIN contacts c ON c.id = lr.contact_id
+ORDER BY lr2.repayment_date DESC, lr2.created_at DESC
+SQL;
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function update(array $input): bool
@@ -215,41 +319,27 @@ SQL;
         }
 
         $entryNote = $notes !== '' ? $notes : 'Lending disbursal to contact #' . $contactId;
-        $stmt = $this->db->prepare(
-            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, amount, reference_type, reference_id, notes)
-             VALUES (:transaction_date, :account_type, :account_id, :transaction_type, :category_id, :amount, :reference_type, :reference_id, :notes)'
-        );
 
         // Money moved from selected account to lending exposure.
-        $stmt->execute([
+        $this->db->prepare(
+            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, contact_id, amount, reference_type, reference_id, notes)
+             VALUES (:transaction_date, :account_type, :account_id, \'expense\', :category_id, :contact_id, :amount, \'lending\', :reference_id, :notes)'
+        )->execute([
             ':transaction_date' => $lendingDate,
-            ':account_type' => $accountType,
-            ':account_id' => $accountId,
-            ':transaction_type' => 'expense',
-            ':category_id' => self::LENDING_CATEGORY_ID,
-            ':amount' => $principal,
-            ':reference_type' => 'lending',
-            ':reference_id' => $recordId,
-            ':notes' => $entryNote,
+            ':account_type'     => $accountType,
+            ':account_id'       => $accountId,
+            ':category_id'      => self::LENDING_CATEGORY_ID,
+            ':contact_id'       => $contactId > 0 ? $contactId : null,
+            ':amount'           => $principal,
+            ':reference_id'     => $recordId,
+            ':notes'            => $entryNote,
         ]);
         $this->applyCreditCardDeltaIfNeeded($accountType, $accountId, 'expense', $principal);
-
-        // Mirror transfer entry for lending module.
-        $stmt->execute([
-            ':transaction_date' => $lendingDate,
-            ':account_type' => 'lending',
-            ':account_id' => null,
-            ':transaction_type' => 'transfer',
-            ':category_id' => self::LENDING_CATEGORY_ID,
-            ':amount' => $principal,
-            ':reference_type' => 'lending',
-            ':reference_id' => $recordId,
-            ':notes' => $entryNote,
-        ]);
     }
 
     private function createRepaymentLedgerTransactions(
         int $recordId,
+        int $contactId,
         string $contactName,
         float $amount,
         string $repaymentDate,
@@ -268,37 +358,22 @@ SQL;
         }
 
         $entryNote = $notes !== '' ? $notes : ('Repayment from ' . $contactName);
-        $stmt = $this->db->prepare(
-            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, amount, reference_type, reference_id, notes)
-             VALUES (:transaction_date, :account_type, :account_id, :transaction_type, :category_id, :amount, :reference_type, :reference_id, :notes)'
-        );
 
         // Money moved from lending exposure into selected account.
-        $stmt->execute([
+        $this->db->prepare(
+            'INSERT INTO transactions (transaction_date, account_type, account_id, transaction_type, category_id, contact_id, amount, reference_type, reference_id, notes)
+             VALUES (:transaction_date, :account_type, :account_id, \'income\', :category_id, :contact_id, :amount, \'lending\', :reference_id, :notes)'
+        )->execute([
             ':transaction_date' => $repaymentDate,
-            ':account_type' => $accountType,
-            ':account_id' => $accountId,
-            ':transaction_type' => 'income',
-            ':category_id' => self::LENDING_CATEGORY_ID,
-            ':amount' => $amount,
-            ':reference_type' => 'lending',
-            ':reference_id' => $recordId,
-            ':notes' => $entryNote,
+            ':account_type'     => $accountType,
+            ':account_id'       => $accountId,
+            ':category_id'      => self::LENDING_CATEGORY_ID,
+            ':contact_id'       => $contactId > 0 ? $contactId : null,
+            ':amount'           => $amount,
+            ':reference_id'     => $recordId,
+            ':notes'            => $entryNote,
         ]);
         $this->applyCreditCardDeltaIfNeeded($accountType, $accountId, 'income', $amount);
-
-        // Mirror transfer entry for lending module.
-        $stmt->execute([
-            ':transaction_date' => $repaymentDate,
-            ':account_type' => 'lending',
-            ':account_id' => null,
-            ':transaction_type' => 'transfer',
-            ':category_id' => self::LENDING_CATEGORY_ID,
-            ':amount' => $amount,
-            ':reference_type' => 'lending',
-            ':reference_id' => $recordId,
-            ':notes' => $entryNote,
-        ]);
     }
 
     private function applyCreditCardDeltaIfNeeded(string $accountType, int $accountId, string $transactionType, float $amount): void
