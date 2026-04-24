@@ -1,4 +1,23 @@
 document.addEventListener('DOMContentLoaded', function () {
+    // Font size toggle
+    const fontBtns = document.querySelectorAll('.font-size-btns [data-font]');
+    const current = document.documentElement.getAttribute('data-font') || 'normal';
+    fontBtns.forEach(function (btn) {
+        if (btn.dataset.font === current) btn.classList.add('is-active');
+        btn.addEventListener('click', function () {
+            const size = this.dataset.font;
+            if (size === 'normal') {
+                document.documentElement.removeAttribute('data-font');
+                localStorage.removeItem('em-font');
+            } else {
+                document.documentElement.setAttribute('data-font', size);
+                localStorage.setItem('em-font', size);
+            }
+            fontBtns.forEach(function (b) { b.classList.remove('is-active'); });
+            this.classList.add('is-active');
+        });
+    });
+
     const body = document.body;
     const toggle = document.getElementById('menu-toggle');
     const closeBtn = document.getElementById('nav-close');

@@ -12,6 +12,32 @@ $purchaseChildren = $purchaseChildren ?? [];
 $creditCards = $creditCards ?? [];
 $filters = $filters ?? [];
 $editTransaction = $editTransaction ?? null;
+$openBorrowingRecords = $openBorrowingRecords ?? [];
+$activeRentedHomes = $activeRentedHomes ?? [];
+
+// Build grouped account list (used in Filters, From account, To account, Redeem points)
+$acctTypeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
+$acctGrouped = [];
+foreach ($accounts as $acct) {
+    $sysKey   = $acct['account_type_system_key'] ?? null;
+    $typeId   = $acct['account_type_id'] ?? null;
+    $isCustom = ($sysKey === null || $sysKey === '') && !empty($typeId);
+    $gKey     = $isCustom ? 'custom_' . (int) $typeId : ($acct['account_type'] ?? 'other');
+    $acctGrouped[$gKey][] = $acct;
+}
+$acctGroups = [];
+foreach ($acctTypeOrder as $typeKey => $typeLabel) {
+    if (!empty($acctGrouped[$typeKey])) {
+        $acctGroups[] = ['label' => $typeLabel, 'accounts' => $acctGrouped[$typeKey]];
+    }
+}
+foreach ($acctGrouped as $gKey => $accts) {
+    if (!isset($acctTypeOrder[$gKey])) {
+        $first = $accts[0];
+        $label = !empty($first['account_type_name']) ? $first['account_type_name'] : ucfirst(str_replace('_', ' ', $gKey));
+        $acctGroups[] = ['label' => $label, 'accounts' => $accts];
+    }
+}
 
 include __DIR__ . '/../partials/nav.php';
 ?>
@@ -58,11 +84,14 @@ include __DIR__ . '/../partials/nav.php';
                 Account
                 <select name="account_id">
                     <option value="">All accounts</option>
-                    <?php foreach ($accounts as $account): ?>
-                        <?php $accountType = $account['account_type'] ?? 'bank'; ?>
-                        <option value="<?= (int) $account['id'] ?>" <?= ($filters['account_id'] ?? null) == $account['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name'] . ' (' . $accountType . ')') ?>
-                        </option>
+                    <?php foreach ($acctGroups as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <option value="<?= (int) $account['id'] ?>" <?= ($filters['account_id'] ?? null) == $account['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -70,6 +99,7 @@ include __DIR__ . '/../partials/nav.php';
                 Category
                 <select name="category_id" id="filter-category-select">
                     <option value="">All categories</option>
+                    <option value="uncategorized" <?= ($filters['category_id'] ?? null) === 'uncategorized' ? 'selected' : '' ?>>— Uncategorized</option>
                     <?php foreach ($categories as $category): ?>
                         <option value="<?= $category['id'] ?>" <?= ($filters['category_id'] ?? null) == $category['id'] ? 'selected' : '' ?>>
                             <?= htmlspecialchars($category['name']) ?>
@@ -81,6 +111,7 @@ include __DIR__ . '/../partials/nav.php';
                 Subcategory
                 <select name="subcategory_id" id="filter-subcategory-select">
                     <option value="">All subcategories</option>
+                    <option value="unspecified" <?= ($filters['subcategory_id'] ?? null) === 'unspecified' ? 'selected' : '' ?>>— Unspecified</option>
                     <?php foreach ($categories as $category): ?>
                         <?php foreach ($category['subcategories'] as $sub): ?>
                             <option value="<?= $sub['id'] ?>" data-category="<?= $category['id'] ?>" <?= ($filters['subcategory_id'] ?? null) == $sub['id'] ? 'selected' : '' ?>>
@@ -167,25 +198,38 @@ include __DIR__ . '/../partials/nav.php';
             </label>
             <label>
                 From account
-                <select name="account_id" required>
-                    <?php foreach ($accounts as $account): ?>
-                        <?php
-                        $accountType = $account['account_type'] ?? 'bank';
-                        $label = $accountType === 'credit_card'
-                            ? 'Card: ' . $account['bank_name'] . ' - ' . $account['account_name']
-                            : $account['bank_name'] . ' - ' . $account['account_name'];
-                        ?>
-                        <option value="<?= $accountType . ':' . $account['id'] ?>" data-type="<?= htmlspecialchars($accountType) ?>">
-                            <?= htmlspecialchars($label) ?>
-                        </option>
+                <select name="account_id" id="from-account-select" required>
+                    <?php foreach ($acctGroups as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <?php
+                                $isDefault = !empty($account['is_default']);
+                                $aLabel = $account['bank_name'] . ' - ' . $account['account_name'];
+                                ?>
+                                <option value="<?= $account['account_type'] . ':' . $account['id'] ?>"
+                                    data-type="<?= htmlspecialchars($account['account_type']) ?>"
+                                    data-account-id="<?= (int) $account['id'] ?>"
+                                    <?= $isDefault ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($aLabel) ?><?= $isDefault ? ' ★' : '' ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
-                    <?php foreach ($loans as $loan): ?>
-                        <option value="loan:<?= (int) $loan['id'] ?>" data-type="loan">
-                            <?= htmlspecialchars('Loan: ' . ($loan['loan_name'] ?? 'Loan #' . $loan['id'])) ?>
-                        </option>
-                    <?php endforeach; ?>
+                    <?php if (!empty($loans)): ?>
+                        <optgroup label="Loans">
+                            <?php foreach ($loans as $loan): ?>
+                                <option value="loan:<?= (int) $loan['id'] ?>" data-type="loan" data-account-id="">
+                                    <?= htmlspecialchars($loan['loan_name'] ?? 'Loan #' . $loan['id']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endif; ?>
                 </select>
             </label>
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:0.5rem;grid-column:1/-1;">
+                <button type="button" class="secondary" id="set-default-btn" style="font-size:0.8rem;padding:0.25rem 0.6rem;" title="Pre-select this account every time">★ Set as default</button>
+                <span id="set-default-msg" class="muted" style="font-size:0.8rem;margin-left:0.5rem;align-self:center;display:none;">Saved</span>
+            </div>
             <label>
                 Transaction type
                 <select name="transaction_type" id="transaction-type">
@@ -196,7 +240,7 @@ include __DIR__ . '/../partials/nav.php';
             </label>
             <label>
                 Amount
-                <input type="number" name="amount" step="0.01" min="0" required>
+                <input type="number" name="amount" id="tx-amount" step="0.01" min="0" required>
             </label>
             <label>
                 Group spend?
@@ -231,8 +275,23 @@ include __DIR__ . '/../partials/nav.php';
                     <?php foreach ($categories as $category): ?>
                         <option value="<?= $category['id'] ?>"><?= htmlspecialchars($category['name']) ?> (<?= $category['type'] ?>)</option>
                     <?php endforeach; ?>
+                    <option value="new_category">+ New category</option>
                 </select>
             </label>
+            <div id="new-category-wrap" class="inline-sub-form">
+                <label>
+                    Category name
+                    <input type="text" name="new_category_name" placeholder="e.g. Groceries">
+                </label>
+                <label>
+                    Type
+                    <select name="new_category_type">
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                        <option value="transfer">Transfer</option>
+                    </select>
+                </label>
+            </div>
             <label>
                 Subcategory
                 <select name="subcategory_id" id="subcategory-select">
@@ -242,11 +301,20 @@ include __DIR__ . '/../partials/nav.php';
                             <option value="<?= $sub['id'] ?>" data-category="<?= $category['id'] ?>"><?= htmlspecialchars($category['name'] . ' - ' . $sub['name']) ?></option>
                         <?php endforeach; ?>
                     <?php endforeach; ?>
+                    <option value="new_subcategory">+ New subcategory</option>
                 </select>
+            </label>
+            <label id="new-subcategory-wrap" style="display:none;grid-column:1/-1;">
+                Subcategory name
+                <input type="text" name="new_subcategory_name" placeholder="e.g. Vegetables">
             </label>
             <label>
                 To whom (Contact)
-                <input type="text" id="transaction-contact-search" placeholder="Type name/mobile/email" autocomplete="off">
+                <span style="display:flex;align-items:center;gap:0.35rem;">
+                    <input type="text" id="transaction-contact-search" placeholder="Type name/mobile/email" autocomplete="off" style="flex:1;min-width:0;">
+                    <button type="button" id="contact-clear-btn" title="Clear contact"
+                        style="display:none;background:none;border:1px solid var(--line);border-radius:50%;width:1.5rem;height:1.5rem;line-height:1;cursor:pointer;color:var(--muted);font-size:0.75rem;flex-shrink:0;padding:0;">✕</button>
+                </span>
                 <input type="hidden" name="contact_id" id="transaction-contact-id">
                 <small class="muted">For group spend, this contact is used for the receivable entry.</small>
             </label>
@@ -311,8 +379,10 @@ include __DIR__ . '/../partials/nav.php';
                         <select name="transfer_target" id="transfer-target">
                             <option value="account">Account / Loan</option>
                             <option value="lending">Lending (lend / repayment)</option>
+                            <option value="borrowing">Borrowing (receive / repay)</option>
                             <option value="rental">Rental (record rent)</option>
                             <option value="investment">Investment</option>
+                            <option value="rented_home">My Rented Home</option>
                         </select>
                     </label>
                 </div>
@@ -323,13 +393,22 @@ include __DIR__ . '/../partials/nav.php';
                         To account
                         <select name="transfer_to_account_id">
                             <option value="">Select target account</option>
-                            <?php foreach ($accounts as $account): ?>
-                                <?php $accountType = $account['account_type'] ?? 'bank'; ?>
-                                <option value="<?= $accountType . ':' . $account['id'] ?>"><?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?></option>
+                            <?php foreach ($acctGroups as $grp): ?>
+                                <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                                    <?php foreach ($grp['accounts'] as $account): ?>
+                                        <option value="<?= $account['account_type'] . ':' . $account['id'] ?>">
+                                            <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </optgroup>
                             <?php endforeach; ?>
-                            <?php foreach ($loans as $loan): ?>
-                                <option value="loan:<?= (int) $loan['id'] ?>"><?= htmlspecialchars('Loan: ' . ($loan['loan_name'] ?? 'Loan #' . $loan['id'])) ?></option>
-                            <?php endforeach; ?>
+                            <?php if (!empty($loans)): ?>
+                                <optgroup label="Loans">
+                                    <?php foreach ($loans as $loan): ?>
+                                        <option value="loan:<?= (int) $loan['id'] ?>"><?= htmlspecialchars('Loan: ' . ($loan['loan_name'] ?? 'Loan #' . $loan['id'])) ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endif; ?>
                         </select>
                     </label>
                 </div>
@@ -341,6 +420,7 @@ include __DIR__ . '/../partials/nav.php';
                             Mode
                             <select name="lending_mode" id="lending-mode">
                                 <option value="new">New lending record</option>
+                                <option value="topup">Top-up existing record</option>
                                 <option value="repayment">Repayment from contact</option>
                             </select>
                         </label>
@@ -358,6 +438,20 @@ include __DIR__ . '/../partials/nav.php';
                     </div>
                     <div class="module-form" id="lending-repayment-fields" style="display: none;">
                         <small class="muted">Amount is taken from the field above.</small>
+                        <label>
+                            Lending record
+                            <select name="lending_record_id">
+                                <option value="">Select lending record</option>
+                                <?php foreach ($openLendingRecords as $record): ?>
+                                    <option value="<?= (int) $record['id'] ?>">
+                                        <?= htmlspecialchars($record['contact_name']) ?> — Outstanding: <?= formatCurrency((float) $record['outstanding_amount']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="module-form" id="lending-topup-fields" style="display: none;">
+                        <small class="muted">Adds the amount above to the selected record's principal.</small>
                         <label>
                             Lending record
                             <select name="lending_record_id">
@@ -527,6 +621,98 @@ include __DIR__ . '/../partials/nav.php';
                         </label>
                     </div>
                 </div>
+
+                <!-- Borrowing sub-panel -->
+                <div id="transfer-borrowing-panel" style="display: none;">
+                    <div class="module-form">
+                        <label>
+                            Mode
+                            <select name="borrowing_mode" id="borrowing-mode">
+                                <option value="new">New borrowing (receive money)</option>
+                                <option value="repayment">Repay existing borrowing</option>
+                            </select>
+                        </label>
+                    </div>
+                    <!-- New borrowing fields -->
+                    <div class="module-form" id="borrowing-new-fields">
+                        <label>
+                            Borrowed from (contact)
+                            <input type="text" id="borrowing-contact-search" placeholder="Type name / mobile" autocomplete="off">
+                            <input type="hidden" name="borrowing_contact_id" id="borrowing-contact-id">
+                        </label>
+                        <div id="borrowing-contact-results" style="margin-top:-0.5rem;margin-bottom:0.5rem;">
+                            <small class="muted">Start typing to search contacts.</small>
+                        </div>
+                        <label>
+                            Interest rate (% p.a.)
+                            <input type="number" name="borrowing_interest_rate" step="0.01" min="0" value="0">
+                        </label>
+                        <label>
+                            Due date
+                            <input type="date" name="borrowing_due_date">
+                        </label>
+                        <label>
+                            Notes
+                            <input type="text" name="borrowing_notes" placeholder="Optional">
+                        </label>
+                    </div>
+                    <!-- Repayment fields -->
+                    <div class="module-form" id="borrowing-repayment-fields" style="display: none;">
+                        <label>
+                            Borrowing record
+                            <select name="borrowing_record_id">
+                                <option value="">Select record</option>
+                                <?php foreach ($openBorrowingRecords ?? [] as $br): ?>
+                                    <option value="<?= (int) $br['id'] ?>">
+                                        <?= htmlspecialchars($br['contact_name']) ?> — <?= formatCurrency((float) $br['outstanding_amount']) ?> outstanding
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Notes
+                            <input type="text" name="borrowing_notes" placeholder="Optional">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Rented Home sub-panel -->
+                <div id="transfer-rented-home-panel" style="display: none;">
+                    <div class="module-form">
+                        <label>
+                            Home
+                            <select name="rented_home_id" id="rh-tx-home">
+                                <option value="">Select home</option>
+                                <?php foreach ($activeRentedHomes ?? [] as $rh): ?>
+                                    <option value="<?= (int) $rh['id'] ?>"
+                                            data-rent="<?= (float) $rh['monthly_rent'] ?>"
+                                            data-maintenance="<?= (float) $rh['maintenance_amount'] ?>"
+                                            data-advance="<?= (float) $rh['advance_amount'] ?>">
+                                        <?= htmlspecialchars($rh['label']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Payment type
+                            <select name="rented_home_type" id="rh-tx-type">
+                                <option value="rent">Monthly Rent</option>
+                                <option value="advance">Advance / Deposit</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="electricity">Electricity Bill</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </label>
+                        <label id="rh-tx-period-wrap">
+                            Period (month)
+                            <input type="month" name="rented_home_period" value="<?= date('Y-m') ?>">
+                        </label>
+                        <label>
+                            Notes
+                            <input type="text" name="rented_home_notes" placeholder="Optional">
+                        </label>
+                    </div>
+                </div>
             </div>
             <label>
                 Reference type
@@ -582,12 +768,19 @@ include __DIR__ . '/../partials/nav.php';
                     Deposit to account
                     <select name="deposit_account_id" required>
                         <option value="">Select account</option>
-                        <?php foreach ($accounts as $account): ?>
-                            <?php if (($account['account_type'] ?? '') === 'credit_card') { continue; } ?>
-                            <?php $accountType = $account['account_type'] ?? 'bank'; ?>
-                            <option value="<?= $accountType . ':' . $account['id'] ?>">
-                                <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
-                            </option>
+                        <?php foreach ($acctGroups as $grp): ?>
+                            <?php
+                            // Exclude credit card accounts — points can't deposit to a CC
+                            $depositAccounts = array_filter($grp['accounts'], fn($a) => ($a['account_type'] ?? '') !== 'credit_card');
+                            if (empty($depositAccounts)) continue;
+                            ?>
+                            <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                                <?php foreach ($depositAccounts as $account): ?>
+                                    <option value="<?= $account['account_type'] . ':' . $account['id'] ?>">
+                                        <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
                         <?php endforeach; ?>
                     </select>
                 </label>
@@ -684,7 +877,18 @@ include __DIR__ . '/../partials/nav.php';
                                     <?php endif; ?>
                                 </td>
                                 <td><?= htmlspecialchars($txn['notes'] ?? '') ?></td>
-                                <td><a class="secondary" href="?module=transactions&edit=<?= (int) $txn['id'] ?>">Edit</a></td>
+                                <td style="white-space:nowrap;">
+                                    <?php if (in_array($txn['reference_type'] ?? '', ['fuel_surcharge', 'fuel_surcharge_refund'], true)): ?>
+                                        <span class="pill card--orange" style="font-size:0.7rem;">Auto</span>
+                                    <?php else: ?>
+                                        <a class="secondary" href="?module=transactions&edit=<?= (int) $txn['id'] ?>">Edit</a>
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('Delete this transaction and any linked surcharge entries?')">
+                                            <input type="hidden" name="form" value="transaction_delete">
+                                            <input type="hidden" name="id" value="<?= (int) $txn['id'] ?>">
+                                            <button type="submit" class="secondary" style="color:var(--red);">Delete</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -696,13 +900,59 @@ include __DIR__ . '/../partials/nav.php';
     <script>
         (function () {
             const typeSelect = document.getElementById('transaction-type');
-            const accountSelect = document.querySelector('select[name=\"account_id\"]');
+            const accountSelect = document.getElementById('from-account-select');
+            const setDefaultBtn = document.getElementById('set-default-btn');
+            const setDefaultMsg = document.getElementById('set-default-msg');
+
+            function syncDefaultAccountBtn() {
+                const opt = accountSelect.options[accountSelect.selectedIndex];
+                const accountId = opt ? opt.dataset.accountId : '';
+                if (setDefaultBtn) setDefaultBtn.disabled = !accountId;
+            }
+
+            if (setDefaultBtn) {
+                setDefaultBtn.addEventListener('click', function () {
+                    const opt = accountSelect.options[accountSelect.selectedIndex];
+                    const accountId = opt ? opt.dataset.accountId : '';
+                    if (!accountId) return;
+
+                    const fd = new FormData();
+                    fd.append('form', 'set_default_account');
+                    fd.append('account_id', accountId);
+                    fetch('?module=transactions', { method: 'POST', body: fd }).then(() => {
+                        // Update ★ in all options
+                        Array.from(accountSelect.options).forEach(o => {
+                            o.textContent = o.textContent.replace(/\s★$/, '');
+                        });
+                        opt.textContent = opt.textContent.trimEnd() + ' ★';
+                        if (setDefaultMsg) {
+                            setDefaultMsg.style.display = 'inline';
+                            setTimeout(() => { setDefaultMsg.style.display = 'none'; }, 2000);
+                        }
+                    });
+                });
+            }
+
+            accountSelect.addEventListener('change', syncDefaultAccountBtn);
+            syncDefaultAccountBtn();
             const transferPanel = document.getElementById('transfer-options');
             const transferTargetSelect = document.getElementById('transfer-target');
             const transferAccountPanel = document.getElementById('transfer-account-panel');
             const transferLendingPanel = document.getElementById('transfer-lending-panel');
             const transferRentalPanel = document.getElementById('transfer-rental-panel');
             const transferInvestmentPanel = document.getElementById('transfer-investment-panel');
+            const transferBorrowingPanel = document.getElementById('transfer-borrowing-panel');
+            const transferRentedHomePanel = document.getElementById('transfer-rented-home-panel');
+            const borrowingModeSelect = document.getElementById('borrowing-mode');
+            const borrowingNewFields = document.getElementById('borrowing-new-fields');
+            const borrowingRepaymentFields = document.getElementById('borrowing-repayment-fields');
+            const borrowingContactSearch = document.getElementById('borrowing-contact-search');
+            const borrowingContactId = document.getElementById('borrowing-contact-id');
+            const borrowingContactResults = document.getElementById('borrowing-contact-results');
+            const rhTransferHomeSelect = document.getElementById('rh-tx-home');
+            const rhTransferTypeSelect = document.getElementById('rh-tx-type');
+            const rhTransferAmount = document.getElementById('tx-amount');
+            const rhTransferPeriodWrap = document.getElementById('rh-tx-period-wrap');
             const lendingModeSelect = document.getElementById('lending-mode');
             const lendingNewFields = document.getElementById('lending-new-fields');
             const lendingRepaymentFields = document.getElementById('lending-repayment-fields');
@@ -717,6 +967,8 @@ include __DIR__ . '/../partials/nav.php';
             const emiFields = document.getElementById('emi-fields');
             const categorySelect = document.getElementById('category-select');
             const subcategorySelect = document.getElementById('subcategory-select');
+            const newCategoryWrap = document.getElementById('new-category-wrap');
+            const newSubcategoryWrap = document.getElementById('new-subcategory-wrap');
             const paymentMethodSelect = document.getElementById('payment-method-select');
             const newPaymentMethodWrap = document.getElementById('new-payment-method-wrap');
             const purchaseSourceSelect = document.getElementById('purchase-source-select');
@@ -762,16 +1014,21 @@ include __DIR__ . '/../partials/nav.php';
 
             function toggleTransferTarget() {
                 const target = transferTargetSelect ? transferTargetSelect.value : 'account';
-                transferAccountPanel.style.display = target === 'account' ? 'grid' : 'none';
-                transferLendingPanel.style.display = target === 'lending' ? 'block' : 'none';
-                transferRentalPanel.style.display = target === 'rental' ? 'block' : 'none';
+                transferAccountPanel.style.display    = target === 'account'    ? 'grid'  : 'none';
+                transferLendingPanel.style.display    = target === 'lending'    ? 'block' : 'none';
+                transferRentalPanel.style.display     = target === 'rental'     ? 'block' : 'none';
                 transferInvestmentPanel.style.display = target === 'investment' ? 'block' : 'none';
+                if (transferBorrowingPanel)  transferBorrowingPanel.style.display  = target === 'borrowing'   ? 'block' : 'none';
+                if (transferRentedHomePanel) transferRentedHomePanel.style.display = target === 'rented_home' ? 'block' : 'none';
             }
+
+            const lendingTopupFields = document.getElementById('lending-topup-fields');
 
             function toggleLendingMode() {
                 const mode = lendingModeSelect ? lendingModeSelect.value : 'new';
-                lendingNewFields.style.display = mode === 'new' ? 'grid' : 'none';
-                lendingRepaymentFields.style.display = mode === 'repayment' ? 'grid' : 'none';
+                lendingNewFields.style.display        = mode === 'new'       ? 'grid' : 'none';
+                lendingRepaymentFields.style.display  = mode === 'repayment' ? 'grid' : 'none';
+                if (lendingTopupFields) lendingTopupFields.style.display = mode === 'topup' ? 'grid' : 'none';
             }
 
             function toggleRentalMode() {
@@ -784,6 +1041,30 @@ include __DIR__ . '/../partials/nav.php';
                 const mode = investmentModeSelect ? investmentModeSelect.value : 'existing';
                 investmentExistingFields.style.display = mode === 'existing' ? 'grid' : 'none';
                 investmentNewFields.style.display = mode === 'new' ? 'grid' : 'none';
+            }
+
+            function toggleBorrowingMode() {
+                const mode = borrowingModeSelect ? borrowingModeSelect.value : 'new';
+                if (borrowingNewFields)       borrowingNewFields.style.display       = mode === 'new'       ? 'grid' : 'none';
+                if (borrowingRepaymentFields) borrowingRepaymentFields.style.display = mode === 'repayment' ? 'grid' : 'none';
+            }
+
+            function toggleRhTransferPeriod() {
+                const type = rhTransferTypeSelect ? rhTransferTypeSelect.value : '';
+                if (rhTransferPeriodWrap) {
+                    rhTransferPeriodWrap.style.display = (type === 'rent' || type === 'electricity') ? '' : 'none';
+                }
+            }
+
+            function prefillRhTransferAmount() {
+                if (!rhTransferHomeSelect || !rhTransferTypeSelect || !rhTransferAmount) return;
+                const opt = rhTransferHomeSelect.options[rhTransferHomeSelect.selectedIndex];
+                const type = rhTransferTypeSelect.value;
+                if (!opt || !opt.value) return;
+                if (type === 'rent')             rhTransferAmount.value = opt.dataset.rent        || '';
+                else if (type === 'maintenance') rhTransferAmount.value = opt.dataset.maintenance || '';
+                else if (type === 'advance')     rhTransferAmount.value = opt.dataset.advance     || '';
+                else                             rhTransferAmount.value = '';
             }
 
             function toggleEmiFields() {
@@ -802,19 +1083,44 @@ include __DIR__ . '/../partials/nav.php';
                 emiFields.style.display = emiToggleSelect.value === 'yes' ? 'block' : 'none';
             }
 
+            function toggleCategoryOther() {
+                const isNew = categorySelect.value === 'new_category';
+                newCategoryWrap.classList.toggle('visible', isNew);
+                categorySelect.name = isNew ? '' : 'category_id';
+                refreshSubcategories();
+            }
+
+            function toggleSubcategoryOther() {
+                const isNew = subcategorySelect.value === 'new_subcategory';
+                newSubcategoryWrap.style.display = isNew ? 'flex' : 'none';
+                subcategorySelect.name = isNew ? '' : 'subcategory_id';
+            }
+
             function refreshSubcategories() {
                 const selectedCategory = categorySelect.value;
+                const isNewCategory = selectedCategory === 'new_category';
                 subcategorySelect.innerHTML = '<option value="">None</option>';
 
-                storedOptions.forEach(item => {
-                    if (!selectedCategory || item.category === selectedCategory) {
-                        const option = document.createElement('option');
-                        option.value = item.value;
-                        option.innerHTML = item.label;
-                        option.dataset.category = item.category;
-                        subcategorySelect.appendChild(option);
-                    }
-                });
+                if (!isNewCategory) {
+                    storedOptions.forEach(item => {
+                        if (!selectedCategory || item.category === selectedCategory) {
+                            const option = document.createElement('option');
+                            option.value = item.value;
+                            option.innerHTML = item.label;
+                            option.dataset.category = item.category;
+                            subcategorySelect.appendChild(option);
+                        }
+                    });
+                }
+
+                const newOpt = document.createElement('option');
+                newOpt.value = 'new_subcategory';
+                newOpt.textContent = '+ New subcategory';
+                subcategorySelect.appendChild(newOpt);
+
+                // Reset subcategory new wrap if category changed
+                newSubcategoryWrap.style.display = 'none';
+                subcategorySelect.name = 'subcategory_id';
             }
 
             function refreshFilterSubcategories() {
@@ -906,6 +1212,8 @@ include __DIR__ . '/../partials/nav.php';
                         idInput.value = item.id;
                         searchInput.value = item.name + (item.mobile ? ' - ' + item.mobile : '');
                         resultsWrap.innerHTML = '<small class="muted">Selected: ' + button.textContent + '</small>';
+                        const clearBtn = document.getElementById('contact-clear-btn');
+                        if (clearBtn) clearBtn.style.display = '';
                     });
                     resultsWrap.appendChild(button);
                 });
@@ -930,12 +1238,36 @@ include __DIR__ . '/../partials/nav.php';
             if (investmentModeSelect) {
                 investmentModeSelect.addEventListener('change', toggleInvestmentMode);
             }
+            if (borrowingModeSelect) {
+                borrowingModeSelect.addEventListener('change', toggleBorrowingMode);
+            }
+            if (rhTransferHomeSelect) {
+                rhTransferHomeSelect.addEventListener('change', prefillRhTransferAmount);
+            }
+            if (rhTransferTypeSelect) {
+                rhTransferTypeSelect.addEventListener('change', function () {
+                    prefillRhTransferAmount();
+                    toggleRhTransferPeriod();
+                });
+            }
+            if (borrowingContactSearch) {
+                borrowingContactSearch.addEventListener('input', function () {
+                    const query = borrowingContactSearch.value.trim();
+                    if (query.length < 2) {
+                        borrowingContactId.value = '';
+                        borrowingContactResults.innerHTML = '<small class="muted">Start typing to search contacts.</small>';
+                        return;
+                    }
+                    searchContactsFor(query, borrowingContactSearch, borrowingContactId, borrowingContactResults);
+                });
+            }
             typeSelect.addEventListener('change', toggleTransferFields);
             typeSelect.addEventListener('change', toggleEmiFields);
             typeSelect.addEventListener('change', toggleGroupSpendFields);
             accountSelect.addEventListener('change', toggleEmiFields);
             emiToggleSelect.addEventListener('change', toggleEmiFields);
-            categorySelect.addEventListener('change', refreshSubcategories);
+            categorySelect.addEventListener('change', toggleCategoryOther);
+            subcategorySelect.addEventListener('change', toggleSubcategoryOther);
             filterCategorySelect.addEventListener('change', refreshFilterSubcategories);
             if (rewardCategorySelect) {
                 rewardCategorySelect.addEventListener('change', refreshRewardSubcategories);
@@ -959,14 +1291,67 @@ include __DIR__ . '/../partials/nav.php';
                 searchContactsFor(query, contactSearchInput, contactIdInput, contactResultsWrap);
             });
 
+            // Clear contact X button
+            const contactClearBtn = document.getElementById('contact-clear-btn');
+            if (contactClearBtn) {
+                contactClearBtn.addEventListener('click', function () {
+                    contactIdInput.value = '';
+                    contactSearchInput.value = '';
+                    contactResultsWrap.innerHTML = '<small class="muted">Start typing to search contacts.</small>';
+                    contactClearBtn.style.display = 'none';
+                    contactSearchInput.focus();
+                });
+            }
+            // Also hide clear btn when user starts typing again (new search)
+            contactSearchInput.addEventListener('focus', function () {
+                if (!contactIdInput.value) contactClearBtn && (contactClearBtn.style.display = 'none');
+            });
+
+            // Smart defaults: remember last-used payment method, category, purchased from
+            const pmSelect  = document.getElementById('payment-method-select');
+            const catSelect = document.getElementById('category-select');
+            const srcSelect = document.getElementById('purchase-source-select');
+
+            // Pre-select saved defaults on load
+            (function applyDefaults() {
+                const savedPM  = localStorage.getItem('tx_default_pm');
+                const savedCat = localStorage.getItem('tx_default_cat');
+                const savedSrc = localStorage.getItem('tx_default_src');
+                if (savedPM  && pmSelect  && pmSelect.querySelector('option[value="' + savedPM  + '"]')) pmSelect.value  = savedPM;
+                if (savedCat && catSelect && catSelect.querySelector('option[value="' + savedCat + '"]')) {
+                    catSelect.value = savedCat;
+                    catSelect.dispatchEvent(new Event('change'));
+                }
+                if (savedSrc && srcSelect && srcSelect.querySelector('option[value="' + savedSrc + '"]')) srcSelect.value = savedSrc;
+            })();
+
+            // Save on change
+            if (pmSelect) pmSelect.addEventListener('change', function () {
+                const v = pmSelect.value;
+                if (v && v !== 'other') localStorage.setItem('tx_default_pm', v);
+            });
+            if (catSelect) catSelect.addEventListener('change', function () {
+                const v = catSelect.value;
+                if (v && v !== 'new_category') localStorage.setItem('tx_default_cat', v);
+                else localStorage.removeItem('tx_default_cat');
+            });
+            if (srcSelect) srcSelect.addEventListener('change', function () {
+                const v = srcSelect.value;
+                if (v && v !== 'other') localStorage.setItem('tx_default_src', v);
+                else localStorage.removeItem('tx_default_src');
+            });
+
             toggleTransferFields();
             toggleTransferTarget();
             toggleLendingMode();
             toggleRentalMode();
             toggleInvestmentMode();
+            toggleBorrowingMode();
+            toggleRhTransferPeriod();
             toggleEmiFields();
             toggleGroupSpendFields();
-            refreshSubcategories();
+            toggleCategoryOther();
+            toggleSubcategoryOther();
             refreshFilterSubcategories();
             refreshRewardSubcategories();
             togglePaymentMethodOther();

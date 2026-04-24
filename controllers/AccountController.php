@@ -3,15 +3,18 @@
 namespace Controllers;
 
 use Models\Account;
+use Models\CreditCard;
 
 class AccountController extends BaseController
 {
     private Account $accountModel;
+    private CreditCard $creditCardModel;
 
     public function __construct()
     {
         parent::__construct();
-        $this->accountModel = new Account($this->database);
+        $this->accountModel    = new Account($this->database);
+        $this->creditCardModel = new CreditCard($this->database);
     }
 
     public function index(): string
@@ -40,6 +43,7 @@ class AccountController extends BaseController
             'summary' => $summary,
             'accountTypes' => $accountTypes,
             'editAccount' => $editAccount,
+            'fuelSurchargeReport' => $this->creditCardModel->getFuelSurchargeReport(),
         ]);
     }
 }

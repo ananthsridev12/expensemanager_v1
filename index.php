@@ -37,26 +37,133 @@ if ($pinHash !== '') {
     }
 
     if (!$hasAccess) {
-        echo '<!doctype html><html><head><meta charset="utf-8"><title>Unlock</title>';
-        echo '<style>body{font-family:Arial, sans-serif;background:#f7f7f7;margin:0;padding:0;display:flex;align-items:center;justify-content:center;height:100vh}';
-        echo '.card{background:#fff;padding:24px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.08);width:320px}';
-        echo 'h1{font-size:18px;margin:0 0 12px}label{display:block;margin:10px 0 6px;font-size:13px}';
-        echo 'input{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:16px}';
-        echo 'button{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:#2f7bff;color:#fff;font-size:15px;cursor:pointer}';
-        echo '.error{color:#c0392b;font-size:13px;margin-top:8px}</style></head><body>';
-        echo '<div class="card"><h1>Enter PIN</h1><form method="post">';
-        echo '<input type="hidden" name="form" value="pin_unlock">';
-        echo '<label>PIN</label><input type="password" name="pin" inputmode="numeric" autocomplete="off" required>';
-        if ($pinError !== '') {
-            echo '<div class="error">' . htmlspecialchars($pinError) . '</div>';
-        }
-        echo '<button type="submit">Unlock</button></form></div></body></html>';
+        $pinErrorHtml = $pinError !== '' ? '<p class="pin-error">' . htmlspecialchars($pinError) . '</p>' : '';
+        echo <<<HTML
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="public/manifest.json">
+<link rel="icon" href="public/icons/icon.svg" type="image/svg+xml">
+<title>PersonFin — Unlock</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #060b16;
+    color: #e5ecff;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+  .pin-wrap {
+    width: 100%;
+    max-width: 360px;
+    background: #0f1a2e;
+    border-radius: 18px;
+    padding: 2.2rem 2rem;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+    border: 1px solid rgba(120,150,210,0.12);
+  }
+  .pin-logo {
+    font-size: 2.4rem;
+    text-align: center;
+    margin-bottom: 0.4rem;
+  }
+  .pin-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+    color: #e5ecff;
+    margin-bottom: 0.25rem;
+  }
+  .pin-sub {
+    font-size: 0.8rem;
+    color: #7a94c4;
+    text-align: center;
+    margin-bottom: 1.8rem;
+  }
+  label {
+    display: block;
+    font-size: 0.78rem;
+    color: #7a94c4;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 0.5rem;
+  }
+  input[type=password] {
+    width: 100%;
+    background: #060b16;
+    border: 1px solid rgba(120,150,210,0.2);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    font-size: 1.5rem;
+    letter-spacing: 0.4em;
+    color: #e5ecff;
+    text-align: center;
+    outline: none;
+    transition: border-color .2s;
+    -webkit-text-security: disc;
+  }
+  input[type=password]:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  }
+  .pin-error {
+    color: #f43f5e;
+    font-size: 0.82rem;
+    text-align: center;
+    margin-top: 0.75rem;
+  }
+  button {
+    margin-top: 1.2rem;
+    width: 100%;
+    padding: 0.85rem;
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .18s;
+  }
+  button:hover { background: #2563eb; }
+  button:active { background: #1d4ed8; }
+</style>
+</head>
+<body>
+<div class="pin-wrap">
+  <div class="pin-logo">₹</div>
+  <p class="pin-title">PersonFin</p>
+  <p class="pin-sub">Enter your PIN to continue</p>
+  <form method="post" autocomplete="off">
+    <input type="hidden" name="form" value="pin_unlock">
+    <label for="pin">PIN</label>
+    <input type="password" id="pin" name="pin" inputmode="numeric" autofocus required>
+    {$pinErrorHtml}
+    <button type="submit">Unlock</button>
+  </form>
+</div>
+<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/public/sw.js').catch(()=>{});</script>
+</body>
+</html>
+HTML;
         exit;
     }
 }
 
 use Controllers\AccountController;
 use Controllers\AnalyticsController;
+use Controllers\BorrowingController;
+use Controllers\BudgetController;
 use Controllers\CategoryController;
 use Controllers\ContactController;
 use Controllers\CreditCardController;
@@ -66,7 +173,10 @@ use Controllers\LoanController;
 use Controllers\LendingController;
 use Controllers\ReminderController;
 use Controllers\RentalController;
+use Controllers\RentedHomeController;
 use Controllers\SipController;
+use Controllers\NotesController;
+use Controllers\ReportsController;
 use Controllers\TransactionController;
 
 $moduleInput = filter_input(INPUT_GET, 'module', FILTER_DEFAULT);
@@ -74,6 +184,14 @@ $module = is_string($moduleInput) ? preg_replace('/[^a-z_]/i', '', $moduleInput)
 $module = $module !== '' ? $module : 'dashboard';
 
 switch ($module) {
+    case 'borrowing':
+        $controller = new BorrowingController();
+        echo $controller->index();
+        break;
+    case 'budget':
+        $controller = new BudgetController();
+        echo $controller->index();
+        break;
     case 'accounts':
         $controller = new AccountController();
         echo $controller->index();
@@ -120,6 +238,18 @@ switch ($module) {
         break;
     case 'rental':
         $controller = new RentalController();
+        echo $controller->index();
+        break;
+    case 'rented_home':
+        $controller = new RentedHomeController();
+        echo $controller->index();
+        break;
+    case 'notes':
+        $controller = new NotesController();
+        echo $controller->index();
+        break;
+    case 'reports':
+        $controller = new ReportsController();
         echo $controller->index();
         break;
     case 'dashboard':

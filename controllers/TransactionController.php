@@ -3,6 +3,7 @@
 namespace Controllers;
 
 use Models\Account;
+use Models\Borrowing;
 use Models\Category;
 use Models\Contact;
 use Models\CreditCard;
@@ -12,6 +13,7 @@ use Models\Loan;
 use Models\PaymentMethod;
 use Models\PurchaseSource;
 use Models\Rental;
+use Models\RentedHome;
 use Models\Transaction;
 use Models\Investment;
 
@@ -23,11 +25,13 @@ class TransactionController extends BaseController
     private CreditCard $creditCardModel;
     private CreditCardReward $rewardModel;
     private Lending $lendingModel;
+    private Borrowing $borrowingModel;
     private Loan $loanModel;
     private PaymentMethod $paymentMethodModel;
     private PurchaseSource $purchaseSourceModel;
     private Contact $contactModel;
     private Rental $rentalModel;
+    private RentedHome $rentedHomeModel;
     private Investment $investmentModel;
 
     public function __construct()
@@ -39,11 +43,13 @@ class TransactionController extends BaseController
         $this->creditCardModel = new CreditCard($this->database);
         $this->rewardModel = new CreditCardReward($this->database);
         $this->lendingModel = new Lending($this->database);
+        $this->borrowingModel = new Borrowing($this->database);
         $this->loanModel = new Loan($this->database);
         $this->paymentMethodModel = new PaymentMethod($this->database);
         $this->purchaseSourceModel = new PurchaseSource($this->database);
         $this->contactModel = new Contact($this->database);
         $this->rentalModel = new Rental($this->database);
+        $this->rentedHomeModel = new RentedHome($this->database);
         $this->investmentModel = new Investment($this->database);
     }
 
@@ -56,13 +62,57 @@ class TransactionController extends BaseController
             );
         }
 
+        if (($_GET['action'] ?? '') === 'quick_add_form') {
+            header('Content-Type: text/html; charset=utf-8');
+            return $this->renderPartial('transactions/quick_add.php', [
+                'accounts'           => $this->accountModel->getList(),
+                'loans'              => $this->loanModel->getAll(),
+                'categories'         => $this->categoryModel->getAllWithSubcategories(),
+                'paymentMethods'     => $this->paymentMethodModel->getAll(),
+                'purchaseChildren'   => $this->purchaseSourceModel->getChildren(),
+                'openLendingRecords'   => $this->lendingModel->getOpenRecords(),
+                'openBorrowingRecords' => $this->borrowingModel->getOpenRecords(),
+                'rentalContracts'      => $this->rentalModel->getContracts(),
+                'rentalProperties'     => $this->rentalModel->getProperties(),
+                'rentalTenants'        => $this->rentalModel->getTenants(),
+                'investments'          => $this->investmentModel->getAll(),
+                'activeRentedHomes'    => $this->rentedHomeModel->getActive(),
+            ]);
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'set_default_account') {
+            $id = (int) ($_POST['account_id'] ?? 0);
+            if ($id > 0) {
+                $this->accountModel->setDefault($id);
+            }
+            header('Location: ?module=transactions');
+            exit;
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction') {
             $this->handleTransaction($_POST);
-            header('Location: ?module=transactions');
+            $redirectTo = trim((string) ($_POST['redirect_to'] ?? ''));
+            // Only allow relative URLs to prevent open-redirect
+            if ($redirectTo !== '' && strpos($redirectTo, '/') === 0) {
+                header('Location: ' . $redirectTo);
+            } else {
+                header('Location: ?module=transactions');
+            }
             exit;
         }
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction_update') {
             $this->transactionModel->update($_POST);
+            header('Location: ?module=transactions');
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction_delete') {
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($id > 0) {
+                // Delete companion fuel surcharge transactions first
+                $this->transactionModel->deleteByReference('fuel_surcharge', $id);
+                $this->transactionModel->deleteByReference('fuel_surcharge_refund', $id);
+                $this->transactionModel->delete($id);
+            }
             header('Location: ?module=transactions');
             exit;
         }
@@ -118,32 +168,36 @@ class TransactionController extends BaseController
         $paymentMethods = $this->paymentMethodModel->getAll();
         $purchaseChildren = $this->purchaseSourceModel->getChildren();
         $creditCards = $this->creditCardModel->getAll();
-        $openLendingRecords = $this->lendingModel->getOpenRecords();
-        $rentalContracts = $this->rentalModel->getContracts();
-        $rentalProperties = $this->rentalModel->getProperties();
-        $rentalTenants = $this->rentalModel->getTenants();
-        $investments = $this->investmentModel->getAll();
-        $recentTransactions = $this->transactionModel->getFiltered($filters);
-        $totalsByType = $this->transactionModel->getTotalsByType();
+        $openLendingRecords  = $this->lendingModel->getOpenRecords();
+        $openBorrowingRecords = $this->borrowingModel->getOpenRecords();
+        $rentalContracts     = $this->rentalModel->getContracts();
+        $rentalProperties    = $this->rentalModel->getProperties();
+        $rentalTenants       = $this->rentalModel->getTenants();
+        $investments         = $this->investmentModel->getAll();
+        $activeRentedHomes   = $this->rentedHomeModel->getActive();
+        $recentTransactions  = $this->transactionModel->getFiltered($filters);
+        $totalsByType        = $this->transactionModel->getTotalsByType();
 
         return $this->render('transactions/index.php', [
-            'accounts' => $accounts,
-            'loans' => $loans,
-            'categories' => $categories,
-            'filters' => $filters,
-            'paymentMethods' => $paymentMethods,
-            'purchaseChildren' => $purchaseChildren,
-            'creditCards' => $creditCards,
-            'openLendingRecords' => $openLendingRecords,
-            'rentalContracts' => $rentalContracts,
-            'rentalProperties' => $rentalProperties,
-            'rentalTenants' => $rentalTenants,
-            'investments' => $investments,
-            'recentTransactions' => $recentTransactions,
-            'totalsByType' => $totalsByType,
-            'imported' => isset($_GET['imported']) ? (int) $_GET['imported'] : null,
-            'failed' => isset($_GET['failed']) ? (int) $_GET['failed'] : null,
-            'editTransaction' => $editTransaction,
+            'accounts'            => $accounts,
+            'loans'               => $loans,
+            'categories'          => $categories,
+            'filters'             => $filters,
+            'paymentMethods'      => $paymentMethods,
+            'purchaseChildren'    => $purchaseChildren,
+            'creditCards'         => $creditCards,
+            'openLendingRecords'  => $openLendingRecords,
+            'openBorrowingRecords'=> $openBorrowingRecords,
+            'rentalContracts'     => $rentalContracts,
+            'rentalProperties'    => $rentalProperties,
+            'rentalTenants'       => $rentalTenants,
+            'investments'         => $investments,
+            'activeRentedHomes'   => $activeRentedHomes,
+            'recentTransactions'  => $recentTransactions,
+            'totalsByType'        => $totalsByType,
+            'imported'            => isset($_GET['imported']) ? (int) $_GET['imported'] : null,
+            'failed'              => isset($_GET['failed']) ? (int) $_GET['failed'] : null,
+            'editTransaction'     => $editTransaction,
         ]);
     }
 
@@ -287,6 +341,16 @@ class TransactionController extends BaseController
             return;
         }
 
+        // Resolve inline-created category/subcategory
+        $resolvedCategoryId = $this->resolveCategoryId($input);
+        if ($resolvedCategoryId !== null) {
+            $input['category_id'] = $resolvedCategoryId;
+        }
+        $resolvedSubcategoryId = $this->resolveSubcategoryId($input, $resolvedCategoryId ?? (!empty($input['category_id']) ? (int)$input['category_id'] : null));
+        if ($resolvedSubcategoryId !== null) {
+            $input['subcategory_id'] = $resolvedSubcategoryId;
+        }
+
         $paymentMethodId = $this->resolvePaymentMethodId($input);
         $contactId = !empty($input['contact_id']) ? (int) $input['contact_id'] : null;
         $purchaseSourceId = $this->resolvePurchaseSourceId($input);
@@ -303,6 +367,14 @@ class TransactionController extends BaseController
             }
             if ($transferTarget === 'investment') {
                 $this->handleTransferToInvestment($input, $fromType, $fromId);
+                return;
+            }
+            if ($transferTarget === 'borrowing') {
+                $this->handleTransferToBorrowing($input, $fromType, $fromId);
+                return;
+            }
+            if ($transferTarget === 'rented_home') {
+                $this->handleTransferToRentedHome($input, $fromType, $fromId);
                 return;
             }
 
@@ -420,7 +492,7 @@ class TransactionController extends BaseController
                 return;
             }
 
-            $this->transactionModel->create(array_merge($input, [
+            $txId = $this->transactionModel->create(array_merge($input, [
                 'account_type' => $fromType,
                 'account_id' => $this->resolveTransactionAccountId($fromType, $fromId),
                 'payment_method_id' => $paymentMethodId,
@@ -430,6 +502,11 @@ class TransactionController extends BaseController
                 'reference_id' => $this->resolveReferenceId($fromType, $fromId, !empty($input['reference_id']) ? (int) $input['reference_id'] : null),
             ]));
             $this->applyDebtDelta($fromType, $fromId, $transactionType, $amount);
+
+            // Auto-create fuel surcharge transactions if applicable
+            if ($txId > 0 && $transactionType === 'expense' && $fromType === 'credit_card') {
+                $this->applyFuelSurcharge($txId, $fromId, $amount, $input);
+            }
         }
     }
 
@@ -443,6 +520,69 @@ class TransactionController extends BaseController
         $allowedTypes = ['savings', 'current', 'credit_card', 'cash', 'wallet', 'other', 'loan'];
         $normalizedType = in_array($type, $allowedTypes, true) ? $type : 'savings';
         return [$normalizedType, (int) $id];
+    }
+
+    private function applyFuelSurcharge(int $txId, int $accountId, float $amount, array $input): void
+    {
+        $categoryId = !empty($input['category_id']) ? (int) $input['category_id'] : 0;
+        if ($categoryId <= 0) {
+            return;
+        }
+
+        $category = $this->categoryModel->getCategoryById($categoryId);
+        if (!$category || empty($category['is_fuel'])) {
+            return;
+        }
+
+        $card = $this->creditCardModel->getByAccountId($accountId);
+        if (!$card) {
+            return;
+        }
+
+        $rate      = (float) ($card['fuel_surcharge_rate'] ?? 1.0);
+        $minRefund = (float) ($card['fuel_surcharge_min_refund'] ?? 400.0);
+        $surcharge = round($amount * $rate / 100, 2);
+        $gst       = round($surcharge * 0.18, 2);
+        $total     = round($surcharge + $gst, 2);
+
+        if ($total <= 0) {
+            return;
+        }
+
+        // Guard against duplicate surcharge entries for the same parent transaction
+        if ($this->transactionModel->referenceExists('fuel_surcharge', $txId)) {
+            return;
+        }
+
+        $date = $input['transaction_date'] ?? date('Y-m-d');
+
+        // Surcharge expense (surcharge + GST) — category: Fuel (id=14)
+        $this->transactionModel->create([
+            'transaction_date' => $date,
+            'account_type'     => 'credit_card',
+            'account_id'       => $accountId,
+            'transaction_type' => 'expense',
+            'category_id'      => 14,
+            'amount'           => $total,
+            'reference_type'   => 'fuel_surcharge',
+            'reference_id'     => $txId,
+            'notes'            => 'Fuel surcharge: ' . $rate . '% + 18% GST = ' . $total,
+        ]);
+
+        // Refund income (surcharge only, GST not refunded) if spend >= min — category: Fuel (id=14)
+        if ($amount >= $minRefund && $surcharge > 0) {
+            $this->transactionModel->create([
+                'transaction_date' => $date,
+                'account_type'     => 'credit_card',
+                'account_id'       => $accountId,
+                'transaction_type' => 'income',
+                'category_id'      => 14,
+                'amount'           => $surcharge,
+                'reference_type'   => 'fuel_surcharge_refund',
+                'reference_id'     => $txId,
+                'notes'            => 'Fuel surcharge refund: ' . $rate . '% of ' . $amount,
+            ]);
+        }
     }
 
     private function applyDebtDelta(string $accountType, int $accountId, string $transactionType, float $amount): void
@@ -526,6 +666,43 @@ class TransactionController extends BaseController
         }
 
         return $this->purchaseSourceModel->findOrCreateChild($parentId, $customChild);
+    }
+
+    private function resolveCategoryId(array $input): ?int
+    {
+        $categoryId = !empty($input['category_id']) ? (int) $input['category_id'] : 0;
+        if ($categoryId > 0) {
+            return $categoryId;
+        }
+
+        $newName = trim((string) ($input['new_category_name'] ?? ''));
+        if ($newName === '') {
+            return null;
+        }
+
+        $type = (string) ($input['new_category_type'] ?? 'expense');
+        if (!in_array($type, ['income', 'expense', 'transfer'], true)) {
+            $type = 'expense';
+        }
+
+        $newId = $this->categoryModel->createCategory($newName, $type);
+        return $newId > 0 ? $newId : null;
+    }
+
+    private function resolveSubcategoryId(array $input, ?int $categoryId): ?int
+    {
+        $subcategoryId = !empty($input['subcategory_id']) ? (int) $input['subcategory_id'] : 0;
+        if ($subcategoryId > 0) {
+            return $subcategoryId;
+        }
+
+        $newName = trim((string) ($input['new_subcategory_name'] ?? ''));
+        if ($newName === '' || !$categoryId) {
+            return null;
+        }
+
+        $newId = $this->categoryModel->createSubcategory($categoryId, $newName);
+        return $newId > 0 ? $newId : null;
     }
 
     private function handleRewardRedemption(array $input): bool
@@ -623,6 +800,17 @@ class TransactionController extends BaseController
             return;
         }
 
+        if ($mode === 'topup') {
+            $this->lendingModel->topUp([
+                'lending_record_id' => $input['lending_record_id'] ?? null,
+                'amount' => $amount,
+                'topup_date' => $date,
+                'funding_account' => $fundingToken,
+                'notes' => $input['lending_notes'] ?? null,
+            ]);
+            return;
+        }
+
         $this->lendingModel->create([
             'contact_id' => !empty($input['contact_id']) ? (int) $input['contact_id'] : null,
             'principal_amount' => $amount,
@@ -704,6 +892,50 @@ class TransactionController extends BaseController
         ], $fundingToken);
     }
 
+    private function handleTransferToBorrowing(array $input, string $fromType, int $fromId): void
+    {
+        $mode         = (string) ($input['borrowing_mode'] ?? 'new');
+        $fundingToken = $fromId > 0 ? $fromType . ':' . $fromId : '';
+        $amount       = is_numeric($input['amount'] ?? null) ? (float) $input['amount'] : 0.0;
+        $date         = $input['transaction_date'] ?? date('Y-m-d');
+
+        if ($mode === 'repayment') {
+            $this->borrowingModel->recordRepayment([
+                'borrowing_record_id' => $input['borrowing_record_id'] ?? null,
+                'repayment_amount'    => $amount,
+                'repayment_date'      => $date,
+                'payment_account'     => $fundingToken,
+                'notes'               => $input['borrowing_notes'] ?? null,
+            ]);
+            return;
+        }
+
+        // New borrowing — money received into account
+        $this->borrowingModel->create([
+            'contact_id'       => !empty($input['borrowing_contact_id']) ? (int) $input['borrowing_contact_id'] : 0,
+            'principal_amount' => $amount,
+            'interest_rate'    => $input['borrowing_interest_rate'] ?? 0,
+            'borrowed_date'    => $date,
+            'due_date'         => !empty($input['borrowing_due_date']) ? $input['borrowing_due_date'] : null,
+            'deposit_account'  => $fundingToken,
+            'notes'            => $input['borrowing_notes'] ?? null,
+        ]);
+    }
+
+    private function handleTransferToRentedHome(array $input, string $fromType, int $fromId): void
+    {
+        $fundingToken = $fromId > 0 ? $fromType . ':' . $fromId : '';
+        $this->rentedHomeModel->recordExpense([
+            'home_id'       => $input['rented_home_id'] ?? 0,
+            'expense_type'  => $input['rented_home_type'] ?? 'rent',
+            'amount'        => is_numeric($input['amount'] ?? null) ? (float) $input['amount'] : 0.0,
+            'expense_date'  => $input['transaction_date'] ?? date('Y-m-d'),
+            'account_token' => $fundingToken,
+            'period_month'  => !empty($input['rented_home_period']) ? $input['rented_home_period'] : null,
+            'notes'         => $input['rented_home_notes'] ?? null,
+        ]);
+    }
+
     private function collectFilters(): array
     {
         $start = isset($_GET['start_date']) ? trim((string) $_GET['start_date']) : '';
@@ -711,8 +943,8 @@ class TransactionController extends BaseController
 
         return [
             'account_id' => !empty($_GET['account_id']) ? (int) $_GET['account_id'] : null,
-            'category_id' => !empty($_GET['category_id']) ? (int) $_GET['category_id'] : null,
-            'subcategory_id' => !empty($_GET['subcategory_id']) ? (int) $_GET['subcategory_id'] : null,
+            'category_id' => $_GET['category_id'] === 'uncategorized' ? 'uncategorized' : (!empty($_GET['category_id']) ? (int) $_GET['category_id'] : null),
+            'subcategory_id' => $_GET['subcategory_id'] === 'unspecified' ? 'unspecified' : (!empty($_GET['subcategory_id']) ? (int) $_GET['subcategory_id'] : null),
             'start_date' => $start !== '' ? $start : null,
             'end_date' => $end !== '' ? $end : null,
         ];

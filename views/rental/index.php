@@ -1,15 +1,17 @@
 <?php
 $activeModule = 'rental';
-$properties = $properties ?? [];
-$tenants = $tenants ?? [];
-$contacts = $contacts ?? [];
-$accounts = $accounts ?? [];
-$contracts = $contracts ?? [];
+$properties   = $properties ?? [];
+$tenants      = $tenants ?? [];
+$contacts     = $contacts ?? [];
+$accounts     = $accounts ?? [];
+$contracts    = $contracts ?? [];
 $transactions = $transactions ?? [];
-$upcoming = $upcoming ?? [];
-$summary = $summary ?? ['properties' => 0, 'tenants' => 0, 'contracts' => 0];
+$upcoming     = $upcoming ?? [];
+$summary      = $summary ?? ['properties' => 0, 'tenants' => 0, 'contracts' => 0];
 $editProperty = $editProperty ?? null;
-$editTenant = $editTenant ?? null;
+$editTenant   = $editTenant ?? null;
+$smtpReady    = $smtpReady ?? false;
+$flash        = $flash ?? null;
 
 include __DIR__ . '/../partials/nav.php';
 ?>
@@ -18,6 +20,10 @@ include __DIR__ . '/../partials/nav.php';
         <h1>Rental management</h1>
         <p>Manage properties, tenants, contracts, and rental income in one ledger.</p>
     </header>
+
+    <?php if ($flash): ?>
+        <div class="flash-message flash-<?= htmlspecialchars($flash['type']) ?>"><?= htmlspecialchars($flash['msg']) ?></div>
+    <?php endif; ?>
 
     <section class="summary-cards">
         <article class="card">
@@ -201,6 +207,12 @@ include __DIR__ . '/../partials/nav.php';
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
+            <?php if ($smtpReady): ?>
+            <label style="display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" name="send_email" value="1" checked>
+                Send receipt email to tenant (when status is Paid)
+            </label>
+            <?php endif; ?>
             <button type="submit">Save rent</button>
         </form>
     </section>
@@ -311,6 +323,7 @@ include __DIR__ . '/../partials/nav.php';
                             <th>Paid</th>
                             <th>Status</th>
                             <th>Due</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -321,6 +334,25 @@ include __DIR__ . '/../partials/nav.php';
                                 <td><?= formatCurrency((float) $txn['paid_amount']) ?></td>
                                 <td><?= htmlspecialchars(ucfirst($txn['payment_status'])) ?></td>
                                 <td><?= htmlspecialchars($txn['due_date']) ?></td>
+                                <td style="white-space:nowrap;">
+                                    <?php if ($smtpReady && in_array($txn['payment_status'], ['pending', 'overdue'])): ?>
+                                    <form method="post" style="display:inline;">
+                                        <input type="hidden" name="form" value="rental_reminder">
+                                        <input type="hidden" name="transaction_id" value="<?= (int) $txn['id'] ?>">
+                                        <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;">Remind</button>
+                                    </form>
+                                    <?php endif; ?>
+                                    <?php if (in_array($txn['payment_status'], ['pending', 'overdue']) && !empty($txn['tenant_mobile'])): ?>
+                                    <?php
+                                        $waRent = 'Rs.' . number_format((float) ($txn['rent_amount'] ?? $txn['paid_amount']), 2, '.', ',');
+                                        $waDue  = !empty($txn['due_date']) ? date('d M Y', strtotime($txn['due_date'])) : 'soon';
+                                        $waMsg  = 'Hi ' . ($txn['tenant_name'] ?? 'Tenant') . ', this is a reminder that rent of ' . $waRent . ' for ' . ($txn['property_name'] ?? 'your property') . ' is due on ' . $waDue . '. Please arrange payment. Thank you.';
+                                    ?>
+                                    <a href="<?= htmlspecialchars(whatsappLink($txn['tenant_mobile'], $waMsg)) ?>"
+                                       target="_blank" rel="noopener" class="secondary"
+                                       style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.3rem;">WA</a>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -342,6 +374,7 @@ include __DIR__ . '/../partials/nav.php';
                             <th>Property</th>
                             <th>Due date</th>
                             <th>Status</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -351,6 +384,25 @@ include __DIR__ . '/../partials/nav.php';
                                 <td><?= htmlspecialchars($due['property_name'] ?? '') ?></td>
                                 <td><?= htmlspecialchars($due['due_date']) ?></td>
                                 <td><?= htmlspecialchars(ucfirst($due['payment_status'])) ?></td>
+                                <td style="white-space:nowrap;">
+                                    <?php if ($smtpReady): ?>
+                                    <form method="post" style="display:inline;">
+                                        <input type="hidden" name="form" value="rental_reminder">
+                                        <input type="hidden" name="transaction_id" value="<?= (int) $due['id'] ?>">
+                                        <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;">Remind</button>
+                                    </form>
+                                    <?php endif; ?>
+                                    <?php if (!empty($due['tenant_mobile'])): ?>
+                                    <?php
+                                        $waRent = 'Rs.' . number_format((float) ($due['rent_amount'] ?? 0), 2, '.', ',');
+                                        $waDue  = !empty($due['due_date']) ? date('d M Y', strtotime($due['due_date'])) : 'soon';
+                                        $waMsg  = 'Hi ' . ($due['tenant_name'] ?? 'Tenant') . ', this is a reminder that rent of ' . $waRent . ' for ' . ($due['property_name'] ?? 'your property') . ' is due on ' . $waDue . '. Please arrange payment. Thank you.';
+                                    ?>
+                                    <a href="<?= htmlspecialchars(whatsappLink($due['tenant_mobile'], $waMsg)) ?>"
+                                       target="_blank" rel="noopener" class="secondary"
+                                       style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.3rem;">WA</a>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

@@ -1,0 +1,1 @@
+ALTER TABLE loans ADD COLUMN linked_lending_id INT NULL DEFAULT NULL;

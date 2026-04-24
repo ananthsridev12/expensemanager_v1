@@ -53,7 +53,9 @@ include __DIR__ . '/../partials/nav.php';
                         <?php if (!empty($customTypes)): ?>
                             <optgroup label="Custom types">
                                 <?php foreach ($customTypes as $type): ?>
-                                    <option value="<?= 'custom:' . (int) $type['id'] ?>" <?= ($editAccount['account_type_id'] ?? null) == $type['id'] ? 'selected' : '' ?>>
+                                    <option value="<?= 'custom:' . (int) $type['id'] ?>"
+                                        data-template="<?= htmlspecialchars($type['template'] ?? 'other') ?>"
+                                        <?= ($editAccount['account_type_id'] ?? null) == $type['id'] ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($type['name']) ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -66,10 +68,23 @@ include __DIR__ . '/../partials/nav.php';
             <?php if ($lockAccountType): ?>
                 <input type="hidden" name="account_type" value="credit_card">
             <?php endif; ?>
-            <label id="new-account-type-wrap" style="display: none;">
-                New account type
-                <input type="text" name="new_account_type" placeholder="Example: Travel Card">
-            </label>
+            <div id="new-account-type-wrap" class="inline-sub-form">
+                <label>
+                    Custom type name
+                    <input type="text" name="new_account_type" placeholder="Example: Travel Card">
+                </label>
+                <label>
+                    Based on template
+                    <select name="new_account_type_template" id="new-account-type-template">
+                        <option value="savings">Savings account</option>
+                        <option value="current">Current account</option>
+                        <option value="credit_card">Credit card (rewards, limit, billing cycle)</option>
+                        <option value="cash">Cash</option>
+                        <option value="wallet">Wallet</option>
+                        <option value="other">Other (basic)</option>
+                    </select>
+                </label>
+            </div>
             <label>
                 Bank name
                 <input type="text" name="bank_name" value="<?= htmlspecialchars($editAccount['bank_name'] ?? '') ?>" required>
@@ -78,7 +93,7 @@ include __DIR__ . '/../partials/nav.php';
                 Account name
                 <input type="text" name="account_name" value="<?= htmlspecialchars($editAccount['account_name'] ?? '') ?>" required>
             </label>
-            <div id="bank-fields" class="module-form">
+            <div id="bank-fields" class="inline-sub-form">
                 <label>
                     Account number
                     <input type="text" name="account_number" value="<?= htmlspecialchars($editAccount['account_number'] ?? '') ?>">
@@ -92,7 +107,7 @@ include __DIR__ . '/../partials/nav.php';
                     <input type="number" name="opening_balance" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['opening_balance'] ?? '0.00')) ?>">
                 </label>
             </div>
-            <div id="credit-card-fields" class="module-form" style="display: none;">
+            <div id="credit-card-fields" class="inline-sub-form">
                 <label>
                     Card name
                     <input type="text" name="card_name" value="<?= htmlspecialchars($editAccount['card_name'] ?? '') ?>">
@@ -145,7 +160,21 @@ include __DIR__ . '/../partials/nav.php';
                     Reward points balance
                     <input type="number" name="points_balance" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['points_balance'] ?? '0.00')) ?>">
                 </label>
+                <label>
+                    Fuel surcharge rate (%)
+                    <input type="number" name="fuel_surcharge_rate" step="0.01" min="0" max="10" value="<?= htmlspecialchars((string) ($editAccount['fuel_surcharge_rate'] ?? '1.00')) ?>">
+                </label>
+                <label>
+                    Min. spend for surcharge refund (₹)
+                    <input type="number" name="fuel_surcharge_min_refund" step="0.01" min="0" value="<?= htmlspecialchars((string) ($editAccount['fuel_surcharge_min_refund'] ?? '400.00')) ?>">
+                </label>
             </div>
+            <?php if ($editAccount): ?>
+            <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+                <input type="checkbox" name="is_default" value="1" <?= !empty($editAccount['is_default']) ? 'checked' : '' ?>>
+                Set as default account (pre-selected when adding transactions)
+            </label>
+            <?php endif; ?>
             <button type="submit"><?= $editAccount ? 'Update account' : 'Save account' ?></button>
             <?php if ($editAccount): ?>
                 <a class="secondary" href="?module=accounts">Cancel</a>
@@ -153,49 +182,184 @@ include __DIR__ . '/../partials/nav.php';
         </form>
     </section>
 
+    <?php
+    $typeOrder = ['savings' => 'Savings', 'current' => 'Current', 'credit_card' => 'Credit Cards', 'cash' => 'Cash', 'wallet' => 'Wallets', 'other' => 'Other'];
+    $grouped = [];
+    foreach ($accounts as $account) {
+        $sysKey  = $account['account_type_system_key'] ?? null;
+        $typeId  = $account['account_type_id'] ?? null;
+        $isCustom = ($sysKey === null || $sysKey === '') && !empty($typeId);
+        $groupKey = $isCustom ? 'custom_' . (int) $typeId : ($account['account_type'] ?? 'other');
+        $grouped[$groupKey][] = $account;
+    }
+    $orderedGroups = [];
+    foreach ($typeOrder as $typeKey => $typeLabel) {
+        if (!empty($grouped[$typeKey])) {
+            $orderedGroups[$typeKey] = ['label' => $typeLabel, 'template' => $typeKey, 'accounts' => $grouped[$typeKey]];
+        }
+    }
+    foreach ($grouped as $groupKey => $accs) {
+        if (!isset($orderedGroups[$groupKey])) {
+            $first    = $accs[0];
+            $label    = !empty($first['account_type_name']) ? $first['account_type_name'] : ucfirst(str_replace('_', ' ', $groupKey));
+            $template = $first['account_type'] ?? 'other';
+            $orderedGroups[$groupKey] = ['label' => $label, 'template' => $template, 'accounts' => $accs];
+        }
+    }
+    ?>
+
+    <?php if (empty($orderedGroups)): ?>
     <section class="module-panel">
-        <h2>Existing accounts</h2>
-        <?php if (count($accounts) === 0): ?>
-            <p class="muted">No accounts added yet.</p>
-        <?php else: ?>
+        <p class="muted">No accounts added yet.</p>
+    </section>
+    <?php endif; ?>
+
+    <?php foreach ($orderedGroups as $typeKey => $group): ?>
+    <section class="module-panel">
+        <h2><?= htmlspecialchars($group['label']) ?></h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bank / Issuer</th>
+                        <th>Name</th>
+                        <?php if ($group['template'] === 'credit_card'): ?>
+                            <th>Outstanding</th>
+                            <th>Limit</th>
+                            <th>Available</th>
+                            <th>Points</th>
+                        <?php else: ?>
+                            <th>Balance</th>
+                        <?php endif; ?>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($group['accounts'] as $account): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($account['bank_name']) ?></td>
+                            <td>
+                                <?= htmlspecialchars($account['account_name']) ?>
+                                <?php if (!empty($account['is_default'])): ?>
+                                    <span class="pill card--green" style="font-size:0.7rem;margin-left:0.3rem;">Default</span>
+                                <?php endif; ?>
+                            </td>
+                            <?php if ($group['template'] === 'credit_card'): ?>
+                                <?php
+                                $outstanding = (float) ($account['live_cc_outstanding'] ?? $account['outstanding_balance'] ?? 0);
+                                $limit       = (float) ($account['credit_limit'] ?? 0);
+                                $available   = max(0, $limit - $outstanding);
+                                $points      = (float) ($account['points_balance'] ?? 0);
+                                ?>
+                                <td><?= formatCurrency($outstanding) ?></td>
+                                <td><?= formatCurrency($limit) ?></td>
+                                <td><?= formatCurrency($available) ?></td>
+                                <td><?= $points > 0 ? number_format($points, 2) : '<span class="muted">—</span>' ?></td>
+                            <?php else: ?>
+                                <td><?= formatCurrency((float) ($account['balance'] ?? 0)) ?></td>
+                            <?php endif; ?>
+                            <td>
+                                <a class="secondary" href="?module=accounts&edit=<?= (int) $account['id'] ?>">Edit</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <?php if ($group['template'] === 'credit_card' && count($group['accounts']) > 1): ?>
+                <tfoot>
+                    <?php
+                    $totalOutstanding = array_sum(array_map(fn($a) => (float)($a['live_cc_outstanding'] ?? $a['outstanding_balance'] ?? 0), $group['accounts']));
+                    $totalLimit       = array_sum(array_map(fn($a) => (float)($a['credit_limit'] ?? 0), $group['accounts']));
+                    $totalAvailable   = max(0, $totalLimit - $totalOutstanding);
+                    ?>
+                    <tr>
+                        <td colspan="2"><strong>Total</strong></td>
+                        <td><strong><?= formatCurrency($totalOutstanding) ?></strong></td>
+                        <td><strong><?= formatCurrency($totalLimit) ?></strong></td>
+                        <td><strong><?= formatCurrency($totalAvailable) ?></strong></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+                <?php elseif ($group['template'] !== 'credit_card' && count($group['accounts']) > 1): ?>
+                <tfoot>
+                    <?php $totalBalance = array_sum(array_map(fn($a) => (float)($a['balance'] ?? 0), $group['accounts'])); ?>
+                    <tr>
+                        <td colspan="2"><strong>Total</strong></td>
+                        <td><strong><?= formatCurrency($totalBalance) ?></strong></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+                <?php endif; ?>
+            </table>
+        </div>
+    </section>
+    <?php endforeach; ?>
+
+    <?php
+    $fuelSurchargeReport = $fuelSurchargeReport ?? [];
+    $hasFuelData = !empty($fuelSurchargeReport);
+    ?>
+    <?php if ($hasFuelData): ?>
+    <section class="module-panel">
+        <h2>Fuel surcharge tracker</h2>
+        <p class="muted" style="margin-bottom:1rem;">Surcharge = spend × rate. GST (18%) is charged on surcharge but <strong>not refunded</strong>. Transactions above the minimum spend qualify for surcharge refund.</p>
+        <?php foreach ($fuelSurchargeReport as $cardReport): ?>
+            <h3 style="margin:1rem 0 0.5rem;"><?= htmlspecialchars($cardReport['bank_name'] . ' — ' . $cardReport['card_name']) ?> <small class="muted">(<?= $cardReport['surcharge_rate'] ?>% · min ₹<?= number_format($cardReport['min_refund'], 2) ?> for refund)</small></h3>
+            <div class="summary-cards" style="margin-bottom:1rem;">
+                <article class="card">
+                    <h3>Total surcharge charged</h3>
+                    <p><?= formatCurrency($cardReport['total_surcharge'] + $cardReport['total_gst']) ?></p>
+                    <small>Surcharge <?= formatCurrency($cardReport['total_surcharge']) ?> + GST <?= formatCurrency($cardReport['total_gst']) ?></small>
+                </article>
+                <article class="card card--green">
+                    <h3>Refundable surcharge</h3>
+                    <p><?= formatCurrency($cardReport['total_refundable']) ?></p>
+                    <small>On eligible transactions</small>
+                </article>
+                <article class="card card--red">
+                    <h3>Net surcharge cost</h3>
+                    <p><?= formatCurrency($cardReport['net_cost']) ?></p>
+                    <small>GST not refunded</small>
+                </article>
+            </div>
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
-                            <th>Type</th>
-                            <th>Bank</th>
-                            <th>Name</th>
-                            <th>Balance</th>
-                            <th>Created</th>
-                            <th>Actions</th>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th>Spend</th>
+                            <th>Surcharge</th>
+                            <th>GST on surcharge</th>
+                            <th>Total charged</th>
+                            <th>Refund?</th>
+                            <th>Net cost</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($accounts as $account): ?>
+                        <?php foreach ($cardReport['transactions'] as $tx): ?>
                             <tr>
+                                <td><?= htmlspecialchars($tx['date']) ?></td>
+                                <td><?= htmlspecialchars($tx['category']) ?></td>
+                                <td><?= formatCurrency($tx['amount']) ?></td>
+                                <td><?= formatCurrency($tx['surcharge']) ?></td>
+                                <td><?= formatCurrency($tx['gst']) ?></td>
+                                <td><?= formatCurrency($tx['total_charged']) ?></td>
                                 <td>
-                                    <?= htmlspecialchars($account['account_type_name'] ?? ucfirst(str_replace('_', ' ', $account['account_type'] ?? 'savings'))) ?>
-                                </td>
-                                <td><?= htmlspecialchars($account['bank_name']) ?></td>
-                                <td><?= htmlspecialchars($account['account_name']) ?></td>
-                                <td>
-                                    <?php if (($account['account_type'] ?? '') === 'credit_card'): ?>
-                                        <?= formatCurrency((float) ($account['outstanding_balance'] ?? 0)) ?> / <?= formatCurrency((float) ($account['credit_limit'] ?? 0)) ?>
+                                    <?php if ($tx['refundable']): ?>
+                                        <span class="pill card--green">Yes <?= formatCurrency($tx['refund_amount']) ?></span>
                                     <?php else: ?>
-                                        <?= formatCurrency((float) ($account['balance'] ?? 0)) ?>
+                                        <span class="pill">No</span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?= htmlspecialchars($account['created_at']) ?></td>
-                                <td>
-                                    <a class="secondary" href="?module=accounts&edit=<?= (int) $account['id'] ?>">Edit</a>
-                                </td>
+                                <td><?= formatCurrency($tx['net_cost']) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
-        <?php endif; ?>
+        <?php endforeach; ?>
     </section>
+    <?php endif; ?>
 
     <script>
         (function () {
@@ -203,15 +367,33 @@ include __DIR__ . '/../partials/nav.php';
             const bankFields = document.getElementById('bank-fields');
             const cardFields = document.getElementById('credit-card-fields');
             const newTypeWrap = document.getElementById('new-account-type-wrap');
+            const newTypeTemplateSelect = document.getElementById('new-account-type-template');
+
+            function getEffectiveTemplate() {
+                const val = typeSelect.value;
+                if (val === 'credit_card') return 'credit_card';
+                if (val === 'new') return newTypeTemplateSelect ? newTypeTemplateSelect.value : 'other';
+                if (val.startsWith('custom:')) {
+                    const opt = typeSelect.options[typeSelect.selectedIndex];
+                    return opt.dataset.template || 'other';
+                }
+                return val; // savings, current, cash, wallet, other
+            }
 
             function toggleAccountFields() {
-                const isCreditCard = typeSelect.value === 'credit_card';
-                bankFields.style.display = isCreditCard ? 'none' : 'grid';
-                cardFields.style.display = isCreditCard ? 'grid' : 'none';
-                newTypeWrap.style.display = typeSelect.value === 'new' ? 'flex' : 'none';
+                const isNew = typeSelect.value === 'new';
+                newTypeWrap.classList.toggle('visible', isNew);
+
+                const template = getEffectiveTemplate();
+                const isCreditCard = template === 'credit_card';
+                bankFields.classList.toggle('visible', !isCreditCard);
+                cardFields.classList.toggle('visible', isCreditCard);
             }
 
             typeSelect.addEventListener('change', toggleAccountFields);
+            if (newTypeTemplateSelect) {
+                newTypeTemplateSelect.addEventListener('change', toggleAccountFields);
+            }
             toggleAccountFields();
         })();
     </script>
