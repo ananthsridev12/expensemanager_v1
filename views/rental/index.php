@@ -1,15 +1,17 @@
 <?php
 $activeModule = 'rental';
-$properties = $properties ?? [];
-$tenants = $tenants ?? [];
-$contacts = $contacts ?? [];
-$accounts = $accounts ?? [];
-$contracts = $contracts ?? [];
+$properties   = $properties ?? [];
+$tenants      = $tenants ?? [];
+$contacts     = $contacts ?? [];
+$accounts     = $accounts ?? [];
+$contracts    = $contracts ?? [];
 $transactions = $transactions ?? [];
-$upcoming = $upcoming ?? [];
-$summary = $summary ?? ['properties' => 0, 'tenants' => 0, 'contracts' => 0];
+$upcoming     = $upcoming ?? [];
+$summary      = $summary ?? ['properties' => 0, 'tenants' => 0, 'contracts' => 0];
 $editProperty = $editProperty ?? null;
-$editTenant = $editTenant ?? null;
+$editTenant   = $editTenant ?? null;
+$smtpReady    = $smtpReady ?? false;
+$flash        = $flash ?? null;
 
 include __DIR__ . '/../partials/nav.php';
 ?>
@@ -18,6 +20,10 @@ include __DIR__ . '/../partials/nav.php';
         <h1>Rental management</h1>
         <p>Manage properties, tenants, contracts, and rental income in one ledger.</p>
     </header>
+
+    <?php if ($flash): ?>
+        <div class="flash-message flash-<?= htmlspecialchars($flash['type']) ?>"><?= htmlspecialchars($flash['msg']) ?></div>
+    <?php endif; ?>
 
     <section class="summary-cards">
         <article class="card">
@@ -201,6 +207,14 @@ include __DIR__ . '/../partials/nav.php';
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
+            <?php if ($smtpReady): ?>
+            <div id="rental-email-opt" style="display:none;">
+                <label style="display:flex;align-items:center;gap:0.5rem;">
+                    <input type="checkbox" name="send_email" value="1" checked>
+                    Send receipt email to tenant
+                </label>
+            </div>
+            <?php endif; ?>
             <button type="submit">Save rent</button>
         </form>
     </section>
@@ -311,6 +325,7 @@ include __DIR__ . '/../partials/nav.php';
                             <th>Paid</th>
                             <th>Status</th>
                             <th>Due</th>
+                            <?php if ($smtpReady): ?><th></th><?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -321,6 +336,17 @@ include __DIR__ . '/../partials/nav.php';
                                 <td><?= formatCurrency((float) $txn['paid_amount']) ?></td>
                                 <td><?= htmlspecialchars(ucfirst($txn['payment_status'])) ?></td>
                                 <td><?= htmlspecialchars($txn['due_date']) ?></td>
+                                <?php if ($smtpReady): ?>
+                                <td>
+                                    <?php if (in_array($txn['payment_status'], ['pending', 'overdue'])): ?>
+                                    <form method="post" style="display:inline;">
+                                        <input type="hidden" name="form" value="rental_reminder">
+                                        <input type="hidden" name="transaction_id" value="<?= (int) $txn['id'] ?>">
+                                        <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;">Remind</button>
+                                    </form>
+                                    <?php endif; ?>
+                                </td>
+                                <?php endif; ?>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -342,6 +368,7 @@ include __DIR__ . '/../partials/nav.php';
                             <th>Property</th>
                             <th>Due date</th>
                             <th>Status</th>
+                            <?php if ($smtpReady): ?><th></th><?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -351,6 +378,15 @@ include __DIR__ . '/../partials/nav.php';
                                 <td><?= htmlspecialchars($due['property_name'] ?? '') ?></td>
                                 <td><?= htmlspecialchars($due['due_date']) ?></td>
                                 <td><?= htmlspecialchars(ucfirst($due['payment_status'])) ?></td>
+                                <?php if ($smtpReady): ?>
+                                <td>
+                                    <form method="post" style="display:inline;">
+                                        <input type="hidden" name="form" value="rental_reminder">
+                                        <input type="hidden" name="transaction_id" value="<?= (int) $due['id'] ?>">
+                                        <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;">Remind</button>
+                                    </form>
+                                </td>
+                                <?php endif; ?>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -358,6 +394,22 @@ include __DIR__ . '/../partials/nav.php';
             </div>
         <?php endif; ?>
     </section>
+
+    <?php if ($smtpReady): ?>
+    <script>
+        (function () {
+            const statusSelect = document.querySelector('select[name="payment_status"]');
+            const emailOpt     = document.getElementById('rental-email-opt');
+            if (statusSelect && emailOpt) {
+                function toggleEmailOpt() {
+                    emailOpt.style.display = statusSelect.value === 'paid' ? '' : 'none';
+                }
+                statusSelect.addEventListener('change', toggleEmailOpt);
+                toggleEmailOpt();
+            }
+        })();
+    </script>
+    <?php endif; ?>
 
     <?php if (!$editTenant): ?>
     <script>

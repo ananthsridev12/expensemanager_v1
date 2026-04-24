@@ -169,7 +169,7 @@ SQL;
     public function getById(int $id): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT br.*, c.name AS contact_name,
+            'SELECT br.*, c.name AS contact_name, c.email,
                     COALESCE((SELECT SUM(p.amount) FROM borrowing_repayments p WHERE p.borrowing_record_id = br.id), 0) AS total_repaid,
                     GREATEST(0, br.principal_amount - COALESCE((SELECT SUM(p.amount) FROM borrowing_repayments p WHERE p.borrowing_record_id = br.id), 0)) AS outstanding_amount
              FROM borrowing_records br

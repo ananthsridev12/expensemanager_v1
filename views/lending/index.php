@@ -7,6 +7,8 @@ $accounts      = $accounts ?? [];
 $summary       = $summary ?? ['count' => 0, 'outstanding' => 0.0];
 $editRecord    = $editRecord ?? null;
 $allLoans      = $allLoans ?? [];
+$smtpReady     = $smtpReady ?? false;
+$flash         = $flash ?? null;
 
 include __DIR__ . '/../partials/nav.php';
 ?>
@@ -15,6 +17,10 @@ include __DIR__ . '/../partials/nav.php';
         <h1>Lending</h1>
         <p>Track funds you have lent and the outstanding amounts for friends or relatives.</p>
     </header>
+
+    <?php if ($flash): ?>
+        <div class="flash-message flash-<?= htmlspecialchars($flash['type']) ?>"><?= htmlspecialchars($flash['msg']) ?></div>
+    <?php endif; ?>
 
     <section class="summary-cards">
         <article class="card">
@@ -167,6 +173,12 @@ include __DIR__ . '/../partials/nav.php';
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
+            <?php if ($smtpReady): ?>
+            <label style="display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" name="send_email" value="1" checked>
+                Send receipt email to contact
+            </label>
+            <?php endif; ?>
             <button type="submit">Record repayment</button>
         </form>
     </section>
@@ -211,7 +223,16 @@ include __DIR__ . '/../partials/nav.php';
                                         </button>
                                     <?php endif; ?>
                                 </td>
-                                <td><a class="secondary" href="?module=lending&edit=<?= (int) $record['id'] ?>">Edit</a></td>
+                                <td style="white-space:nowrap;">
+                                    <a class="secondary" href="?module=lending&edit=<?= (int) $record['id'] ?>">Edit</a>
+                                    <?php if ($smtpReady && $record['status'] === 'ongoing' && !empty($record['email'])): ?>
+                                    <form method="post" style="display:inline;margin-left:0.4rem;">
+                                        <input type="hidden" name="form" value="lending_reminder">
+                                        <input type="hidden" name="lending_record_id" value="<?= (int) $record['id'] ?>">
+                                        <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;">Remind</button>
+                                    </form>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

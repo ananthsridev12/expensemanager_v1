@@ -6,6 +6,8 @@ $allRepayments = $allRepayments ?? [];
 $accounts      = $accounts      ?? [];
 $summary       = $summary       ?? ['count' => 0, 'outstanding' => 0.0];
 $editRecord    = $editRecord    ?? null;
+$smtpReady     = $smtpReady     ?? false;
+$flash         = $flash         ?? null;
 
 include __DIR__ . '/../partials/nav.php';
 ?>
@@ -14,6 +16,10 @@ include __DIR__ . '/../partials/nav.php';
         <h1>Borrowings</h1>
         <p>Track money you have borrowed from friends or relatives, and repayments you've made.</p>
     </header>
+
+    <?php if ($flash): ?>
+        <div class="flash-message flash-<?= htmlspecialchars($flash['type']) ?>"><?= htmlspecialchars($flash['msg']) ?></div>
+    <?php endif; ?>
 
     <section class="summary-cards">
         <article class="card">
@@ -159,6 +165,12 @@ include __DIR__ . '/../partials/nav.php';
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
+            <?php if ($smtpReady): ?>
+            <label style="display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" name="send_email" value="1" checked>
+                Notify lender by email
+            </label>
+            <?php endif; ?>
             <button type="submit">Record repayment</button>
         </form>
         <?php endif; ?>
