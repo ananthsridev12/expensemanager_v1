@@ -62,7 +62,7 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="closed"   <?= ($editRecord['status'] ?? '') === 'closed'   ? 'selected' : '' ?>>Closed</option>
                 </select>
             </label>
-            <label style="grid-column:1/-1;">
+            <label>
                 Notes
                 <textarea name="notes" rows="2"><?= htmlspecialchars($editRecord['notes'] ?? '') ?></textarea>
             </label>
@@ -77,12 +77,12 @@ include __DIR__ . '/../partials/nav.php';
         <h2>Record a new borrowing</h2>
         <form method="post" class="module-form">
             <input type="hidden" name="form" value="borrowing">
-            <label style="grid-column:1/-1;">
+            <label>
                 Search contact (who you borrowed from)
                 <input type="text" id="contact-search" placeholder="Type name / mobile / email" autocomplete="off">
             </label>
             <input type="hidden" name="contact_id" id="contact-id" required>
-            <label style="grid-column:1/-1;">
+            <label>
                 Matched contacts
                 <div id="contact-results" class="module-placeholder">
                     <small class="muted">Start typing to search contacts.</small>
@@ -115,7 +115,7 @@ include __DIR__ . '/../partials/nav.php';
                 Due date
                 <input type="date" name="due_date">
             </label>
-            <label style="grid-column:1/-1;">
+            <label>
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
@@ -161,12 +161,12 @@ include __DIR__ . '/../partials/nav.php';
                     <?php endforeach; ?>
                 </select>
             </label>
-            <label style="grid-column:1/-1;">
+            <label>
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
             <?php if ($smtpReady): ?>
-            <label style="grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;flex-direction:row;text-transform:none;font-size:0.88rem;letter-spacing:0;">
+            <label style="display:flex;flex-direction:row;align-items:center;gap:0.5rem;">
                 <input type="checkbox" name="send_email" value="1" checked>
                 Notify lender by email
             </label>
@@ -333,8 +333,8 @@ include __DIR__ . '/../partials/nav.php';
             btn.textContent = item.name + (item.mobile ? ' – ' + item.mobile : '');
             btn.style.cssText = 'margin-right:0.5rem;margin-bottom:0.5rem;';
             btn.addEventListener('click', function () {
-                contactId.value    = String(item.id);
-                searchInput.value  = btn.textContent;
+                contactId.value   = String(item.id);
+                searchInput.value = btn.textContent;
                 resultsWrap.innerHTML = '<small class="muted">Selected: ' + btn.textContent + '</small>';
             });
             resultsWrap.appendChild(btn);

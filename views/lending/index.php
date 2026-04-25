@@ -63,7 +63,7 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="defaulted" <?= ($editRecord['status'] ?? '') === 'defaulted' ? 'selected' : '' ?>>Defaulted</option>
                 </select>
             </label>
-            <label style="grid-column:1/-1;">
+            <label>
                 Notes
                 <textarea name="notes" rows="2"><?= htmlspecialchars($editRecord['notes'] ?? '') ?></textarea>
             </label>
@@ -77,19 +77,19 @@ include __DIR__ . '/../partials/nav.php';
         <h2>New lending record</h2>
         <form method="post" class="module-form">
             <input type="hidden" name="form" value="lending">
-            <label style="grid-column:1/-1;">
+            <label>
                 Search contact
                 <input type="text" id="contact-search" placeholder="Type name/mobile/email" autocomplete="off">
             </label>
             <input type="hidden" name="contact_id" id="contact-id" required>
-            <label style="grid-column:1/-1;">
+            <label>
                 Matched contacts
                 <div id="contact-results" class="module-placeholder">
                     <small class="muted">Start typing to search contacts.</small>
                 </div>
             </label>
             <label>
-                Lending amount
+                Lending amount (₹)
                 <input type="number" name="principal_amount" step="0.01" required>
             </label>
             <label>
@@ -123,7 +123,7 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="defaulted">Defaulted</option>
                 </select>
             </label>
-            <label style="grid-column:1/-1;">
+            <label>
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
@@ -165,12 +165,12 @@ include __DIR__ . '/../partials/nav.php';
                     <?php endforeach; ?>
                 </select>
             </label>
-            <label style="grid-column:1/-1;">
+            <label>
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
             <?php if ($smtpReady): ?>
-            <label style="grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;flex-direction:row;text-transform:none;font-size:0.88rem;letter-spacing:0;">
+            <label style="display:flex;flex-direction:row;align-items:center;gap:0.5rem;">
                 <input type="checkbox" name="send_email" value="1" checked>
                 Send receipt email to contact
             </label>
@@ -220,7 +220,7 @@ include __DIR__ . '/../partials/nav.php';
                                     <?php if (!empty($record['linked_loan_id'])): ?>
                                         <span class="pill pill--green"><?= htmlspecialchars($record['linked_loan_name'] ?? 'Loan #' . $record['linked_loan_id']) ?></span>
                                     <?php else: ?>
-                                        <button type="button" class="secondary link-lending-btn" style="font-size:0.75rem; padding:0.2rem 0.6rem;"
+                                        <button type="button" class="secondary link-lending-btn" style="font-size:0.75rem;padding:0.2rem 0.6rem;"
                                             data-lending-id="<?= (int) $record['id'] ?>"
                                             data-contact="<?= htmlspecialchars($record['contact_name']) ?>">
                                             + Link
@@ -254,10 +254,10 @@ include __DIR__ . '/../partials/nav.php';
                 </table>
             </div>
             <!-- Link to loan inline form -->
-            <form method="post" class="module-form" id="link-lending-form" style="display:none; margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
+            <form method="post" class="module-form" id="link-lending-form" style="display:none;margin-top:1rem;border-top:1px solid var(--line);padding-top:1rem;">
                 <input type="hidden" name="form" value="lending_link_loan">
                 <input type="hidden" name="lending_record_id" id="link-lending-id">
-                <p id="link-lending-label" style="grid-column:1/-1; margin:0; font-weight:500;"></p>
+                <p id="link-lending-label" style="grid-column:1/-1;margin:0;font-weight:500;"></p>
                 <label style="grid-column:1/-1;">
                     Select loan to link
                     <select name="loan_id" required>
@@ -297,10 +297,10 @@ include __DIR__ . '/../partials/nav.php';
                             <tr>
                                 <td><?= htmlspecialchars($rep['repayment_date']) ?></td>
                                 <td><?= htmlspecialchars($rep['contact_name']) ?></td>
-                                <td style="color:var(--green)"><?= formatCurrency((float)$rep['amount']) ?></td>
+                                <td style="color:var(--green)"><?= formatCurrency((float) $rep['amount']) ?></td>
                                 <td>
                                     <?php if (!empty($rep['deposit_account_type'])): ?>
-                                        <span class="pill pill--green"><?= htmlspecialchars(ucfirst($rep['deposit_account_type'])) ?> #<?= (int)$rep['deposit_account_id'] ?></span>
+                                        <span class="pill pill--green"><?= htmlspecialchars(ucfirst($rep['deposit_account_type'])) ?> #<?= (int) $rep['deposit_account_id'] ?></span>
                                     <?php else: ?>
                                         <span class="muted">—</span>
                                     <?php endif; ?>
@@ -329,7 +329,6 @@ include __DIR__ . '/../partials/nav.php';
     </section>
 
     <script>
-        // Link lending record to loan inline form
         (function () {
             const form      = document.getElementById('link-lending-form');
             const lendingId = document.getElementById('link-lending-id');
@@ -351,10 +350,10 @@ include __DIR__ . '/../partials/nav.php';
         })();
 
         (function () {
-            const searchInput = document.getElementById('contact-search');
+            const searchInput    = document.getElementById('contact-search');
             const contactIdInput = document.getElementById('contact-id');
-            const resultsWrap = document.getElementById('contact-results');
-            let debounceTimer = null;
+            const resultsWrap    = document.getElementById('contact-results');
+            let debounceTimer    = null;
 
             function renderResults(items) {
                 resultsWrap.innerHTML = '';
@@ -362,8 +361,7 @@ include __DIR__ . '/../partials/nav.php';
                     resultsWrap.innerHTML = '<small class="muted">No contacts found.</small>';
                     return;
                 }
-
-                items.forEach(item => {
+                items.forEach(function (item) {
                     const button = document.createElement('button');
                     button.type = 'button';
                     button.className = 'secondary';
@@ -372,21 +370,11 @@ include __DIR__ . '/../partials/nav.php';
                     button.style.marginBottom = '0.5rem';
                     button.addEventListener('click', function () {
                         contactIdInput.value = String(item.id);
-                        searchInput.value = item.name + (item.mobile ? ' - ' + item.mobile : '');
+                        searchInput.value    = button.textContent;
                         resultsWrap.innerHTML = '<small class="muted">Selected: ' + button.textContent + '</small>';
                     });
                     resultsWrap.appendChild(button);
                 });
-            }
-
-            async function searchContacts(query) {
-                const response = await fetch('?module=lending&action=contact_search&q=' + encodeURIComponent(query));
-                if (!response.ok) {
-                    resultsWrap.innerHTML = '<small class="muted">Search failed. Try again.</small>';
-                    return;
-                }
-                const items = await response.json();
-                renderResults(Array.isArray(items) ? items : []);
             }
 
             searchInput.addEventListener('input', function () {
@@ -398,7 +386,10 @@ include __DIR__ . '/../partials/nav.php';
                         resultsWrap.innerHTML = '<small class="muted">Start typing to search contacts.</small>';
                         return;
                     }
-                    searchContacts(query);
+                    fetch('?module=lending&action=contact_search&q=' + encodeURIComponent(query))
+                        .then(function (r) { return r.json(); })
+                        .then(function (items) { renderResults(Array.isArray(items) ? items : []); })
+                        .catch(function () { resultsWrap.innerHTML = '<small class="muted">Search failed. Try again.</small>'; });
                 }, 250);
             });
         })();
