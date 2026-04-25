@@ -63,7 +63,7 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="defaulted" <?= ($editRecord['status'] ?? '') === 'defaulted' ? 'selected' : '' ?>>Defaulted</option>
                 </select>
             </label>
-            <label>
+            <label style="grid-column:1/-1;">
                 Notes
                 <textarea name="notes" rows="2"><?= htmlspecialchars($editRecord['notes'] ?? '') ?></textarea>
             </label>
@@ -77,12 +77,12 @@ include __DIR__ . '/../partials/nav.php';
         <h2>New lending record</h2>
         <form method="post" class="module-form">
             <input type="hidden" name="form" value="lending">
-            <label>
+            <label style="grid-column:1/-1;">
                 Search contact
-                <input type="text" id="contact-search" placeholder="Type name/mobile/email" autocomplete="off" required>
+                <input type="text" id="contact-search" placeholder="Type name/mobile/email" autocomplete="off">
             </label>
             <input type="hidden" name="contact_id" id="contact-id" required>
-            <label>
+            <label style="grid-column:1/-1;">
                 Matched contacts
                 <div id="contact-results" class="module-placeholder">
                     <small class="muted">Start typing to search contacts.</small>
@@ -93,12 +93,16 @@ include __DIR__ . '/../partials/nav.php';
                 <input type="number" name="principal_amount" step="0.01" required>
             </label>
             <label>
-                Interest rate
-                <input type="number" name="interest_rate" step="0.01" required>
+                Interest rate (%)
+                <input type="number" name="interest_rate" step="0.01" value="0">
             </label>
             <label>
                 Lending date
                 <input type="date" name="lending_date" value="<?= date('Y-m-d') ?>" required>
+            </label>
+            <label>
+                Due date
+                <input type="date" name="due_date">
             </label>
             <label>
                 Funding account
@@ -112,14 +116,6 @@ include __DIR__ . '/../partials/nav.php';
                 </select>
             </label>
             <label>
-                Due date
-                <input type="date" name="due_date">
-            </label>
-            <label>
-                Total repaid
-                <input type="number" name="total_repaid" step="0.01" value="0">
-            </label>
-            <label>
                 Status
                 <select name="status">
                     <option value="ongoing" selected>Ongoing</option>
@@ -127,7 +123,7 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="defaulted">Defaulted</option>
                 </select>
             </label>
-            <label>
+            <label style="grid-column:1/-1;">
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
@@ -151,7 +147,7 @@ include __DIR__ . '/../partials/nav.php';
                 </select>
             </label>
             <label>
-                Repayment amount
+                Repayment amount (₹)
                 <input type="number" name="repayment_amount" step="0.01" min="0.01" required>
             </label>
             <label>
@@ -169,12 +165,12 @@ include __DIR__ . '/../partials/nav.php';
                     <?php endforeach; ?>
                 </select>
             </label>
-            <label>
+            <label style="grid-column:1/-1;">
                 Notes
                 <textarea name="notes" rows="2"></textarea>
             </label>
             <?php if ($smtpReady): ?>
-            <label style="display:flex;align-items:center;gap:0.5rem;">
+            <label style="grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;flex-direction:row;text-transform:none;font-size:0.88rem;letter-spacing:0;">
                 <input type="checkbox" name="send_email" value="1" checked>
                 Send receipt email to contact
             </label>
