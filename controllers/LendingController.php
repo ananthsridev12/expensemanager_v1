@@ -104,6 +104,41 @@ class LendingController extends BaseController
                 exit;
             }
 
+            if ($form === 'lending_void_repayment') {
+                $ok = $this->lendingModel->deleteRepayment((int) ($_POST['repayment_id'] ?? 0));
+                $_SESSION['lending_flash'] = ['type' => $ok ? 'success' : 'error', 'msg' => $ok ? 'Repayment voided.' : 'Failed to void repayment.'];
+                header('Location: ?module=lending');
+                exit;
+            }
+
+            if ($form === 'lending_resend_email') {
+                $rep = $this->lendingModel->getRepaymentById((int) ($_POST['repayment_id'] ?? 0));
+                if ($rep && !empty($rep['email'])) {
+                    $mailer = $this->buildMailer();
+                    if ($mailer) {
+                        $amt  = 'Rs.' . number_format((float) $rep['amount'], 2, '.', ',');
+                        $bal  = 'Rs.' . number_format((float) ($rep['outstanding_amount'] ?? 0), 2, '.', ',');
+                        $date = date('d M Y', strtotime($rep['repayment_date']));
+                        $html = $this->notificationEmail(
+                            'Payment Received',
+                            $rep['contact_name'],
+                            'We have received your payment of ' . $amt . ' on ' . $date . '. Thank you.',
+                            ['Amount received' => $amt, 'Date' => $date, 'Remaining balance' => $bal]
+                        );
+                        $sent = $mailer->send($rep['email'], 'Payment received – ' . $amt, $html);
+                        $_SESSION['lending_flash'] = $sent
+                            ? ['type' => 'success', 'msg' => 'Receipt sent to ' . $rep['contact_name'] . '.']
+                            : ['type' => 'error',   'msg' => 'Send failed: ' . $mailer->getLastError()];
+                    } else {
+                        $_SESSION['lending_flash'] = ['type' => 'error', 'msg' => 'SMTP not configured.'];
+                    }
+                } else {
+                    $_SESSION['lending_flash'] = ['type' => 'error', 'msg' => empty($rep) ? 'Repayment not found.' : 'No email on file for this contact.'];
+                }
+                header('Location: ?module=lending');
+                exit;
+            }
+
             if ($form === 'lending_update') {
                 $this->lendingModel->update($_POST);
                 header('Location: ?module=lending');

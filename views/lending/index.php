@@ -202,7 +202,9 @@ include __DIR__ . '/../partials/nav.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($records as $record): ?>
+                        <?php foreach ($records as $record):
+                            $isOverdue = !empty($record['due_date']) && $record['due_date'] < date('Y-m-d') && $record['status'] === 'ongoing';
+                        ?>
                             <tr>
                                 <td>
                                     <strong><?= htmlspecialchars($record['contact_name']) ?></strong><br>
@@ -211,7 +213,13 @@ include __DIR__ . '/../partials/nav.php';
                                 <td><?= formatCurrency((float) $record['principal_amount']) ?></td>
                                 <td><?= number_format((float) $record['interest_rate'], 2) ?>%</td>
                                 <td><?= formatCurrency((float) $record['outstanding_amount']) ?></td>
-                                <td><?= htmlspecialchars($record['due_date'] ?? '?') ?></td>
+                                <td>
+                                    <?php if ($isOverdue): ?>
+                                        <span style="color:#f43f5e;font-weight:600;"><?= htmlspecialchars($record['due_date']) ?> ⚠</span>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars($record['due_date'] ?? '—') ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <?php if (!empty($record['linked_loan_id'])): ?>
                                         <span class="pill pill--green"><?= htmlspecialchars($record['linked_loan_name'] ?? 'Loan #' . $record['linked_loan_id']) ?></span>
@@ -231,6 +239,17 @@ include __DIR__ . '/../partials/nav.php';
                                         <input type="hidden" name="lending_record_id" value="<?= (int) $record['id'] ?>">
                                         <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;">Remind</button>
                                     </form>
+                                    <?php endif; ?>
+                                    <?php if ($record['status'] === 'ongoing' && !empty($record['mobile'])): ?>
+                                    <?php
+                                        $waBal = number_format((float) $record['outstanding_amount'], 2, '.', ',');
+                                        $waMsg = 'Hi ' . $record['contact_name'] . ', this is a reminder that Rs.' . $waBal . ' is outstanding'
+                                            . (!empty($record['due_date']) ? ', due by ' . date('d M Y', strtotime($record['due_date'])) : '')
+                                            . '. Please arrange repayment. Thank you.';
+                                    ?>
+                                    <a href="<?= htmlspecialchars(whatsappLink($record['mobile'], $waMsg)) ?>"
+                                       target="_blank" rel="noopener" class="secondary"
+                                       style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.4rem;">WA</a>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -274,6 +293,7 @@ include __DIR__ . '/../partials/nav.php';
                             <th>Amount</th>
                             <th>Deposited to</th>
                             <th>Notes</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -290,6 +310,20 @@ include __DIR__ . '/../partials/nav.php';
                                     <?php endif; ?>
                                 </td>
                                 <td><?= htmlspecialchars($rep['notes'] ?? '—') ?></td>
+                                <td style="white-space:nowrap;">
+                                    <?php if ($smtpReady && !empty($rep['email'])): ?>
+                                    <form method="post" style="display:inline;">
+                                        <input type="hidden" name="form" value="lending_resend_email">
+                                        <input type="hidden" name="repayment_id" value="<?= (int) $rep['repayment_id'] ?>">
+                                        <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;">Email</button>
+                                    </form>
+                                    <?php endif; ?>
+                                    <form method="post" style="display:inline;margin-left:0.3rem;" onsubmit="return confirm('Void this repayment? This cannot be undone.');">
+                                        <input type="hidden" name="form" value="lending_void_repayment">
+                                        <input type="hidden" name="repayment_id" value="<?= (int) $rep['repayment_id'] ?>">
+                                        <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;color:#f43f5e;">Void</button>
+                                    </form>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

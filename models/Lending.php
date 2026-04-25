@@ -272,7 +272,7 @@ SELECT
     lr2.deposit_account_id,
     lr2.notes,
     lr2.created_at,
-    c.name AS contact_name
+    c.name AS contact_name, c.email
 FROM lending_repayments lr2
 JOIN lending_records lr ON lr.id = lr2.lending_record_id
 JOIN contacts c ON c.id = lr.contact_id
@@ -280,6 +280,68 @@ ORDER BY lr2.repayment_date DESC, lr2.created_at DESC
 SQL;
         $stmt = $this->db->query($sql);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getRepaymentById(int $repaymentId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT lrp.*, lr.contact_id, lr.principal_amount, c.name AS contact_name, c.email,
+                    GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(x.amount) FROM lending_repayments x WHERE x.lending_record_id = lr.id), 0)) AS outstanding_amount
+             FROM lending_repayments lrp
+             JOIN lending_records lr ON lr.id = lrp.lending_record_id
+             JOIN contacts c ON c.id = lr.contact_id
+             WHERE lrp.id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $repaymentId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function deleteRepayment(int $repaymentId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT lrp.*, lr.principal_amount FROM lending_repayments lrp
+             JOIN lending_records lr ON lr.id = lrp.lending_record_id
+             WHERE lrp.id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $repaymentId]);
+        $rep = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$rep) return false;
+
+        $recordId = (int) $rep['lending_record_id'];
+        $amount   = (float) $rep['amount'];
+        $date     = $rep['repayment_date'];
+        $acctType = $rep['deposit_account_type'] ?? null;
+        $acctId   = (int) ($rep['deposit_account_id'] ?? 0);
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare('DELETE FROM lending_repayments WHERE id = :id')
+                ->execute([':id' => $repaymentId]);
+
+            $this->db->prepare(
+                "DELETE FROM transactions WHERE reference_type='lending' AND reference_id=:ref AND transaction_type='income' AND amount=:amt AND transaction_date=:date LIMIT 1"
+            )->execute([':ref' => $recordId, ':amt' => $amount, ':date' => $date]);
+
+            if ($acctType === 'credit_card' && $acctId > 0) {
+                $this->applyCreditCardDeltaIfNeeded($acctType, $acctId, 'expense', $amount);
+            }
+
+            $totalsStmt = $this->db->prepare('SELECT COALESCE(SUM(amount), 0) FROM lending_repayments WHERE lending_record_id = :id');
+            $totalsStmt->execute([':id' => $recordId]);
+            $sumRepaid      = (float) $totalsStmt->fetchColumn();
+            $newOutstanding = max(0.0, (float) $rep['principal_amount'] - $sumRepaid);
+            $newStatus      = $newOutstanding <= 0 ? 'closed' : 'ongoing';
+            $this->db->prepare(
+                'UPDATE lending_records SET total_repaid=:r, outstanding_amount=:o, status=:s, updated_at=CURRENT_TIMESTAMP WHERE id=:id'
+            )->execute([':r' => $sumRepaid, ':o' => $newOutstanding, ':s' => $newStatus, ':id' => $recordId]);
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            return false;
+        }
     }
 
     public function update(array $input): bool

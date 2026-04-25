@@ -224,8 +224,19 @@ include __DIR__ . '/../partials/nav.php';
                                 <?= htmlspecialchars(ucfirst($rec['status'])) ?>
                             </span>
                         </td>
-                        <td>
+                        <td style="white-space:nowrap;">
                             <a class="secondary" href="?module=borrowing&edit=<?= (int) $rec['id'] ?>">Edit</a>
+                            <?php if ($rec['status'] === 'ongoing' && !empty($rec['mobile'])): ?>
+                            <?php
+                                $waBal = number_format((float) $rec['outstanding_amount'], 2, '.', ',');
+                                $waMsg = 'Hi ' . $rec['contact_name'] . ', just to confirm our outstanding repayment to you is Rs.' . $waBal
+                                    . (!empty($rec['due_date']) ? ', due by ' . date('d M Y', strtotime($rec['due_date'])) : '')
+                                    . '. We will arrange payment. Thank you.';
+                            ?>
+                            <a href="<?= htmlspecialchars(whatsappLink($rec['mobile'], $waMsg)) ?>"
+                               target="_blank" rel="noopener" class="secondary"
+                               style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.4rem;">WA</a>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -267,7 +278,7 @@ include __DIR__ . '/../partials/nav.php';
                             <?php endif; ?>
                         </td>
                         <td><?= htmlspecialchars($rep['notes'] ?? '—') ?></td>
-                        <td>
+                        <td style="white-space:nowrap;">
                             <?php if (!empty($rep['mobile'])): ?>
                             <?php
                                 $waAmt  = 'Rs.' . number_format((float) $rep['amount'], 2, '.', ',');
@@ -278,6 +289,18 @@ include __DIR__ . '/../partials/nav.php';
                                target="_blank" rel="noopener" class="secondary"
                                style="font-size:0.75rem;padding:0.2rem 0.6rem;">WA</a>
                             <?php endif; ?>
+                            <?php if ($smtpReady && !empty($rep['email'])): ?>
+                            <form method="post" style="display:inline;margin-left:0.3rem;">
+                                <input type="hidden" name="form" value="borrowing_resend_email">
+                                <input type="hidden" name="repayment_id" value="<?= (int) $rep['repayment_id'] ?>">
+                                <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;">Email</button>
+                            </form>
+                            <?php endif; ?>
+                            <form method="post" style="display:inline;margin-left:0.3rem;" onsubmit="return confirm('Void this repayment? This cannot be undone.');">
+                                <input type="hidden" name="form" value="borrowing_void_repayment">
+                                <input type="hidden" name="repayment_id" value="<?= (int) $rep['repayment_id'] ?>">
+                                <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;color:#f43f5e;">Void</button>
+                            </form>
                         </td>
                     </tr>
                     <?php endforeach; ?>

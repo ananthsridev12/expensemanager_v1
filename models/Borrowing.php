@@ -90,15 +90,15 @@ class Borrowing extends BaseModel
                 ':notes'     => $notes !== '' ? $notes : null,
             ]);
 
-            // Sync stored totals from live sum
+            // Compute new totals via separate query to avoid correlated-subquery id ambiguity in UPDATE SET
+            $totalsStmt = $this->db->prepare('SELECT COALESCE(SUM(amount), 0) FROM borrowing_repayments WHERE borrowing_record_id = :id');
+            $totalsStmt->execute([':id' => $recordId]);
+            $sumRepaid      = (float) $totalsStmt->fetchColumn();
+            $newOutstanding = max(0.0, (float) $record['principal_amount'] - $sumRepaid);
+            $newStatus      = $newOutstanding <= 0 ? 'closed' : 'ongoing';
             $this->db->prepare(
-                'UPDATE borrowing_records
-                 SET total_repaid       = COALESCE((SELECT SUM(p.amount) FROM borrowing_repayments p WHERE p.borrowing_record_id = id), 0),
-                     outstanding_amount = GREATEST(0, principal_amount - COALESCE((SELECT SUM(p.amount) FROM borrowing_repayments p WHERE p.borrowing_record_id = id), 0)),
-                     status             = CASE WHEN GREATEST(0, principal_amount - COALESCE((SELECT SUM(p.amount) FROM borrowing_repayments p WHERE p.borrowing_record_id = id), 0)) <= 0 THEN \'closed\' ELSE status END,
-                     updated_at         = CURRENT_TIMESTAMP
-                 WHERE id = :id'
-            )->execute([':id' => $recordId]);
+                'UPDATE borrowing_records SET total_repaid=:r, outstanding_amount=:o, status=:s, updated_at=CURRENT_TIMESTAMP WHERE id=:id'
+            )->execute([':r' => $sumRepaid, ':o' => $newOutstanding, ':s' => $newStatus, ':id' => $recordId]);
 
             $this->createRepaymentLedger(
                 $recordId,
@@ -195,14 +195,77 @@ SQL;
         $sql = <<<SQL
 SELECT
     p.id AS repayment_id, p.borrowing_record_id, p.amount,
-    p.repayment_date, p.notes, p.created_at,
-    c.name AS contact_name
+    p.repayment_date, p.payment_account_type, p.payment_account_id,
+    p.notes, p.created_at,
+    c.name AS contact_name, c.mobile, c.email
 FROM borrowing_repayments p
 JOIN borrowing_records br ON br.id = p.borrowing_record_id
 JOIN contacts c ON c.id = br.contact_id
 ORDER BY p.repayment_date DESC, p.created_at DESC
 SQL;
         return $this->db->query($sql)->fetchAll();
+    }
+
+    public function getRepaymentById(int $repaymentId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT brp.*, br.contact_id, br.principal_amount, c.name AS contact_name, c.email,
+                    GREATEST(0, br.principal_amount - COALESCE((SELECT SUM(x.amount) FROM borrowing_repayments x WHERE x.borrowing_record_id = br.id), 0)) AS outstanding_amount
+             FROM borrowing_repayments brp
+             JOIN borrowing_records br ON br.id = brp.borrowing_record_id
+             JOIN contacts c ON c.id = br.contact_id
+             WHERE brp.id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $repaymentId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function deleteRepayment(int $repaymentId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT brp.*, br.principal_amount FROM borrowing_repayments brp
+             JOIN borrowing_records br ON br.id = brp.borrowing_record_id
+             WHERE brp.id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $repaymentId]);
+        $rep = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$rep) return false;
+
+        $recordId = (int) $rep['borrowing_record_id'];
+        $amount   = (float) $rep['amount'];
+        $date     = $rep['repayment_date'];
+        $acctType = $rep['payment_account_type'] ?? null;
+        $acctId   = (int) ($rep['payment_account_id'] ?? 0);
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare('DELETE FROM borrowing_repayments WHERE id = :id')
+                ->execute([':id' => $repaymentId]);
+
+            $this->db->prepare(
+                "DELETE FROM transactions WHERE reference_type='borrowing' AND reference_id=:ref AND transaction_type='expense' AND amount=:amt AND transaction_date=:date LIMIT 1"
+            )->execute([':ref' => $recordId, ':amt' => $amount, ':date' => $date]);
+
+            if ($acctType === 'credit_card' && $acctId > 0) {
+                $this->applyCreditCardDeltaIfNeeded($acctType, $acctId, 'income', $amount);
+            }
+
+            $totalsStmt = $this->db->prepare('SELECT COALESCE(SUM(amount), 0) FROM borrowing_repayments WHERE borrowing_record_id = :id');
+            $totalsStmt->execute([':id' => $recordId]);
+            $sumRepaid      = (float) $totalsStmt->fetchColumn();
+            $newOutstanding = max(0.0, (float) $rep['principal_amount'] - $sumRepaid);
+            $newStatus      = $newOutstanding <= 0 ? 'closed' : 'ongoing';
+            $this->db->prepare(
+                'UPDATE borrowing_records SET total_repaid=:r, outstanding_amount=:o, status=:s, updated_at=CURRENT_TIMESTAMP WHERE id=:id'
+            )->execute([':r' => $sumRepaid, ':o' => $newOutstanding, ':s' => $newStatus, ':id' => $recordId]);
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            return false;
+        }
     }
 
     public function update(array $input): bool
