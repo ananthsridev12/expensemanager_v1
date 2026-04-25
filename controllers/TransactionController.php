@@ -132,6 +132,13 @@ class TransactionController extends BaseController
             exit;
         }
 
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction_split') {
+            $flash = $this->handleSplitTransaction($_POST);
+            $_SESSION['tx_flash'] = $flash;
+            header('Location: ?module=transactions');
+            exit;
+        }
+
         if (($_GET['action'] ?? '') === 'export') {
             $filters = $this->collectFilters();
             $rows = $this->transactionModel->getFiltered($filters);
@@ -154,6 +161,12 @@ class TransactionController extends BaseController
                 echo '"' . implode('","', $line) . '"' . "\n";
             }
             exit;
+        }
+
+        $txFlash = null;
+        if (!empty($_SESSION['tx_flash'])) {
+            $txFlash = $_SESSION['tx_flash'];
+            unset($_SESSION['tx_flash']);
         }
 
         $editTransaction = null;
@@ -198,6 +211,7 @@ class TransactionController extends BaseController
             'imported'            => isset($_GET['imported']) ? (int) $_GET['imported'] : null,
             'failed'              => isset($_GET['failed']) ? (int) $_GET['failed'] : null,
             'editTransaction'     => $editTransaction,
+            'txFlash'             => $txFlash,
         ]);
     }
 
@@ -666,6 +680,67 @@ class TransactionController extends BaseController
         }
 
         return $this->purchaseSourceModel->findOrCreateChild($parentId, $customChild);
+    }
+
+    private function handleSplitTransaction(array $input): array
+    {
+        [$acctType, $acctId] = $this->parseAccountToken((string) ($input['split_account_id'] ?? ''));
+        if ($acctId <= 0) {
+            return ['type' => 'error', 'msg' => 'Please select a valid account.'];
+        }
+
+        $date         = !empty($input['split_date']) ? (string) $input['split_date'] : date('Y-m-d');
+        $pmId         = !empty($input['split_payment_method_id']) ? (int) $input['split_payment_method_id'] : null;
+        $contactId    = !empty($input['split_contact_id']) ? (int) $input['split_contact_id'] : null;
+        $psId         = !empty($input['split_purchase_source_id']) ? (int) $input['split_purchase_source_id'] : null;
+        $sharedNotes  = trim((string) ($input['split_notes'] ?? ''));
+
+        $rawCategories = (array) ($input['split_category'] ?? []);
+        $rawSubcats    = (array) ($input['split_subcategory'] ?? []);
+        $rawAmounts    = (array) ($input['split_amount'] ?? []);
+        $rawLineNotes  = (array) ($input['split_line_notes'] ?? []);
+
+        $lines = [];
+        foreach ($rawAmounts as $i => $rawAmt) {
+            $amt = is_numeric($rawAmt) ? (float) $rawAmt : 0.0;
+            if ($amt <= 0) {
+                continue;
+            }
+            $catId    = !empty($rawCategories[$i]) ? (int) $rawCategories[$i] : null;
+            $subId    = !empty($rawSubcats[$i]) ? (int) $rawSubcats[$i] : null;
+            $lineNote = trim((string) ($rawLineNotes[$i] ?? ''));
+            $finalNote = $sharedNotes !== '' && $lineNote !== ''
+                ? $sharedNotes . ' | ' . $lineNote
+                : ($sharedNotes !== '' ? $sharedNotes : ($lineNote !== '' ? $lineNote : null));
+            $lines[] = [
+                'category_id'    => $catId,
+                'subcategory_id' => $subId,
+                'amount'         => $amt,
+                'notes'          => $finalNote,
+            ];
+        }
+
+        if (count($lines) < 2) {
+            return ['type' => 'error', 'msg' => 'Please enter at least 2 valid split lines with amounts greater than zero.'];
+        }
+
+        $shared = [
+            'transaction_date'   => $date,
+            'account_type'       => $acctType,
+            'account_id'         => $acctId,
+            'payment_method_id'  => $pmId,
+            'contact_id'         => $contactId,
+            'purchase_source_id' => $psId,
+        ];
+
+        $ids = $this->transactionModel->createSplitGroup($shared, $lines);
+
+        if (count($ids) < 2) {
+            return ['type' => 'error', 'msg' => 'Failed to record split transactions.'];
+        }
+
+        $total = array_sum(array_column($lines, 'amount'));
+        return ['type' => 'success', 'msg' => count($ids) . ' split transactions recorded (total ' . formatCurrency($total) . ').'];
     }
 
     private function resolveCategoryId(array $input): ?int

@@ -188,6 +188,34 @@ SQL;
         return $ok ? (int) $this->db->lastInsertId() : 0;
     }
 
+    public function createSplitGroup(array $shared, array $lines): array
+    {
+        $ids = [];
+        foreach ($lines as $line) {
+            $id = $this->create(array_merge($shared, [
+                'transaction_type' => 'expense',
+                'category_id'      => $line['category_id'],
+                'subcategory_id'   => $line['subcategory_id'],
+                'amount'           => $line['amount'],
+                'notes'            => $line['notes'],
+            ]));
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        if (count($ids) >= 2) {
+            $firstId      = $ids[0];
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $this->db->prepare(
+                "UPDATE transactions SET reference_type = 'split', reference_id = ? WHERE id IN ($placeholders)"
+            );
+            $stmt->execute(array_merge([$firstId], $ids));
+        }
+
+        return $ids;
+    }
+
     public function delete(int $id): bool
     {
         $stmt = $this->db->prepare('DELETE FROM transactions WHERE id = :id');

@@ -1,5 +1,6 @@
 <?php
 $activeModule = 'transactions';
+$txFlash  = $txFlash ?? null;
 $accounts = $accounts ?? [];
 $loans = $loans ?? [];
 $categories = $categories ?? [];
@@ -46,6 +47,10 @@ include __DIR__ . '/../partials/nav.php';
         <h1>Transactions</h1>
         <p>Every money movement hits the master ledger with immutable history.</p>
     </header>
+
+    <?php if ($txFlash): ?>
+        <div class="flash-message flash-<?= htmlspecialchars($txFlash['type']) ?>"><?= htmlspecialchars($txFlash['msg']) ?></div>
+    <?php endif; ?>
 
     <?php if ($imported !== null || $failed !== null): ?>
         <section class="module-panel">
@@ -730,6 +735,121 @@ include __DIR__ . '/../partials/nav.php';
         </form>
     </section>
 
+    <!-- Split Transaction -->
+    <section class="module-panel">
+        <h2>Split transaction</h2>
+        <p class="muted" style="margin-bottom:1rem;font-size:0.85rem;">
+            Paid once at a store but want to split across categories? Enter each category and its amount below.
+        </p>
+        <form method="post" id="split-tx-form">
+            <input type="hidden" name="form" value="transaction_split">
+            <div class="module-form" style="margin-bottom:1rem;">
+                <label>
+                    Date
+                    <input type="date" name="split_date" value="<?= date('Y-m-d') ?>" required>
+                </label>
+                <label>
+                    From account
+                    <select name="split_account_id" required>
+                        <?php foreach ($acctGroups as $grp): ?>
+                            <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                                <?php foreach ($grp['accounts'] as $account): ?>
+                                    <option value="<?= htmlspecialchars($account['account_type'] . ':' . $account['id']) ?>"
+                                        <?= !empty($account['is_default']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label>
+                    Payment method
+                    <select name="split_payment_method_id">
+                        <option value="">Select method (optional)</option>
+                        <?php foreach ($paymentMethods as $method): ?>
+                            <option value="<?= (int) $method['id'] ?>"><?= htmlspecialchars($method['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label>
+                    Purchased from
+                    <select name="split_purchase_source_id">
+                        <option value="">Select source (optional)</option>
+                        <?php foreach ($purchaseChildren as $source): ?>
+                            <option value="<?= (int) $source['id'] ?>"><?= htmlspecialchars($source['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label style="grid-column:1/-1;">
+                    Shared notes
+                    <input type="text" name="split_notes" placeholder="e.g. D-Mart 25 Apr">
+                </label>
+            </div>
+
+            <!-- Split lines table -->
+            <div class="table-wrapper" style="margin-bottom:0.75rem;">
+                <table class="split-lines-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Subcategory</th>
+                            <th>Amount (₹)</th>
+                            <th>Notes</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="split-lines-body">
+                        <?php for ($si = 0; $si < 2; $si++): ?>
+                        <tr class="split-line-row">
+                            <td>
+                                <select name="split_category[]" class="split-cat-select" style="width:100%;min-width:120px;">
+                                    <option value="">Uncategorized</option>
+                                    <?php foreach ($categories as $cat): ?>
+                                        <option value="<?= (int) $cat['id'] ?>" data-type="<?= htmlspecialchars($cat['type']) ?>">
+                                            <?= htmlspecialchars($cat['name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="split_subcategory[]" class="split-subcat-select" style="width:100%;min-width:120px;">
+                                    <option value="">None</option>
+                                    <?php foreach ($categories as $cat): ?>
+                                        <?php foreach ($cat['subcategories'] as $sub): ?>
+                                            <option value="<?= (int) $sub['id'] ?>" data-category="<?= (int) $cat['id'] ?>">
+                                                <?= htmlspecialchars($sub['name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="number" name="split_amount[]" class="split-amt" step="0.01" min="0.01"
+                                    style="width:100%;min-width:90px;" placeholder="0.00" required>
+                            </td>
+                            <td>
+                                <input type="text" name="split_line_notes[]" style="width:100%;min-width:90px;" placeholder="Optional">
+                            </td>
+                            <td>
+                                <button type="button" class="secondary split-remove-btn"
+                                    style="padding:0.25rem 0.5rem;color:var(--red);">✕</button>
+                            </td>
+                        </tr>
+                        <?php endfor; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
+                <button type="button" id="split-add-line" class="secondary" style="font-size:0.85rem;">+ Add line</button>
+                <span class="muted" style="font-size:0.85rem;">Total: <strong id="split-running-total">₹ 0.00</strong></span>
+            </div>
+
+            <button type="submit">Record split</button>
+        </form>
+    </section>
+
     <section class="module-panel">
         <h2>Redeem credit card points</h2>
         <?php if (empty($creditCards)): ?>
@@ -874,6 +994,9 @@ include __DIR__ . '/../partials/nav.php';
                                     <?= htmlspecialchars($txn['category_name'] ?? 'Uncategorized') ?>
                                     <?php if (!empty($txn['subcategory_name'])): ?>
                                         <small class="muted">-> <?= htmlspecialchars($txn['subcategory_name']) ?></small>
+                                    <?php endif; ?>
+                                    <?php if (($txn['reference_type'] ?? '') === 'split'): ?>
+                                        <span class="pill pill--muted" style="font-size:0.68rem;margin-left:0.25rem;">Split</span>
                                     <?php endif; ?>
                                 </td>
                                 <td><?= htmlspecialchars($txn['notes'] ?? '') ?></td>
@@ -1358,5 +1481,60 @@ include __DIR__ . '/../partials/nav.php';
             togglePurchaseOther();
             updateRewardCash();
         })();
+    </script>
+
+    <script>
+    (function () {
+        var body       = document.getElementById('split-lines-body');
+        var addBtn     = document.getElementById('split-add-line');
+        var totalEl    = document.getElementById('split-running-total');
+        if (!body || !addBtn) return;
+
+        function filterSubcats(row) {
+            var catId  = row.querySelector('.split-cat-select').value;
+            var subSel = row.querySelector('.split-subcat-select');
+            Array.from(subSel.options).forEach(function (opt) {
+                if (opt.value === '') { opt.hidden = false; return; }
+                opt.hidden = catId !== '' && opt.dataset.category !== catId;
+            });
+            if (subSel.options[subSel.selectedIndex] && subSel.options[subSel.selectedIndex].hidden) {
+                subSel.value = '';
+            }
+        }
+
+        function updateTotal() {
+            var total = 0;
+            Array.from(body.querySelectorAll('.split-amt')).forEach(function (inp) {
+                total += parseFloat(inp.value) || 0;
+            });
+            totalEl.textContent = '₹ ' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function attachRowEvents(row) {
+            row.querySelector('.split-cat-select').addEventListener('change', function () { filterSubcats(row); });
+            row.querySelector('.split-amt').addEventListener('input', updateTotal);
+            row.querySelector('.split-remove-btn').addEventListener('click', function () {
+                if (body.querySelectorAll('.split-line-row').length > 2) {
+                    row.remove();
+                    updateTotal();
+                }
+            });
+            filterSubcats(row);
+        }
+
+        Array.from(body.querySelectorAll('.split-line-row')).forEach(attachRowEvents);
+
+        addBtn.addEventListener('click', function () {
+            var rows   = body.querySelectorAll('.split-line-row');
+            var clone  = rows[rows.length - 1].cloneNode(true);
+            clone.querySelectorAll('input[type=number], input[type=text]').forEach(function (inp) { inp.value = ''; });
+            clone.querySelectorAll('select').forEach(function (sel) { sel.selectedIndex = 0; });
+            body.appendChild(clone);
+            attachRowEvents(clone);
+            clone.querySelector('.split-amt').focus();
+        });
+
+        updateTotal();
+    })();
     </script>
 </main>
