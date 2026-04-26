@@ -11,6 +11,7 @@ $paymentMethods = $paymentMethods ?? [];
 $purchaseChildren = $purchaseChildren ?? [];
 $creditCards = $creditCards ?? [];
 $filters = $filters ?? [];
+$showAll = $showAll ?? false;
 $editTransaction = $editTransaction ?? null;
 
 include __DIR__ . '/../partials/nav.php';
@@ -645,16 +646,33 @@ include __DIR__ . '/../partials/nav.php';
     </section>
 
     <section class="module-panel">
-        <h2>Transactions</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+            <h2 style="margin:0;">
+                <?php if ($showAll): ?>
+                    All transactions
+                    <?php if (!empty($recentTransactions)): ?>
+                        <small class="muted" style="font-size:0.75rem;font-weight:400;margin-left:0.5rem;"><?= count($recentTransactions) ?> result(s)</small>
+                    <?php endif; ?>
+                <?php else: ?>
+                    Recent transactions
+                    <small class="muted" style="font-size:0.75rem;font-weight:400;margin-left:0.5rem;">Last 10</small>
+                <?php endif; ?>
+            </h2>
+            <?php if (!$showAll): ?>
+                <a href="?module=transactions&view=all" style="font-size:0.875rem;padding:0.4rem 1rem;" class="secondary">View all transactions &rarr;</a>
+            <?php else: ?>
+                <a href="?module=transactions" style="font-size:0.875rem;padding:0.4rem 1rem;" class="secondary">&larr; Back to recent</a>
+            <?php endif; ?>
+        </div>
         <?php if (empty($recentTransactions)): ?>
-            <p class="muted">No transactions found for the selected filters.</p>
+            <p class="muted">No transactions found<?= $showAll ? ' for the selected filters' : '' ?>.</p>
         <?php else: ?>
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Bank</th>
+                            <th>Account</th>
                             <th>Type</th>
                             <th>Amount</th>
                             <th>Payment</th>
@@ -670,13 +688,15 @@ include __DIR__ . '/../partials/nav.php';
                             <tr>
                                 <td><?= htmlspecialchars($txn['transaction_date']) ?></td>
                                 <td><?= htmlspecialchars($txn['account_display'] ?? '-') ?></td>
-                                <td><?= htmlspecialchars(ucfirst($txn['transaction_type'])) ?></td>
+                                <td>
+                                    <span class="pill pill--<?= $txn['transaction_type'] === 'income' ? 'green' : ($txn['transaction_type'] === 'expense' ? 'red' : 'blue') ?>">
+                                        <?= htmlspecialchars(ucfirst($txn['transaction_type'])) ?>
+                                    </span>
+                                </td>
                                 <td><?= formatCurrency((float) $txn['amount']) ?></td>
                                 <td><?= htmlspecialchars($txn['payment_method_name'] ?? '-') ?></td>
                                 <td><?= htmlspecialchars($txn['contact_name'] ?? '-') ?></td>
-                                <td>
-                                    <?= htmlspecialchars($txn['purchase_source_name'] ?? '-') ?>
-                                </td>
+                                <td><?= htmlspecialchars($txn['purchase_source_name'] ?? '-') ?></td>
                                 <td>
                                     <?= htmlspecialchars($txn['category_name'] ?? 'Uncategorized') ?>
                                     <?php if (!empty($txn['subcategory_name'])): ?>
@@ -690,6 +710,11 @@ include __DIR__ . '/../partials/nav.php';
                     </tbody>
                 </table>
             </div>
+            <?php if (!$showAll): ?>
+                <div style="text-align:center;margin-top:1rem;">
+                    <a href="?module=transactions&view=all" class="secondary" style="padding:0.5rem 1.5rem;">View all transactions &rarr;</a>
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
     </section>
 
