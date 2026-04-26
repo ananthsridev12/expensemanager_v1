@@ -175,6 +175,7 @@ use Controllers\ReminderController;
 use Controllers\RentalController;
 use Controllers\RentedHomeController;
 use Controllers\SipController;
+use Controllers\AllTransactionsController;
 use Controllers\NotesController;
 use Controllers\ReportsController;
 use Controllers\TransactionController;
@@ -210,6 +211,10 @@ switch ($module) {
         break;
     case 'transactions':
         $controller = new TransactionController();
+        echo $controller->index();
+        break;
+    case 'all_transactions':
+        $controller = new AllTransactionsController();
         echo $controller->index();
         break;
     case 'credit_cards':

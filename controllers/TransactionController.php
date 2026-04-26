@@ -174,12 +174,6 @@ class TransactionController extends BaseController
             $editTransaction = $this->transactionModel->getById((int) $_GET['edit']);
         }
 
-        $filters = $this->collectFilters();
-        $hasFilters = !empty($filters['account_id']) || !empty($filters['category_id']) ||
-                      !empty($filters['subcategory_id']) || !empty($filters['start_date']) ||
-                      !empty($filters['end_date']);
-        $showAll = (($_GET['view'] ?? '') === 'all') || $hasFilters;
-
         $accounts = $this->accountModel->getList();
         $loans = $this->loanModel->getAll();
         $categories = $this->categoryModel->getAllWithSubcategories();

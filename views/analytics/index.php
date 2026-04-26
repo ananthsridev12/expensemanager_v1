@@ -712,7 +712,7 @@ include __DIR__ . '/../partials/nav.php';
                             $net = (float)$row['income'] - (float)$row['expense'];
                             $periodStart = $row['period'] . '-01';
                             $periodEnd = date('Y-m-t', strtotime($periodStart));
-                            $monthLink = '?module=transactions&view=all&start_date=' . $periodStart . '&end_date=' . $periodEnd;
+                            $monthLink = '?module=all_transactions&start_date=' . $periodStart . '&end_date=' . $periodEnd;
                         ?>
                         <tr>
                             <td>
@@ -759,7 +759,7 @@ include __DIR__ . '/../partials/nav.php';
 
             function navigateToMonth(period) {
                 const { start, end } = periodToRange(period);
-                window.location.href = '?module=transactions&view=all&start_date=' + start + '&end_date=' + end;
+                window.location.href = '?module=all_transactions&start_date=' + start + '&end_date=' + end;
             }
 
             new Chart(document.getElementById('monthly-bar-chart'), {
@@ -845,7 +845,7 @@ include __DIR__ . '/../partials/nav.php';
                         <tbody>
                             <?php foreach ($expensesByCategory as $row): ?>
                                 <?php
-                                    $catLink = '?module=transactions&view=all'
+                                    $catLink = '?module=all_transactions'
                                         . (!empty($row['category_id']) ? '&category_id=' . (int)$row['category_id'] : '')
                                         . '&start_date=' . urlencode($startDate)
                                         . '&end_date=' . urlencode($endDate);
@@ -877,7 +877,7 @@ include __DIR__ . '/../partials/nav.php';
                         <tbody>
                             <?php foreach ($incomeByCategory as $row): ?>
                                 <?php
-                                    $catLink = '?module=transactions&view=all'
+                                    $catLink = '?module=all_transactions'
                                         . (!empty($row['category_id']) ? '&category_id=' . (int)$row['category_id'] : '')
                                         . '&start_date=' . urlencode($startDate)
                                         . '&end_date=' . urlencode($endDate);
@@ -915,7 +915,7 @@ include __DIR__ . '/../partials/nav.php';
                 onClick: (e, elements) => {
                     if (elements.length > 0) {
                         const row = rows[elements[0].index];
-                        let url = '?module=transactions&view=all&start_date=' + encodeURIComponent(startDate) + '&end_date=' + encodeURIComponent(endDate);
+                        let url = '?module=all_transactions&start_date=' + encodeURIComponent(startDate) + '&end_date=' + encodeURIComponent(endDate);
                         if (row.category_id) url += '&category_id=' + row.category_id;
                         window.location.href = url;
                     }

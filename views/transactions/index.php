@@ -11,8 +11,6 @@ $failed = $failed ?? null;
 $paymentMethods = $paymentMethods ?? [];
 $purchaseChildren = $purchaseChildren ?? [];
 $creditCards = $creditCards ?? [];
-$filters = $filters ?? [];
-$showAll = $showAll ?? false;
 $editTransaction = $editTransaction ?? null;
 $openBorrowingRecords = $openBorrowingRecords ?? [];
 $activeRentedHomes = $activeRentedHomes ?? [];
@@ -70,76 +68,7 @@ include __DIR__ . '/../partials/nav.php';
         <?php endforeach; ?>
     </section>
 
-    <?php
-    $filterQuery = array_filter([
-        'module' => 'transactions',
-        'account_id' => $filters['account_id'] ?? null,
-        'category_id' => $filters['category_id'] ?? null,
-        'subcategory_id' => $filters['subcategory_id'] ?? null,
-        'start_date' => $filters['start_date'] ?? null,
-        'end_date' => $filters['end_date'] ?? null,
-    ], static fn ($value): bool => $value !== null && $value !== '');
-    $exportQuery = http_build_query(array_merge($filterQuery, ['action' => 'export']));
-    ?>
 
-    <section class="module-panel">
-        <h2>Filters</h2>
-        <form method="get" class="module-form">
-            <input type="hidden" name="module" value="transactions">
-            <label>
-                Account
-                <select name="account_id">
-                    <option value="">All accounts</option>
-                    <?php foreach ($acctGroups as $grp): ?>
-                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
-                            <?php foreach ($grp['accounts'] as $account): ?>
-                                <option value="<?= (int) $account['id'] ?>" <?= ($filters['account_id'] ?? null) == $account['id'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </optgroup>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label>
-                Category
-                <select name="category_id" id="filter-category-select">
-                    <option value="">All categories</option>
-                    <option value="uncategorized" <?= ($filters['category_id'] ?? null) === 'uncategorized' ? 'selected' : '' ?>>— Uncategorized</option>
-                    <?php foreach ($categories as $category): ?>
-                        <option value="<?= $category['id'] ?>" <?= ($filters['category_id'] ?? null) == $category['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($category['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label>
-                Subcategory
-                <select name="subcategory_id" id="filter-subcategory-select">
-                    <option value="">All subcategories</option>
-                    <option value="unspecified" <?= ($filters['subcategory_id'] ?? null) === 'unspecified' ? 'selected' : '' ?>>— Unspecified</option>
-                    <?php foreach ($categories as $category): ?>
-                        <?php foreach ($category['subcategories'] as $sub): ?>
-                            <option value="<?= $sub['id'] ?>" data-category="<?= $category['id'] ?>" <?= ($filters['subcategory_id'] ?? null) == $sub['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($category['name'] . ' - ' . $sub['name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label>
-                Start date
-                <input type="date" name="start_date" value="<?= htmlspecialchars($filters['start_date'] ?? '') ?>">
-            </label>
-            <label>
-                End date
-                <input type="date" name="end_date" value="<?= htmlspecialchars($filters['end_date'] ?? '') ?>">
-            </label>
-            <button type="submit">Apply filters</button>
-            <a class="secondary" href="?module=transactions">Reset</a>
-            <a class="secondary" href="?<?= htmlspecialchars($exportQuery) ?>">Export CSV</a>
-        </form>
-    </section>
 
     <?php if ($editTransaction): ?>
     <section class="module-panel">
@@ -961,24 +890,13 @@ include __DIR__ . '/../partials/nav.php';
     <section class="module-panel">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;">
             <h2 style="margin:0;">
-                <?php if ($showAll): ?>
-                    All transactions
-                    <?php if (!empty($recentTransactions)): ?>
-                        <small class="muted" style="font-size:0.75rem;font-weight:400;margin-left:0.5rem;"><?= count($recentTransactions) ?> result(s)</small>
-                    <?php endif; ?>
-                <?php else: ?>
-                    Recent transactions
-                    <small class="muted" style="font-size:0.75rem;font-weight:400;margin-left:0.5rem;">Last 10</small>
-                <?php endif; ?>
+                Recent transactions
+                <small class="muted" style="font-size:0.75rem;font-weight:400;margin-left:0.5rem;">Last 10</small>
             </h2>
-            <?php if (!$showAll): ?>
-                <a href="?module=transactions&view=all" style="font-size:0.875rem;padding:0.4rem 1rem;" class="secondary">View all transactions &rarr;</a>
-            <?php else: ?>
-                <a href="?module=transactions" style="font-size:0.875rem;padding:0.4rem 1rem;" class="secondary">&larr; Back to recent</a>
-            <?php endif; ?>
+            <a href="?module=all_transactions" style="font-size:0.875rem;padding:0.4rem 1rem;" class="secondary">View all transactions &rarr;</a>
         </div>
         <?php if (empty($recentTransactions)): ?>
-            <p class="muted">No transactions found<?= $showAll ? ' for the selected filters' : '' ?>.</p>
+            <p class="muted">No transactions found.</p>
         <?php else: ?>
             <div class="table-wrapper">
                 <table>
@@ -1037,11 +955,9 @@ include __DIR__ . '/../partials/nav.php';
                     </tbody>
                 </table>
             </div>
-            <?php if (!$showAll): ?>
-                <div style="text-align:center;margin-top:1rem;">
-                    <a href="?module=transactions&view=all" class="secondary" style="padding:0.5rem 1.5rem;">View all transactions &rarr;</a>
-                </div>
-            <?php endif; ?>
+            <div style="text-align:center;margin-top:1rem;">
+                <a href="?module=all_transactions" class="secondary" style="padding:0.5rem 1.5rem;">View all transactions &rarr;</a>
+            </div>
         <?php endif; ?>
     </section>
 
@@ -1126,8 +1042,6 @@ include __DIR__ . '/../partials/nav.php';
             const contactSearchInput = document.getElementById('transaction-contact-search');
             const contactIdInput = document.getElementById('transaction-contact-id');
             const contactResultsWrap = document.getElementById('transaction-contact-results');
-            const filterCategorySelect = document.getElementById('filter-category-select');
-            const filterSubcategorySelect = document.getElementById('filter-subcategory-select');
             const rewardCategorySelect = document.getElementById('reward-category-select');
             const rewardSubcategorySelect = document.getElementById('reward-subcategory-select');
             const rewardPointsInput = document.getElementById('reward-points');
@@ -1135,11 +1049,6 @@ include __DIR__ . '/../partials/nav.php';
             const rewardCashInput = document.getElementById('reward-cash');
 
             const storedOptions = Array.from(subcategorySelect.querySelectorAll('option[data-category]')).map(option => ({
-                value: option.value,
-                label: option.innerHTML,
-                category: option.dataset.category,
-            }));
-            const storedFilterOptions = Array.from(filterSubcategorySelect.querySelectorAll('option[data-category]')).map(option => ({
                 value: option.value,
                 label: option.innerHTML,
                 category: option.dataset.category,
@@ -1269,21 +1178,6 @@ include __DIR__ . '/../partials/nav.php';
                 // Reset subcategory new wrap if category changed
                 newSubcategoryWrap.style.display = 'none';
                 subcategorySelect.name = 'subcategory_id';
-            }
-
-            function refreshFilterSubcategories() {
-                const selectedCategory = filterCategorySelect.value;
-                filterSubcategorySelect.innerHTML = '<option value="">All subcategories</option>';
-
-                storedFilterOptions.forEach(item => {
-                    if (!selectedCategory || item.category === selectedCategory) {
-                        const option = document.createElement('option');
-                        option.value = item.value;
-                        option.innerHTML = item.label;
-                        option.dataset.category = item.category;
-                        filterSubcategorySelect.appendChild(option);
-                    }
-                });
             }
 
             function refreshRewardSubcategories() {
@@ -1416,7 +1310,6 @@ include __DIR__ . '/../partials/nav.php';
             emiToggleSelect.addEventListener('change', toggleEmiFields);
             categorySelect.addEventListener('change', toggleCategoryOther);
             subcategorySelect.addEventListener('change', toggleSubcategoryOther);
-            filterCategorySelect.addEventListener('change', refreshFilterSubcategories);
             if (rewardCategorySelect) {
                 rewardCategorySelect.addEventListener('change', refreshRewardSubcategories);
             }
@@ -1500,7 +1393,7 @@ include __DIR__ . '/../partials/nav.php';
             toggleGroupSpendFields();
             toggleCategoryOther();
             toggleSubcategoryOther();
-            refreshFilterSubcategories();
+            refreshSubcategories();
             refreshRewardSubcategories();
             togglePaymentMethodOther();
             togglePurchaseOther();
