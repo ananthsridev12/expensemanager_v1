@@ -176,6 +176,7 @@ use Controllers\RentalController;
 use Controllers\RentedHomeController;
 use Controllers\SipController;
 use Controllers\AllTransactionsController;
+use Controllers\CalendarController;
 use Controllers\NotesController;
 use Controllers\ReportsController;
 use Controllers\TransactionController;
@@ -215,6 +216,10 @@ switch ($module) {
         break;
     case 'all_transactions':
         $controller = new AllTransactionsController();
+        echo $controller->index();
+        break;
+    case 'calendar':
+        $controller = new CalendarController();
         echo $controller->index();
         break;
     case 'credit_cards':

@@ -503,4 +503,43 @@ SQL;
 
         return $result;
     }
+
+    public function getDailyNetFlow(string $startDate, string $endDate): array
+    {
+        $sql = <<<SQL
+SELECT
+    DATE(t.transaction_date)                                                        AS tx_date,
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'income'  THEN t.amount END), 0)   AS total_income,
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount END), 0)   AS total_expense
+FROM transactions t
+WHERE t.transaction_date BETWEEN :start_date AND :end_date
+  AND t.transaction_type IN ('income', 'expense')
+  AND (t.category_id IS NULL OR t.category_id NOT IN (
+      SELECT id FROM categories WHERE exclude_from_analytics = 1
+  ))
+GROUP BY DATE(t.transaction_date)
+SQL;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
+
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $map[$row['tx_date']] = $row;
+        }
+
+        $result  = [];
+        $current = new \DateTime($startDate);
+        $end     = new \DateTime($endDate);
+        while ($current <= $end) {
+            $d          = $current->format('Y-m-d');
+            $result[$d] = [
+                'tx_date'       => $d,
+                'total_income'  => (float) ($map[$d]['total_income']  ?? 0),
+                'total_expense' => (float) ($map[$d]['total_expense'] ?? 0),
+            ];
+            $current->modify('+1 day');
+        }
+
+        return $result;
+    }
 }

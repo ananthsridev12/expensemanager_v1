@@ -18,6 +18,7 @@
     <a href="?module=categories" class="<?= $module === 'categories' ? 'is-active' : '' ?>">Categories</a>
     <a href="?module=transactions" class="<?= $module === 'transactions' ? 'is-active' : '' ?>">Transactions</a>
     <a href="?module=all_transactions" class="<?= $module === 'all_transactions' ? 'is-active' : '' ?>">All Transactions</a>
+    <a href="?module=calendar" class="<?= $module === 'calendar' ? 'is-active' : '' ?>">Calendar</a>
     <a href="?module=reminders" class="<?= $module === 'reminders' ? 'is-active' : '' ?>">Reminders</a>
     <a href="?module=loans" class="<?= $module === 'loans' ? 'is-active' : '' ?>">Loans</a>
     <a href="?module=lending"   class="<?= $module === 'lending'   ? 'is-active' : '' ?>">Lending</a>

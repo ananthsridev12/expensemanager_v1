@@ -357,3 +357,19 @@ table tbody tr:last-child td { border-bottom: none; }
 .check-group-body input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
 .check-group-body label.hidden { display: none; }
 .check-sel-count { font-size: 0.75rem; background: var(--accent); color: #fff; border-radius: 999px; padding: 0.1rem 0.45rem; margin-left: 0.35rem; }
+
+/* Calendar module */
+.cal-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.cal-grid th { font-size: 0.72rem; color: var(--muted); text-align: center; padding: 0.4rem 0; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--line); }
+.cal-cell { border: 1px solid var(--line); vertical-align: top; padding: 0.4rem 0.5rem; height: 80px; width: 14.28%; }
+.cal-cell a { display: flex; flex-direction: column; gap: 0.15rem; height: 100%; color: inherit; text-decoration: none; border-radius: var(--radius-sm); padding: 0.15rem; }
+.cal-cell a:hover { background: var(--panel-hover); }
+.cal-cell--income  { background: rgba(34,197,94,0.08); }
+.cal-cell--expense { background: rgba(244,63,94,0.08); }
+.cal-cell--both    { background: transparent; }
+.cal-cell--today   { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 2px; }
+.cal-cell--pad     { background: transparent; opacity: 0.2; }
+.cal-date { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+.cal-date.today { color: var(--accent); font-weight: 700; }
+.cal-income  { font-size: 0.74rem; color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-expense { font-size: 0.74rem; color: var(--red); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
