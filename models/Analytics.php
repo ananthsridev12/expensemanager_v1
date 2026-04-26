@@ -121,6 +121,7 @@ SQL;
     {
         $sql = <<<SQL
 SELECT
+    c.id AS category_id,
     COALESCE(c.name, 'Uncategorized') AS category_name,
     COALESCE(SUM(t.amount), 0) AS total_amount
 FROM transactions t
@@ -144,6 +145,7 @@ SQL;
     {
         $sql = <<<SQL
 SELECT
+    c.id AS category_id,
     COALESCE(c.name, 'Uncategorized') AS category_name,
     COALESCE(SUM(t.amount), 0) AS total_amount
 FROM transactions t

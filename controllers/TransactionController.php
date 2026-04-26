@@ -175,6 +175,11 @@ class TransactionController extends BaseController
         }
 
         $filters = $this->collectFilters();
+        $hasFilters = !empty($filters['account_id']) || !empty($filters['category_id']) ||
+                      !empty($filters['subcategory_id']) || !empty($filters['start_date']) ||
+                      !empty($filters['end_date']);
+        $showAll = (($_GET['view'] ?? '') === 'all') || $hasFilters;
+
         $accounts = $this->accountModel->getList();
         $loans = $this->loanModel->getAll();
         $categories = $this->categoryModel->getAllWithSubcategories();
@@ -188,7 +193,9 @@ class TransactionController extends BaseController
         $rentalTenants       = $this->rentalModel->getTenants();
         $investments         = $this->investmentModel->getAll();
         $activeRentedHomes   = $this->rentedHomeModel->getActive();
-        $recentTransactions  = $this->transactionModel->getFiltered($filters);
+        $recentTransactions  = $showAll
+            ? $this->transactionModel->getFiltered($filters)
+            : $this->transactionModel->getRecent(10);
         $totalsByType        = $this->transactionModel->getTotalsByType();
 
         return $this->render('transactions/index.php', [
@@ -208,6 +215,7 @@ class TransactionController extends BaseController
             'activeRentedHomes'   => $activeRentedHomes,
             'recentTransactions'  => $recentTransactions,
             'totalsByType'        => $totalsByType,
+            'showAll'             => $showAll,
             'imported'            => isset($_GET['imported']) ? (int) $_GET['imported'] : null,
             'failed'              => isset($_GET['failed']) ? (int) $_GET['failed'] : null,
             'editTransaction'     => $editTransaction,

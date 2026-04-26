@@ -32,6 +32,12 @@ SELECT
         WHEN a.account_type = 'credit_card' THEN COALESCE(cc.card_name, a.account_name)
         ELSE a.account_name
     END AS account_name,
+    CASE
+        WHEN t.account_type = 'loan' THEN CONCAT('Loan - ', COALESCE(l.loan_name, ''))
+        WHEN t.account_type = 'lending' THEN CONCAT('Lending - ', COALESCE(ct.name, ''))
+        WHEN t.account_type = 'rental' THEN CONCAT(COALESCE(rt_tenant.name, 'Tenant'), ' / ', COALESCE(rt_property.property_name, 'Property'))
+        ELSE CONCAT(COALESCE(a.bank_name, '-'), ' - ', COALESCE(a.account_name, '-'))
+    END AS account_display,
     pm.name AS payment_method_name,
     ct_tx.name AS contact_name,
     ps_parent.name AS purchase_parent_name,
@@ -93,6 +99,10 @@ SQL;
         } elseif (!empty($filters['subcategory_id'])) {
             $where[] = 't.subcategory_id = :subcategory_id';
             $params[':subcategory_id'] = $filters['subcategory_id'];
+        }
+        if (!empty($filters['transaction_type'])) {
+            $where[] = 't.transaction_type = :transaction_type';
+            $params[':transaction_type'] = $filters['transaction_type'];
         }
 
         if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
