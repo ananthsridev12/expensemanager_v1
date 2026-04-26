@@ -111,12 +111,6 @@ class TransactionController extends BaseController
             $editTransaction = $this->transactionModel->getById((int) $_GET['edit']);
         }
 
-        $filters = $this->collectFilters();
-        $hasFilters = !empty($filters['account_id']) || !empty($filters['category_id']) ||
-                      !empty($filters['subcategory_id']) || !empty($filters['start_date']) ||
-                      !empty($filters['end_date']);
-        $showAll = (($_GET['view'] ?? '') === 'all') || $hasFilters;
-
         $accounts = $this->accountModel->getList();
         $loans = $this->loanModel->getAll();
         $categories = $this->categoryModel->getAllWithSubcategories();
@@ -128,16 +122,13 @@ class TransactionController extends BaseController
         $rentalProperties = $this->rentalModel->getProperties();
         $rentalTenants = $this->rentalModel->getTenants();
         $investments = $this->investmentModel->getAll();
-        $recentTransactions = $showAll
-            ? $this->transactionModel->getFiltered($filters)
-            : $this->transactionModel->getRecent(10);
+        $recentTransactions = $this->transactionModel->getRecent(10);
         $totalsByType = $this->transactionModel->getTotalsByType();
 
         return $this->render('transactions/index.php', [
             'accounts' => $accounts,
             'loans' => $loans,
             'categories' => $categories,
-            'filters' => $filters,
             'paymentMethods' => $paymentMethods,
             'purchaseChildren' => $purchaseChildren,
             'creditCards' => $creditCards,
@@ -148,7 +139,6 @@ class TransactionController extends BaseController
             'investments' => $investments,
             'recentTransactions' => $recentTransactions,
             'totalsByType' => $totalsByType,
-            'showAll' => $showAll,
             'imported' => isset($_GET['imported']) ? (int) $_GET['imported'] : null,
             'failed' => isset($_GET['failed']) ? (int) $_GET['failed'] : null,
             'editTransaction' => $editTransaction,

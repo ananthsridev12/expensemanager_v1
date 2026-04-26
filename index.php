@@ -67,6 +67,7 @@ use Controllers\LendingController;
 use Controllers\ReminderController;
 use Controllers\RentalController;
 use Controllers\SipController;
+use Controllers\AllTransactionsController;
 use Controllers\TransactionController;
 
 $moduleInput = filter_input(INPUT_GET, 'module', FILTER_DEFAULT);
@@ -92,6 +93,10 @@ switch ($module) {
         break;
     case 'transactions':
         $controller = new TransactionController();
+        echo $controller->index();
+        break;
+    case 'all_transactions':
+        $controller = new AllTransactionsController();
         echo $controller->index();
         break;
     case 'credit_cards':
