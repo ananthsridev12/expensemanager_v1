@@ -66,7 +66,7 @@ SELECT
     c.name AS contact_name
 FROM lending_records lr
 JOIN contacts c ON c.id = lr.contact_id
-WHERE lr.status = 'ongoing'
+WHERE lr.status != 'defaulted'
   AND GREATEST(0, lr.principal_amount - COALESCE((SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0)) > 0
 ORDER BY lr.lending_date DESC
 SQL;
