@@ -164,10 +164,7 @@ class LendingController extends BaseController
         $records     = $this->lendingModel->getAll();
         $openRecords = $this->lendingModel->getOpenRecords();
         $allRepayments = $this->lendingModel->getAllRepayments();
-        $accounts    = array_values(array_filter(
-            $this->accountModel->getList(),
-            static fn (array $a): bool => ($a['account_type'] ?? '') !== 'credit_card'
-        ));
+        $accounts    = $this->accountModel->getList();
         $summary  = $this->lendingModel->getSummary();
         $allLoans = $this->loanModel->getAll();
 
