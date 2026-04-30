@@ -145,6 +145,13 @@ class LendingController extends BaseController
                 exit;
             }
 
+            if ($form === 'lending_topup') {
+                $ok = $this->lendingModel->topUp($_POST);
+                $_SESSION['lending_flash'] = ['type' => $ok ? 'success' : 'error', 'msg' => $ok ? 'Additional amount added to lending record.' : 'Failed to add amount.'];
+                header('Location: ?module=lending');
+                exit;
+            }
+
             if ($form === 'lending_link_loan') {
                 $loanId    = (int) ($_POST['loan_id'] ?? 0);
                 $lendingId = (int) ($_POST['lending_record_id'] ?? 0);

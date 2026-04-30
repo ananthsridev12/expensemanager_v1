@@ -180,6 +180,50 @@ include __DIR__ . '/../partials/nav.php';
     </section>
 
     <section class="module-panel">
+        <h2>Add amount to existing record</h2>
+        <form method="post" class="module-form">
+            <input type="hidden" name="form" value="lending_topup">
+            <label>
+                Lending record
+                <select name="lending_record_id" required>
+                    <option value="">Choose record</option>
+                    <?php foreach ($records as $rec): ?>
+                        <?php if (($rec['status'] ?? '') !== 'defaulted'): ?>
+                        <option value="<?= (int) $rec['id'] ?>">
+                            <?= htmlspecialchars(($rec['contact_name'] ?? 'Contact') . ' — Principal ' . formatCurrency((float) ($rec['principal_amount'] ?? 0)) . ' (' . ucfirst($rec['status'] ?? '') . ')') ?>
+                        </option>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>
+                Additional amount (₹)
+                <input type="number" name="amount" step="0.01" min="0.01" required>
+            </label>
+            <label>
+                Date
+                <input type="date" name="topup_date" value="<?= date('Y-m-d') ?>" required>
+            </label>
+            <label>
+                Funding account
+                <select name="funding_account">
+                    <option value="">Select account (optional)</option>
+                    <?php foreach ($accounts as $account): ?>
+                        <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
+                            <?= htmlspecialchars(($account['bank_name'] ?? '') . ' - ' . ($account['account_name'] ?? '')) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>
+                Notes
+                <textarea name="notes" rows="2"></textarea>
+            </label>
+            <button type="submit">Add amount</button>
+        </form>
+    </section>
+
+    <section class="module-panel">
         <h2>Lending ledger</h2>
         <?php if (empty($records)): ?>
             <p class="muted">No lending records yet.</p>
