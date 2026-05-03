@@ -121,9 +121,12 @@ $exportQuery = http_build_query(array_merge($filterQuery, ['action' => 'export']
                                 <td><?= htmlspecialchars($txn['transaction_date']) ?></td>
                                 <td><?= htmlspecialchars($txn['account_display'] ?? '-') ?></td>
                                 <td>
-                                    <span class="pill pill--<?= $txn['transaction_type'] === 'income' ? 'green' : ($txn['transaction_type'] === 'expense' ? 'red' : 'blue') ?>">
-                                        <?= htmlspecialchars(ucfirst($txn['transaction_type'])) ?>
-                                    </span>
+                                    <?php
+                                        $isRefund = ($txn['reference_type'] ?? '') === 'refund';
+                                        $pillClass = $isRefund ? 'yellow' : ($txn['transaction_type'] === 'income' ? 'green' : ($txn['transaction_type'] === 'expense' ? 'red' : 'blue'));
+                                        $pillLabel = $isRefund ? 'Refund' : ucfirst($txn['transaction_type']);
+                                    ?>
+                                    <span class="pill pill--<?= $pillClass ?>"><?= htmlspecialchars($pillLabel) ?></span>
                                 </td>
                                 <td><?= formatCurrency((float) $txn['amount']) ?></td>
                                 <td><?= htmlspecialchars($txn['payment_method_name'] ?? '-') ?></td>
@@ -136,7 +139,19 @@ $exportQuery = http_build_query(array_merge($filterQuery, ['action' => 'export']
                                     <?php endif; ?>
                                 </td>
                                 <td><?= htmlspecialchars($txn['notes'] ?? '') ?></td>
-                                <td><a class="secondary" href="?module=transactions&edit=<?= (int) $txn['id'] ?>">Edit</a></td>
+                                <td style="white-space:nowrap;">
+                                    <a class="secondary" href="?module=transactions&edit=<?= (int) $txn['id'] ?>">Edit</a>
+                                    <?php if ($txn['transaction_type'] === 'expense'): ?>
+                                        <button type="button" class="secondary refund-btn"
+                                            style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.25rem;"
+                                            data-id="<?= (int) $txn['id'] ?>"
+                                            data-amount="<?= (float) $txn['amount'] ?>"
+                                            data-label="<?= htmlspecialchars(($txn['category_name'] ?? 'Expense') . ' · ' . number_format((float) $txn['amount'], 2)) ?>"
+                                            data-account="<?= htmlspecialchars($txn['account_display'] ?? '') ?>">
+                                            Refund
+                                        </button>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -178,6 +193,66 @@ $exportQuery = http_build_query(array_merge($filterQuery, ['action' => 'export']
 
             filterCategorySelect.addEventListener('change', refreshFilterSubcategories);
             refreshFilterSubcategories();
+        })();
+    </script>
+
+    <div id="refund-modal" style="display:none;position:fixed;inset:0;z-index:1000;
+         background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+        <div style="background:var(--panel);border-radius:var(--radius);padding:1.5rem;
+                    max-width:380px;width:100%;box-shadow:var(--shadow);">
+            <h3 style="margin:0 0 0.25rem;">Refund</h3>
+            <p id="refund-desc" style="color:var(--muted);font-size:0.88rem;margin:0 0 1rem;"></p>
+            <div style="display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+                <button type="button" id="refund-full-btn" class="secondary" style="flex:1;">Full amount</button>
+                <input type="number" id="refund-custom-amt" step="0.01" min="0.01"
+                       placeholder="Custom amount" style="flex:1;min-width:120px;">
+            </div>
+            <div style="display:flex;gap:0.5rem;">
+                <button type="button" id="refund-confirm-btn">Confirm Refund</button>
+                <button type="button" id="refund-cancel-btn" class="secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var modal      = document.getElementById('refund-modal');
+            var desc       = document.getElementById('refund-desc');
+            var fullBtn    = document.getElementById('refund-full-btn');
+            var customAmt  = document.getElementById('refund-custom-amt');
+            var confirmBtn = document.getElementById('refund-confirm-btn');
+            var cancelBtn  = document.getElementById('refund-cancel-btn');
+            var currentId  = null, currentAmt = 0;
+
+            document.querySelectorAll('.refund-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    currentId  = btn.dataset.id;
+                    currentAmt = parseFloat(btn.dataset.amount);
+                    desc.textContent = btn.dataset.label + (btn.dataset.account ? ' · ' + btn.dataset.account : '');
+                    customAmt.value  = '';
+                    fullBtn.textContent = 'Full amount (' + currentAmt.toFixed(2) + ')';
+                    modal.style.display = 'flex';
+                });
+            });
+
+            fullBtn.addEventListener('click', function () { customAmt.value = currentAmt; });
+            cancelBtn.addEventListener('click', function () { modal.style.display = 'none'; });
+            modal.addEventListener('click', function (e) { if (e.target === modal) modal.style.display = 'none'; });
+
+            confirmBtn.addEventListener('click', function () {
+                var amt = parseFloat(customAmt.value);
+                if (!amt || amt <= 0) { alert('Enter a refund amount.'); return; }
+                var fd = new FormData();
+                fd.append('form', 'refund');
+                fd.append('refund_of_id', currentId);
+                fd.append('amount', amt);
+                fetch('?module=all_transactions', { method: 'POST', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.ok) { modal.style.display = 'none'; location.reload(); }
+                        else { alert(data.error || 'Failed to record refund.'); }
+                    });
+            });
         })();
     </script>
 </main>

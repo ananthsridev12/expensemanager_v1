@@ -22,6 +22,40 @@ class AllTransactionsController extends BaseController
 
     public function index(): string
     {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'refund') {
+            header('Content-Type: application/json');
+            $refundOfId = (int) ($_POST['refund_of_id'] ?? 0);
+            $amount     = (float) ($_POST['amount'] ?? 0);
+
+            if ($refundOfId <= 0 || $amount <= 0) {
+                echo json_encode(['ok' => false, 'error' => 'Invalid input.']);
+                exit;
+            }
+
+            $original = $this->transactionModel->getById($refundOfId);
+
+            if (!$original || $original['transaction_type'] !== 'expense') {
+                echo json_encode(['ok' => false, 'error' => 'Original expense not found.']);
+                exit;
+            }
+
+            $newId = $this->transactionModel->create([
+                'transaction_date' => date('Y-m-d'),
+                'account_type'     => $original['account_type'],
+                'account_id'       => $original['account_id'],
+                'transaction_type' => 'income',
+                'category_id'      => $original['category_id'],
+                'subcategory_id'   => $original['subcategory_id'] ?? null,
+                'amount'           => $amount,
+                'reference_type'   => 'refund',
+                'reference_id'     => $refundOfId,
+                'notes'            => 'Refund of #' . $refundOfId,
+            ]);
+
+            echo json_encode(['ok' => $newId > 0]);
+            exit;
+        }
+
         if (($_GET['action'] ?? '') === 'export') {
             $filters = $this->collectFilters();
             $rows = $this->transactionModel->getFiltered($filters);
