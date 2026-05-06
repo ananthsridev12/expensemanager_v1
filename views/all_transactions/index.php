@@ -151,6 +151,11 @@ $exportQuery = http_build_query(array_merge($filterQuery, ['action' => 'export']
                                             Refund
                                         </button>
                                     <?php endif; ?>
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('Delete this transaction?')">
+                                        <input type="hidden" name="form" value="transaction_delete">
+                                        <input type="hidden" name="id" value="<?= (int) $txn['id'] ?>">
+                                        <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.25rem;color:var(--red);">Delete</button>
+                                    </form>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

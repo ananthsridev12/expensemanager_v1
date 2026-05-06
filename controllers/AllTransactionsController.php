@@ -22,6 +22,17 @@ class AllTransactionsController extends BaseController
 
     public function index(): string
     {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'transaction_delete') {
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($id > 0) {
+                $this->transactionModel->deleteByReference('fuel_surcharge', $id);
+                $this->transactionModel->deleteByReference('fuel_surcharge_refund', $id);
+                $this->transactionModel->delete($id);
+            }
+            header('Location: ?module=all_transactions');
+            exit;
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'refund') {
             header('Content-Type: application/json');
             $refundOfId = (int) ($_POST['refund_of_id'] ?? 0);

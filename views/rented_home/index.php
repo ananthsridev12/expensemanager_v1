@@ -4,6 +4,7 @@ $homes          = $homes          ?? [];
 $activeHomes    = $activeHomes    ?? [];
 $recentExpenses = $recentExpenses ?? [];
 $accounts       = $accounts       ?? [];
+$contacts       = $contacts       ?? [];
 $summary        = $summary        ?? ['total_homes' => 0, 'active_homes' => 0, 'monthly_committed' => 0, 'advance_committed' => 0];
 $editHome       = $editHome       ?? null;
 
@@ -89,7 +90,19 @@ include __DIR__ . '/../partials/nav.php';
             </label>
             <label>
                 Landlord name
-                <input type="text" name="landlord_name" placeholder="e.g. Mr. Ramesh"
+                <?php if (!empty($contacts)): ?>
+                <select id="rh-contact-pick" style="margin-bottom:0.35rem;">
+                    <option value="">— Pick from contacts —</option>
+                    <?php foreach ($contacts as $c): ?>
+                        <option value="<?= htmlspecialchars($c['name']) ?>"
+                            <?= ($editHome['landlord_name'] ?? '') === $c['name'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($c['name']) ?><?= !empty($c['mobile']) ? ' (' . htmlspecialchars($c['mobile']) . ')' : '' ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php endif; ?>
+                <input type="text" name="landlord_name" id="rh-landlord-name"
+                       placeholder="e.g. Mr. Ramesh"
                        value="<?= htmlspecialchars($editHome['landlord_name'] ?? '') ?>">
             </label>
             <label>
@@ -338,6 +351,14 @@ include __DIR__ . '/../partials/nav.php';
 
 <script>
 (function () {
+    var contactPick = document.getElementById('rh-contact-pick');
+    var landlordName = document.getElementById('rh-landlord-name');
+    if (contactPick && landlordName) {
+        contactPick.addEventListener('change', function () {
+            if (this.value) landlordName.value = this.value;
+        });
+    }
+
     const homeSelect   = document.getElementById('rh-home-select');
     const typeSelect   = document.getElementById('rh-type-select');
     const amountInput  = document.getElementById('rh-amount');

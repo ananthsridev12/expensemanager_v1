@@ -3,18 +3,21 @@
 namespace Controllers;
 
 use Models\Account;
+use Models\Contact;
 use Models\RentedHome;
 
 class RentedHomeController extends BaseController
 {
     private RentedHome $model;
     private Account    $accountModel;
+    private Contact    $contactModel;
 
     public function __construct()
     {
         parent::__construct();
         $this->model        = new RentedHome($this->database);
         $this->accountModel = new Account($this->database);
+        $this->contactModel = new Contact($this->database);
     }
 
     public function index(): string
@@ -59,6 +62,7 @@ class RentedHomeController extends BaseController
         $activeHomes    = $this->model->getActive();
         $recentExpenses = $this->model->getRecentExpenses(20);
         $accounts       = $this->accountModel->getList();
+        $contacts       = $this->contactModel->getAll();
         $summary        = $this->model->getSummary();
 
         return $this->render('rented_home/index.php', [
@@ -66,6 +70,7 @@ class RentedHomeController extends BaseController
             'activeHomes'    => $activeHomes,
             'recentExpenses' => $recentExpenses,
             'accounts'       => $accounts,
+            'contacts'       => $contacts,
             'summary'        => $summary,
             'editHome'       => $editHome,
         ]);
