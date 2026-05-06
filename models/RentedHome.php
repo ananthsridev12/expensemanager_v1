@@ -8,11 +8,12 @@ class RentedHome extends BaseModel
 {
     // category_id / subcategory_id auto-mapped by expense_type
     private const CATEGORY_MAP = [
-        'advance'     => ['category_id' => 13,   'subcategory_id' => null],
-        'rent'        => ['category_id' => 16,   'subcategory_id' => 28],
-        'maintenance' => ['category_id' => 16,   'subcategory_id' => 23],
-        'electricity' => ['category_id' => 18,   'subcategory_id' => null],
-        'other'       => ['category_id' => null, 'subcategory_id' => null],
+        'advance'        => ['category_id' => 13,   'subcategory_id' => null],
+        'rent'           => ['category_id' => 16,   'subcategory_id' => 28],
+        'maintenance'    => ['category_id' => 16,   'subcategory_id' => 23],
+        'electricity'    => ['category_id' => 18,   'subcategory_id' => null],
+        'other'          => ['category_id' => null, 'subcategory_id' => null],
+        'deposit_refund' => ['category_id' => 13,   'subcategory_id' => null],
     ];
 
     public function getAll(): array
@@ -183,6 +184,69 @@ class RentedHome extends BaseModel
                 ':notes'         => $autoNote,
             ]);
         }
+
+        return true;
+    }
+
+    /**
+     * Record a deposit refund from the landlord (income back into an account).
+     * $input keys: home_id, amount, refund_date, account_token (type:id), notes
+     */
+    public function recordDepositRefund(array $input): bool
+    {
+        $homeId = (int) ($input['home_id'] ?? 0);
+        $amount = is_numeric($input['amount'] ?? null) ? (float) $input['amount'] : 0;
+        $date   = !empty($input['refund_date']) ? $input['refund_date'] : date('Y-m-d');
+        $token  = (string) ($input['account_token'] ?? '');
+        $notes  = trim($input['notes'] ?? '') ?: null;
+
+        if ($homeId <= 0 || $amount <= 0) return false;
+
+        $accountId = null;
+        $accountType = null;
+        if ($token !== '' && strpos($token, ':') !== false) {
+            [$accountType, $accountIdRaw] = explode(':', $token, 2);
+            $accountId = (int) $accountIdRaw;
+            $allowed = ['savings', 'current', 'cash', 'wallet', 'other', 'credit_card'];
+            if ($accountId <= 0 || !in_array($accountType, $allowed, true)) {
+                $accountId = null;
+                $accountType = null;
+            }
+        }
+        if ($accountId === null) return false;
+
+        $stmt = $this->db->prepare(
+            'INSERT INTO rented_home_expenses (home_id, expense_type, amount, expense_date, account_id, notes)
+             VALUES (:home_id, \'deposit_refund\', :amount, :expense_date, :account_id, :notes)'
+        );
+        $ok = $stmt->execute([
+            ':home_id'      => $homeId,
+            ':amount'       => $amount,
+            ':expense_date' => $date,
+            ':account_id'   => $accountId,
+            ':notes'        => $notes,
+        ]);
+        if (!$ok) return false;
+
+        $expenseId = (int) $this->db->lastInsertId();
+        $home      = $this->getById($homeId);
+        $autoNote  = $notes ?? 'Deposit refund — ' . ($home['label'] ?? 'Rented Home');
+
+        $this->db->prepare(
+            'INSERT INTO transactions
+                (transaction_date, account_type, account_id, transaction_type, category_id, subcategory_id, amount, reference_type, reference_id, notes)
+             VALUES
+                (:date, :acct_type, :acct_id, \'income\', :category_id, :subcategory_id, :amount, \'rented_home\', :ref_id, :notes)'
+        )->execute([
+            ':date'          => $date,
+            ':acct_type'     => $accountType,
+            ':acct_id'       => $accountId,
+            ':category_id'   => 13,
+            ':subcategory_id'=> null,
+            ':amount'        => $amount,
+            ':ref_id'        => $expenseId,
+            ':notes'         => $autoNote,
+        ]);
 
         return true;
     }

@@ -22,6 +22,15 @@ class RentedHomeController extends BaseController
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $form = $_POST['form'] ?? '';
 
+            if ($form === 'deposit_refund') {
+                header('Content-Type: application/json');
+                $ok = $this->model->recordDepositRefund(array_merge($_POST, [
+                    'account_token' => $_POST['account_token'] ?? '',
+                ]));
+                echo json_encode(['ok' => $ok]);
+                exit;
+            }
+
             if ($form === 'rented_home') {
                 $this->model->create($_POST);
             } elseif ($form === 'rented_home_update') {

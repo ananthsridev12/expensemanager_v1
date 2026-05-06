@@ -32,18 +32,20 @@ foreach ($acctGrouped as $gKey => $accts) {
 }
 
 $expenseLabels = [
-    'advance'     => 'Advance / Deposit',
-    'rent'        => 'Monthly Rent',
-    'maintenance' => 'Maintenance',
-    'electricity' => 'Electricity Bill',
-    'other'       => 'Other',
+    'advance'        => 'Advance / Deposit',
+    'rent'           => 'Monthly Rent',
+    'maintenance'    => 'Maintenance',
+    'electricity'    => 'Electricity Bill',
+    'other'          => 'Other',
+    'deposit_refund' => 'Deposit Refund',
 ];
 $expenseBadgeColors = [
-    'advance'     => '#6366f1',
-    'rent'        => '#3b82f6',
-    'maintenance' => '#f97316',
-    'electricity' => '#eab308',
-    'other'       => '#64748b',
+    'advance'        => '#6366f1',
+    'rent'           => '#3b82f6',
+    'maintenance'    => '#f97316',
+    'electricity'    => '#eab308',
+    'other'          => '#64748b',
+    'deposit_refund' => '#22c55e',
 ];
 
 include __DIR__ . '/../partials/nav.php';
@@ -164,7 +166,16 @@ include __DIR__ . '/../partials/nav.php';
                                 <?= ucfirst($home['status']) ?>
                             </span>
                         </td>
-                        <td><a class="secondary" href="?module=rented_home&edit=<?= (int) $home['id'] ?>">Edit</a></td>
+                        <td style="white-space:nowrap;">
+                            <a class="secondary" href="?module=rented_home&edit=<?= (int) $home['id'] ?>">Edit</a>
+                            <button type="button" class="secondary refund-deposit-btn"
+                                style="font-size:0.75rem;padding:0.2rem 0.6rem;"
+                                data-id="<?= (int) $home['id'] ?>"
+                                data-label="<?= htmlspecialchars($home['label']) ?>"
+                                data-advance="<?= (float) $home['advance_amount'] ?>">
+                                Refund Deposit
+                            </button>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -281,6 +292,50 @@ include __DIR__ . '/../partials/nav.php';
     <?php endif; ?>
 </main>
 
+<div id="deposit-refund-modal" style="display:none;position:fixed;inset:0;z-index:1000;
+     background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border-radius:var(--radius);padding:1.5rem;
+              max-width:420px;width:100%;box-shadow:var(--shadow);">
+    <h3 style="margin:0 0 0.2rem;">Refund Deposit</h3>
+    <p id="dr-home-label" style="color:var(--muted);font-size:0.88rem;margin:0 0 0.15rem;"></p>
+    <p id="dr-expected" style="color:var(--muted);font-size:0.82rem;margin:0 0 1rem;"></p>
+    <input type="hidden" id="dr-home-id">
+    <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;flex-wrap:wrap;">
+      <button type="button" id="dr-full-btn" class="secondary" style="flex:1;">Full amount</button>
+      <input type="number" id="dr-amount" step="0.01" min="0.01"
+             placeholder="Amount refunded (₹)" style="flex:1;min-width:140px;">
+    </div>
+    <label style="display:block;margin-bottom:0.75rem;">
+      Received into account
+      <select id="dr-account" style="width:100%;margin-top:0.25rem;">
+        <option value="">Select account</option>
+        <?php foreach ($acctGroups as $grp): ?>
+          <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+            <?php foreach ($grp['accounts'] as $acct): ?>
+              <option value="<?= $acct['account_type'] . ':' . $acct['id'] ?>"
+                      <?= !empty($acct['is_default']) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($acct['bank_name'] . ' - ' . $acct['account_name']) ?>
+              </option>
+            <?php endforeach; ?>
+          </optgroup>
+        <?php endforeach; ?>
+      </select>
+    </label>
+    <label style="display:block;margin-bottom:0.75rem;">
+      Date
+      <input type="date" id="dr-date" value="<?= date('Y-m-d') ?>" style="width:100%;margin-top:0.25rem;">
+    </label>
+    <label style="display:block;margin-bottom:1rem;">
+      Notes (optional)
+      <input type="text" id="dr-notes" placeholder="e.g. Partial refund after deductions" style="width:100%;margin-top:0.25rem;">
+    </label>
+    <div style="display:flex;gap:0.5rem;">
+      <button type="button" id="dr-confirm-btn">Confirm Refund</button>
+      <button type="button" id="dr-cancel-btn" class="secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
     const homeSelect   = document.getElementById('rh-home-select');
@@ -314,5 +369,59 @@ include __DIR__ . '/../partials/nav.php';
     }
 
     togglePeriod();
+})();
+
+(function () {
+    var modal      = document.getElementById('deposit-refund-modal');
+    var homeLabel  = document.getElementById('dr-home-label');
+    var expected   = document.getElementById('dr-expected');
+    var homeIdEl   = document.getElementById('dr-home-id');
+    var fullBtn    = document.getElementById('dr-full-btn');
+    var amountEl   = document.getElementById('dr-amount');
+    var accountEl  = document.getElementById('dr-account');
+    var dateEl     = document.getElementById('dr-date');
+    var notesEl    = document.getElementById('dr-notes');
+    var confirmBtn = document.getElementById('dr-confirm-btn');
+    var cancelBtn  = document.getElementById('dr-cancel-btn');
+    var currentAdv = 0;
+
+    document.querySelectorAll('.refund-deposit-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            homeIdEl.value        = btn.dataset.id;
+            currentAdv            = parseFloat(btn.dataset.advance) || 0;
+            homeLabel.textContent = btn.dataset.label;
+            expected.textContent  = 'Expected deposit: ₹' + currentAdv.toFixed(2);
+            fullBtn.textContent   = 'Full amount (₹' + currentAdv.toFixed(2) + ')';
+            amountEl.value        = '';
+            notesEl.value         = '';
+            modal.style.display   = 'flex';
+        });
+    });
+
+    fullBtn.addEventListener('click', function () { amountEl.value = currentAdv; });
+    cancelBtn.addEventListener('click', function () { modal.style.display = 'none'; });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.style.display = 'none'; });
+
+    confirmBtn.addEventListener('click', function () {
+        var amt = parseFloat(amountEl.value);
+        if (!amt || amt <= 0)  { alert('Enter the refunded amount.'); return; }
+        if (!accountEl.value)  { alert('Select the account that received the refund.'); return; }
+        if (!homeIdEl.value)   { return; }
+
+        var fd = new FormData();
+        fd.append('form',          'deposit_refund');
+        fd.append('home_id',       homeIdEl.value);
+        fd.append('amount',        amt);
+        fd.append('account_token', accountEl.value);
+        fd.append('refund_date',   dateEl.value);
+        fd.append('notes',         notesEl.value);
+
+        fetch('?module=rented_home', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.ok) { modal.style.display = 'none'; location.reload(); }
+                else { alert('Failed to record deposit refund.'); }
+            });
+    });
 })();
 </script>
