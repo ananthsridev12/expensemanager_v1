@@ -166,6 +166,29 @@ SQL;
         ];
     }
 
+    public function getByContact(): array
+    {
+        $sql = <<<SQL
+SELECT
+    c.id    AS contact_id,
+    c.name  AS contact_name,
+    c.mobile,
+    COUNT(br.id) AS record_count,
+    SUM(br.principal_amount) AS total_principal,
+    COALESCE(SUM(
+        GREATEST(0, br.principal_amount - COALESCE(
+            (SELECT SUM(p.amount) FROM borrowing_repayments p WHERE p.borrowing_record_id = br.id), 0
+        ))
+    ), 0) AS total_outstanding,
+    SUM(CASE WHEN br.status = 'ongoing' THEN 1 ELSE 0 END) AS open_count
+FROM borrowing_records br
+JOIN contacts c ON c.id = br.contact_id
+GROUP BY c.id, c.name, c.mobile
+ORDER BY total_outstanding DESC, c.name ASC
+SQL;
+        return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function getById(int $id): ?array
     {
         $stmt = $this->db->prepare(

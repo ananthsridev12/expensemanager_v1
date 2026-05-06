@@ -110,6 +110,29 @@ SQL;
         ];
     }
 
+    public function getByContact(): array
+    {
+        $sql = <<<SQL
+SELECT
+    c.id    AS contact_id,
+    c.name  AS contact_name,
+    c.mobile,
+    COUNT(lr.id) AS record_count,
+    SUM(lr.principal_amount) AS total_principal,
+    COALESCE(SUM(
+        GREATEST(0, lr.principal_amount - COALESCE(
+            (SELECT SUM(lrp.amount) FROM lending_repayments lrp WHERE lrp.lending_record_id = lr.id), 0
+        ))
+    ), 0) AS total_outstanding,
+    SUM(CASE WHEN lr.status != 'closed' THEN 1 ELSE 0 END) AS open_count
+FROM lending_records lr
+JOIN contacts c ON c.id = lr.contact_id
+GROUP BY c.id, c.name, c.mobile
+ORDER BY total_outstanding DESC, c.name ASC
+SQL;
+        return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function topUp(array $input): bool
     {
         $recordId      = (int) ($input['lending_record_id'] ?? 0);

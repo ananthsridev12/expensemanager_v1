@@ -172,8 +172,9 @@ class LendingController extends BaseController
         $openRecords = $this->lendingModel->getOpenRecords();
         $allRepayments = $this->lendingModel->getAllRepayments();
         $accounts    = $this->accountModel->getList();
-        $summary  = $this->lendingModel->getSummary();
-        $allLoans = $this->loanModel->getAll();
+        $summary     = $this->lendingModel->getSummary();
+        $byContact   = $this->lendingModel->getByContact();
+        $allLoans    = $this->loanModel->getAll();
 
         return $this->render('lending/index.php', [
             'records'       => $records,
@@ -181,6 +182,7 @@ class LendingController extends BaseController
             'allRepayments' => $allRepayments,
             'accounts'      => $accounts,
             'summary'       => $summary,
+            'byContact'     => $byContact,
             'editRecord'    => $editRecord,
             'allLoans'      => $allLoans,
             'smtpReady'     => $this->smtpIsReady(),

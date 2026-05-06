@@ -5,6 +5,7 @@ $openRecords   = $openRecords ?? [];
 $allRepayments = $allRepayments ?? [];
 $accounts      = $accounts ?? [];
 $summary       = $summary ?? ['count' => 0, 'outstanding' => 0.0];
+$byContact     = $byContact ?? [];
 $editRecord    = $editRecord ?? null;
 $allLoans      = $allLoans ?? [];
 $smtpReady     = $smtpReady ?? false;
@@ -27,11 +28,70 @@ include __DIR__ . '/../partials/nav.php';
             <h3>Lending records</h3>
             <p><?= $summary['count'] ?></p>
         </article>
-        <article class="card">
-            <h3>Outstanding</h3>
+        <article class="card card--orange">
+            <h3>Total outstanding</h3>
             <p><?= formatCurrency($summary['outstanding']) ?></p>
+            <small>Across all contacts</small>
         </article>
+        <?php
+            $activeContacts = count(array_filter($byContact, fn($r) => (float)$r['total_outstanding'] > 0));
+        ?>
+        <?php if ($activeContacts > 0): ?>
+        <article class="card">
+            <h3>Contacts with balance</h3>
+            <p><?= $activeContacts ?></p>
+            <small>Still owe you money</small>
+        </article>
+        <?php endif; ?>
     </section>
+
+    <?php if (!empty($byContact)): ?>
+    <section class="module-panel">
+        <h2>Outstanding by contact</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Contact</th>
+                        <th>Ledgers</th>
+                        <th>Total lent</th>
+                        <th>Outstanding</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($byContact as $row): ?>
+                    <?php $settled = (float) $row['total_outstanding'] <= 0; ?>
+                    <tr<?= $settled ? ' style="opacity:0.55;"' : '' ?>>
+                        <td>
+                            <strong><?= htmlspecialchars($row['contact_name']) ?></strong>
+                            <?php if (!empty($row['mobile'])): ?>
+                                <br><small class="muted"><?= htmlspecialchars($row['mobile']) ?></small>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= (int) $row['record_count'] ?></td>
+                        <td><?= formatCurrency((float) $row['total_principal']) ?></td>
+                        <td>
+                            <?php if (!$settled): ?>
+                                <strong><?= formatCurrency((float) $row['total_outstanding']) ?></strong>
+                            <?php else: ?>
+                                <span class="muted">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if (!$settled): ?>
+                                <span class="pill pill--red"><?= (int)$row['open_count'] > 1 ? $row['open_count'] . ' active' : 'Active' ?></span>
+                            <?php else: ?>
+                                <span class="pill pill--green">Settled</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <?php endif; ?>
 
     <?php if ($editRecord): ?>
     <section class="module-panel">

@@ -122,6 +122,7 @@ class BorrowingController extends BaseController
         $allRepayments = $this->borrowingModel->getAllRepayments();
         $accounts      = $this->accountModel->getList();
         $summary       = $this->borrowingModel->getSummary();
+        $byContact     = $this->borrowingModel->getByContact();
 
         return $this->render('borrowing/index.php', [
             'records'       => $records,
@@ -129,6 +130,7 @@ class BorrowingController extends BaseController
             'allRepayments' => $allRepayments,
             'accounts'      => $accounts,
             'summary'       => $summary,
+            'byContact'     => $byContact,
             'editRecord'    => $editRecord,
             'smtpReady'     => $this->smtpIsReady(),
             'flash'         => $flash,
