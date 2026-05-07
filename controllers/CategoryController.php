@@ -28,7 +28,8 @@ class CategoryController extends BaseController
                 $this->categoryModel->createCategory(
                     $_POST['name'] ?? '',
                     $_POST['type'] ?? 'expense',
-                    isset($_POST['is_fuel']) && $_POST['is_fuel'] === '1'
+                    isset($_POST['is_fuel'])    && $_POST['is_fuel']    === '1',
+                    isset($_POST['is_earning']) && $_POST['is_earning'] === '1'
                 );
             }
 

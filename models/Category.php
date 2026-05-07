@@ -14,6 +14,7 @@ SELECT
     c.name AS category_name,
     c.type AS category_type,
     c.is_fuel AS category_is_fuel,
+    c.is_earning AS category_is_earning,
     c.exclude_from_analytics AS category_exclude_from_analytics,
     c.created_at AS category_created_at,
     sc.id AS sub_id,
@@ -34,6 +35,7 @@ SQL;
                     'name'                  => $row['category_name'],
                     'type'                  => $row['category_type'],
                     'is_fuel'               => (bool) $row['category_is_fuel'],
+                    'is_earning'            => (bool) $row['category_is_earning'],
                     'exclude_from_analytics'=> (bool) $row['category_exclude_from_analytics'],
                     'created_at'            => $row['category_created_at'],
                     'subcategories'         => [],
@@ -59,14 +61,15 @@ SQL;
         return $stmt->fetchAll();
     }
 
-    public function createCategory(string $name, string $type, bool $isFuel = false): int
+    public function createCategory(string $name, string $type, bool $isFuel = false, bool $isEarning = false): int
     {
-        $sql = 'INSERT INTO categories (name, type, is_fuel) VALUES (:name, :type, :is_fuel)';
+        $sql = 'INSERT INTO categories (name, type, is_fuel, is_earning) VALUES (:name, :type, :is_fuel, :is_earning)';
         $stmt = $this->db->prepare($sql);
         $ok = $stmt->execute([
-            ':name' => trim($name),
-            ':type' => $type,
-            ':is_fuel' => $isFuel ? 1 : 0,
+            ':name'       => trim($name),
+            ':type'       => $type,
+            ':is_fuel'    => $isFuel ? 1 : 0,
+            ':is_earning' => $isEarning ? 1 : 0,
         ]);
         return $ok ? (int) $this->db->lastInsertId() : 0;
     }
@@ -114,10 +117,11 @@ SQL;
         $type = (string) ($input['type'] ?? 'expense');
         $allowed = ['income', 'expense', 'transfer'];
         if (!in_array($type, $allowed, true)) $type = 'expense';
-        $isFuel  = isset($input['is_fuel'])  && $input['is_fuel']  ? 1 : 0;
-        $exclude = isset($input['exclude_from_analytics']) && $input['exclude_from_analytics'] ? 1 : 0;
-        $stmt = $this->db->prepare('UPDATE categories SET name=:name, type=:type, is_fuel=:is_fuel, exclude_from_analytics=:exclude WHERE id=:id');
-        return $stmt->execute([':name' => $name, ':type' => $type, ':is_fuel' => $isFuel, ':exclude' => $exclude, ':id' => $id]);
+        $isFuel    = isset($input['is_fuel'])    && $input['is_fuel']    ? 1 : 0;
+        $isEarning = isset($input['is_earning']) && $input['is_earning'] ? 1 : 0;
+        $exclude   = isset($input['exclude_from_analytics']) && $input['exclude_from_analytics'] ? 1 : 0;
+        $stmt = $this->db->prepare('UPDATE categories SET name=:name, type=:type, is_fuel=:is_fuel, is_earning=:is_earning, exclude_from_analytics=:exclude WHERE id=:id');
+        return $stmt->execute([':name' => $name, ':type' => $type, ':is_fuel' => $isFuel, ':is_earning' => $isEarning, ':exclude' => $exclude, ':id' => $id]);
     }
 
     public function toggleExcludeFromAnalytics(int $id): bool

@@ -6,9 +6,6 @@ use PDO;
 
 class Analytics extends BaseModel
 {
-    private const EARNINGS_CATEGORY_ID = 1;
-
-
     public function getSummary(string $startDate, string $endDate): array
     {
         $sql = <<<SQL
@@ -45,20 +42,15 @@ FROM transactions t
 JOIN categories c ON c.id = t.category_id
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
   AND t.transaction_type = 'income'
-  AND (c.id = :category_id OR c.name = :category_name)
+  AND c.is_earning = 1
 SQL;
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            ':start_date' => $startDate,
-            ':end_date' => $endDate,
-            ':category_id' => self::EARNINGS_CATEGORY_ID,
-            ':category_name' => 'Earnings',
-        ]);
+        $stmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
         return [
             'total_earnings' => (float) ($row['total_earnings'] ?? 0),
-            'entries' => (int) ($row['entries'] ?? 0),
+            'entries'        => (int)   ($row['entries']        ?? 0),
         ];
     }
 
@@ -73,17 +65,12 @@ JOIN categories c ON c.id = t.category_id
 LEFT JOIN subcategories sc ON sc.id = t.subcategory_id
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
   AND t.transaction_type = 'income'
-  AND (c.id = :category_id OR c.name = :category_name)
+  AND c.is_earning = 1
 GROUP BY sc.id, sc.name
 ORDER BY total_amount DESC
 SQL;
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            ':start_date' => $startDate,
-            ':end_date' => $endDate,
-            ':category_id' => self::EARNINGS_CATEGORY_ID,
-            ':category_name' => 'Earnings',
-        ]);
+        $stmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -91,8 +78,8 @@ SQL;
     public function getMonthlyEarningsTrend(int $months = 12): array
     {
         $months = max(1, min(24, $months));
-        $start = date('Y-m-01', strtotime('-' . ($months - 1) . ' months'));
-        $end = date('Y-m-t');
+        $start  = date('Y-m-01', strtotime('-' . ($months - 1) . ' months'));
+        $end    = date('Y-m-t');
 
         $sql = <<<SQL
 SELECT
@@ -102,17 +89,12 @@ FROM transactions t
 JOIN categories c ON c.id = t.category_id
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
   AND t.transaction_type = 'income'
-  AND (c.id = :category_id OR c.name = :category_name)
+  AND c.is_earning = 1
 GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m')
 ORDER BY period ASC
 SQL;
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            ':start_date' => $start,
-            ':end_date' => $end,
-            ':category_id' => self::EARNINGS_CATEGORY_ID,
-            ':category_name' => 'Earnings',
-        ]);
+        $stmt->execute([':start_date' => $start, ':end_date' => $end]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

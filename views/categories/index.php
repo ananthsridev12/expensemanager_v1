@@ -33,6 +33,10 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="transfer" <?= ($editCategory['type'] ?? '') === 'transfer' ? 'selected' : '' ?>>Transfer</option>
                 </select>
             </label>
+            <label style="flex-direction:row;align-items:center;gap:0.5rem;" id="earning-label">
+                <input type="checkbox" name="is_earning" value="1" <?= !empty($editCategory['is_earning']) ? 'checked' : '' ?>>
+                Earning category (salary, freelance, business — counted as actual earnings in analytics)
+            </label>
             <label style="flex-direction:row;align-items:center;gap:0.5rem;">
                 <input type="checkbox" name="is_fuel" value="1" <?= !empty($editCategory['is_fuel']) ? 'checked' : '' ?>>
                 Fuel category (for surcharge tracking)
@@ -93,6 +97,9 @@ include __DIR__ . '/../partials/nav.php';
                         <header>
                             <strong><?= htmlspecialchars($category['name']) ?></strong>
                             <span class="pill"><?= ucfirst($category['type']) ?></span>
+                            <?php if (!empty($category['is_earning'])): ?>
+                                <span class="pill pill--green">Earning</span>
+                            <?php endif; ?>
                             <?php if (!empty($category['is_fuel'])): ?>
                                 <span class="pill card--orange">Fuel</span>
                             <?php endif; ?>
@@ -127,6 +134,21 @@ include __DIR__ . '/../partials/nav.php';
         <?php endif; ?>
     </section>
 <script>
+    // Show "Earning category" checkbox only when type = income
+    (function () {
+        var typeSelect    = document.querySelector('select[name="type"]');
+        var earningLabel  = document.getElementById('earning-label');
+        var earningCheck  = earningLabel ? earningLabel.querySelector('input[name="is_earning"]') : null;
+        function syncEarning() {
+            if (!earningLabel) return;
+            var isIncome = typeSelect && typeSelect.value === 'income';
+            earningLabel.style.display = isIncome ? '' : 'none';
+            if (!isIncome && earningCheck) earningCheck.checked = false;
+        }
+        if (typeSelect) typeSelect.addEventListener('change', syncEarning);
+        syncEarning();
+    })();
+
     document.querySelectorAll('.cat-exclude-toggle').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const id       = btn.dataset.id;
