@@ -21,11 +21,18 @@ $netCashflow        = (float) ($summary['net_cashflow'] ?? 0);
 $netClass           = $netCashflow >= 0 ? 'card--green' : 'card--red';
 $excludedCategories = $excludedCategories ?? [];
 
+$actualEarnings   = (float) ($earningsSummary['total_earnings'] ?? 0);
+$totalIncome      = (float) ($summary['total_income'] ?? 0);
+$otherIncome      = max(0.0, $totalIncome - $actualEarnings);
+$earningsNet      = $actualEarnings - (float) ($summary['total_expense'] ?? 0);
+$earningsNetClass = $earningsNet >= 0 ? 'card--green' : 'card--red';
+
 // ── Insights engine ──────────────────────────────────────────────────────────
 function buildInsights(array $p): array {
     $insights    = [];
-    $totalExp    = (float) ($p['summary']['total_expense'] ?? 0);
-    $totalInc    = (float) ($p['summary']['total_income']  ?? 0);
+    $totalExp    = (float) ($p['summary']['total_expense']           ?? 0);
+    $totalInc    = (float) ($p['summary']['total_income']            ?? 0);
+    $earnings    = (float) ($p['earningsSummary']['total_earnings']  ?? $totalInc);
     $expCats     = $p['expensesByCategory'] ?? [];
     $dowSpend    = $p['dayOfWeekSpend']    ?? [];
     $trend       = $p['monthlyTrend']      ?? [];
@@ -83,16 +90,16 @@ function buildInsights(array $p): array {
         ];
     }
 
-    // 4. Savings rate
-    if ($totalInc > 0) {
-        $saved    = $totalInc - $totalExp;
-        $saveRate = $pct($saved, $totalInc);
+    // 4. Savings rate (based on actual earnings, not all income)
+    if ($earnings > 0) {
+        $saved    = $earnings - $totalExp;
+        $saveRate = $pct($saved, $earnings);
         $type     = $saveRate >= 20 ? 'positive' : ($saveRate >= 0 ? 'warning' : 'negative');
         $msg      = $saveRate >= 20
-            ? "Great discipline! You saved {$saveRate}% of income ({$fmt($saved)})."
+            ? "Great discipline! You saved {$saveRate}% of earnings ({$fmt($saved)})."
             : ($saveRate >= 0
-                ? "You saved {$saveRate}% of income ({$fmt($saved)}). Aim for 20%+ for a stronger financial cushion."
-                : "Expenses exceeded income by {$fmt(abs($saved))} ({$fmt($totalInc)} earned vs {$fmt($totalExp)} spent). Review recurring costs.");
+                ? "You saved {$saveRate}% of earnings ({$fmt($saved)}). Aim for 20%+ for a stronger financial cushion."
+                : "Expenses exceeded earnings by {$fmt(abs($saved))} ({$fmt($earnings)} earned vs {$fmt($totalExp)} spent). Review recurring costs.");
         $insights[] = [
             'type'  => $type,
             'icon'  => $saveRate >= 20 ? '✅' : ($saveRate >= 0 ? '⚠️' : '🚨'),
@@ -188,6 +195,7 @@ $ddCountExpense = (int)   ($drilldown['summary_expense']['tx_count'] ?? 0);
 
 $insights = buildInsights([
     'summary'           => $summary,
+    'earningsSummary'   => $earningsSummary,
     'expensesByCategory'=> $expensesByCategory,
     'dayOfWeekSpend'    => $dayOfWeekSpend,
     'monthlyTrend'      => $monthlyTrend,
@@ -643,24 +651,26 @@ include __DIR__ . '/../partials/nav.php';
     <!-- Summary cards -->
     <section class="summary-cards">
         <article class="card card--green">
-            <h3>Total income</h3>
-            <p><?= formatCurrency((float) ($summary['total_income'] ?? 0)) ?></p>
-            <small>All income entries</small>
-        </article>
-        <article class="card card--cyan">
             <h3>Actual earnings</h3>
-            <p><?= formatCurrency((float) ($earningsSummary['total_earnings'] ?? 0)) ?></p>
-            <small><?= (int) ($earningsSummary['entries'] ?? 0) ?> entries</small>
+            <p><?= formatCurrency($actualEarnings) ?></p>
+            <small><?= (int) ($earningsSummary['entries'] ?? 0) ?> entries · salary, business &amp; more</small>
         </article>
+        <?php if ($otherIncome > 0): ?>
+        <article class="card" style="opacity:0.7;">
+            <h3>Other income</h3>
+            <p><?= formatCurrency($otherIncome) ?></p>
+            <small>Refunds, returns, non-earnings</small>
+        </article>
+        <?php endif; ?>
         <article class="card card--red">
             <h3>Total expense</h3>
             <p><?= formatCurrency((float) ($summary['total_expense'] ?? 0)) ?></p>
             <small>All expense entries</small>
         </article>
-        <article class="card <?= $netClass ?>">
-            <h3>Net cashflow</h3>
-            <p><?= formatCurrency($netCashflow) ?></p>
-            <small>Income minus expense</small>
+        <article class="card <?= $earningsNetClass ?>">
+            <h3>Earnings net flow</h3>
+            <p><?= formatCurrency($earningsNet) ?></p>
+            <small>Actual earnings minus expenses</small>
         </article>
     </section>
 

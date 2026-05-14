@@ -38,11 +38,36 @@ if (!function_exists('whatsappLink')) {
     <link rel="apple-touch-icon" href="public/icons/icon.svg">
 
     <link rel="stylesheet" href="public/css/style.css?v=<?= filemtime(__DIR__ . '/../public/css/style.css') ?>">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/themes/dark.css">
     <script>(function(){var f=localStorage.getItem('em-font');if(f&&f!=='normal')document.documentElement.setAttribute('data-font',f);})();</script>
 </head>
 <body>
     <?= $content ?? '' ?>
     <script src="public/js/main.js?v=<?= filemtime(__DIR__ . '/../public/js/main.js') ?>"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+    <script>
+    (function () {
+        function initDates(root) {
+            (root || document).querySelectorAll("input[type='date']:not(.flatpickr-input)").forEach(function (el) {
+                flatpickr(el, {
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "d/m/Y",
+                    allowInput: true,
+                    disableMobile: true,
+                });
+            });
+        }
+        initDates();
+        new MutationObserver(function (mutations) {
+            mutations.forEach(function (m) {
+                m.addedNodes.forEach(function (node) {
+                    if (node.nodeType === 1) initDates(node);
+                });
+            });
+        }).observe(document.body, { childList: true, subtree: true });
+    })();
+    </script>
     <script>
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/public/sw.js').catch(() => {});
