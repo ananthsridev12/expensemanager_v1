@@ -157,8 +157,10 @@ SQL;
 SELECT
     DATE_FORMAT(t.transaction_date, '%Y-%m') AS period,
     COALESCE(SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END), 0) AS income,
+    COALESCE(SUM(CASE WHEN t.transaction_type = 'income' AND c.is_earning = 1 THEN t.amount ELSE 0 END), 0) AS earnings,
     COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense
 FROM transactions t
+LEFT JOIN categories c ON c.id = t.category_id
 WHERE t.transaction_date BETWEEN :start_date AND :end_date
   AND (t.category_id IS NULL OR t.category_id NOT IN (SELECT id FROM categories WHERE exclude_from_analytics = 1))
 GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m')

@@ -140,22 +140,27 @@ $exportQuery = http_build_query(array_merge($filterQuery, ['action' => 'export']
                                 </td>
                                 <td><?= htmlspecialchars($txn['notes'] ?? '') ?></td>
                                 <td style="white-space:nowrap;">
-                                    <a class="secondary" href="?module=transactions&edit=<?= (int) $txn['id'] ?>">Edit</a>
-                                    <?php if ($txn['transaction_type'] === 'expense'): ?>
-                                        <button type="button" class="secondary refund-btn"
-                                            style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.25rem;"
-                                            data-id="<?= (int) $txn['id'] ?>"
-                                            data-amount="<?= (float) $txn['amount'] ?>"
-                                            data-label="<?= htmlspecialchars(($txn['category_name'] ?? 'Expense') . ' · ' . number_format((float) $txn['amount'], 2)) ?>"
-                                            data-account="<?= htmlspecialchars($txn['account_display'] ?? '') ?>">
-                                            Refund
-                                        </button>
+                                    <?php $isFuelAuto = in_array($txn['reference_type'] ?? '', ['fuel_surcharge', 'fuel_surcharge_refund'], true); ?>
+                                    <?php if ($isFuelAuto): ?>
+                                        <span class="pill pill--muted" style="font-size:0.72rem;">Auto</span>
+                                    <?php else: ?>
+                                        <a class="secondary" href="?module=transactions&edit=<?= (int) $txn['id'] ?>">Edit</a>
+                                        <?php if ($txn['transaction_type'] === 'expense'): ?>
+                                            <button type="button" class="secondary refund-btn"
+                                                style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.25rem;"
+                                                data-id="<?= (int) $txn['id'] ?>"
+                                                data-amount="<?= (float) $txn['amount'] ?>"
+                                                data-label="<?= htmlspecialchars(($txn['category_name'] ?? 'Expense') . ' · ' . number_format((float) $txn['amount'], 2)) ?>"
+                                                data-account="<?= htmlspecialchars($txn['account_display'] ?? '') ?>">
+                                                Refund
+                                            </button>
+                                        <?php endif; ?>
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('Delete this transaction?')">
+                                            <input type="hidden" name="form" value="transaction_delete">
+                                            <input type="hidden" name="id" value="<?= (int) $txn['id'] ?>">
+                                            <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.25rem;color:var(--red);">Delete</button>
+                                        </form>
                                     <?php endif; ?>
-                                    <form method="post" style="display:inline;" onsubmit="return confirm('Delete this transaction?')">
-                                        <input type="hidden" name="form" value="transaction_delete">
-                                        <input type="hidden" name="id" value="<?= (int) $txn['id'] ?>">
-                                        <button type="submit" class="secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;margin-left:0.25rem;color:var(--red);">Delete</button>
-                                    </form>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

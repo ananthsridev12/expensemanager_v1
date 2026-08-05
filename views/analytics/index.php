@@ -697,7 +697,7 @@ include __DIR__ . '/../partials/nav.php';
         <h2>Monthly income vs expense (last 12 months)</h2>
         <div class="charts-2col">
             <div>
-                <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">Income vs Expense</h3>
+                <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.05em;">Earnings vs Expense</h3>
                 <canvas id="monthly-bar-chart"></canvas>
             </div>
             <div>
@@ -710,7 +710,7 @@ include __DIR__ . '/../partials/nav.php';
                 <thead>
                     <tr>
                         <th>Month</th>
-                        <th>Income</th>
+                        <th>Earnings</th>
                         <th>Expense</th>
                         <th>Net</th>
                         <th>Details</th>
@@ -719,7 +719,7 @@ include __DIR__ . '/../partials/nav.php';
                 <tbody>
                     <?php foreach ($monthlyTrend as $row): ?>
                         <?php
-                            $net = (float)$row['income'] - (float)$row['expense'];
+                            $net = (float)$row['earnings'] - (float)$row['expense'];
                             $periodStart = $row['period'] . '-01';
                             $periodEnd = date('Y-m-t', strtotime($periodStart));
                             $monthLink = '?module=all_transactions&start_date=' . $periodStart . '&end_date=' . $periodEnd;
@@ -730,7 +730,7 @@ include __DIR__ . '/../partials/nav.php';
                                     <?= htmlspecialchars($row['period']) ?>
                                 </a>
                             </td>
-                            <td style="color:var(--green)"><?= formatCurrency((float)$row['income']) ?></td>
+                            <td style="color:var(--green)"><?= formatCurrency((float)$row['earnings']) ?></td>
                             <td style="color:var(--red)"><?= formatCurrency((float)$row['expense']) ?></td>
                             <td style="color:<?= $net >= 0 ? 'var(--green)' : 'var(--red)' ?>"><?= formatCurrency($net) ?></td>
                             <td>
@@ -745,7 +745,7 @@ include __DIR__ . '/../partials/nav.php';
         (function () {
             const rows = <?= json_encode($monthlyTrend, JSON_UNESCAPED_UNICODE) ?>;
             const labels = rows.map(r => r.period);
-            const income = rows.map(r => Number(r.income));
+            const income = rows.map(r => Number(r.earnings));
             const expense = rows.map(r => Number(r.expense));
             const net = rows.map((r, i) => income[i] - expense[i]);
             const gridColor = 'rgba(255,255,255,0.07)';
@@ -777,7 +777,7 @@ include __DIR__ . '/../partials/nav.php';
                 data: {
                     labels,
                     datasets: [
-                        { label: 'Income', data: income, backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 4 },
+                        { label: 'Earnings', data: income, backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 4 },
                         { label: 'Expense', data: expense, backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 4 }
                     ]
                 },
