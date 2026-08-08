@@ -162,6 +162,7 @@ HTML;
 
 use Controllers\AccountController;
 use Controllers\AnalyticsController;
+use Controllers\ImportController;
 use Controllers\BorrowingController;
 use Controllers\BudgetController;
 use Controllers\CategoryController;
@@ -260,6 +261,10 @@ switch ($module) {
         break;
     case 'reports':
         $controller = new ReportsController();
+        echo $controller->index();
+        break;
+    case 'import':
+        $controller = new ImportController();
         echo $controller->index();
         break;
     case 'dashboard':
