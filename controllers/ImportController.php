@@ -4,20 +4,26 @@ namespace Controllers;
 
 use Models\Account;
 use Models\Category;
+use Models\Contact;
 use Models\Import;
+use Models\PaymentMethod;
 
 class ImportController extends BaseController
 {
-    private Import   $importModel;
-    private Account  $accountModel;
-    private Category $categoryModel;
+    private Import        $importModel;
+    private Account       $accountModel;
+    private Category      $categoryModel;
+    private PaymentMethod $paymentMethodModel;
+    private Contact       $contactModel;
 
     public function __construct()
     {
         parent::__construct();
-        $this->importModel   = new Import($this->database);
-        $this->accountModel  = new Account($this->database);
-        $this->categoryModel = new Category($this->database);
+        $this->importModel        = new Import($this->database);
+        $this->accountModel       = new Account($this->database);
+        $this->categoryModel      = new Category($this->database);
+        $this->paymentMethodModel = new PaymentMethod($this->database);
+        $this->contactModel       = new Contact($this->database);
     }
 
     public function index(): string
@@ -25,9 +31,39 @@ class ImportController extends BaseController
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         $form   = $_POST['form'] ?? '';
 
+        // ── AJAX: approve a staging row ──────────────────────────────────────
+        if ($method === 'POST' && $form === 'approve_staging') {
+            header('Content-Type: application/json');
+            $stagingId = (int) ($_POST['staging_id'] ?? 0);
+            if ($stagingId <= 0) {
+                echo json_encode(['ok' => false, 'error' => 'Invalid staging id.']);
+                exit;
+            }
+            try {
+                $txId = $this->importModel->approveStagingRow($stagingId, $_POST);
+                echo json_encode(['ok' => true, 'tx_id' => $txId]);
+            } catch (\Throwable $e) {
+                echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+        }
+
+        // ── AJAX: skip a staging row ─────────────────────────────────────────
+        if ($method === 'POST' && $form === 'skip_staging') {
+            header('Content-Type: application/json');
+            $stagingId = (int) ($_POST['staging_id'] ?? 0);
+            if ($stagingId <= 0) {
+                echo json_encode(['ok' => false, 'error' => 'Invalid staging id.']);
+                exit;
+            }
+            $this->importModel->skipStagingRow($stagingId);
+            echo json_encode(['ok' => true]);
+            exit;
+        }
+
         // ── Rollback a batch ─────────────────────────────────────────────────
         if ($method === 'POST' && $form === 'rollback') {
-            $batchId = (int)($_POST['batch_id'] ?? 0);
+            $batchId = (int) ($_POST['batch_id'] ?? 0);
             if ($batchId > 0) {
                 $deleted = $this->importModel->rollbackBatch($batchId);
                 $_SESSION['import_msg'] = "Batch #{$batchId} rolled back — {$deleted} transaction(s) removed.";
@@ -36,52 +72,19 @@ class ImportController extends BaseController
             exit;
         }
 
-        // ── Confirm import ───────────────────────────────────────────────────
-        if ($method === 'POST' && $form === 'confirm') {
-            $preview = $_SESSION['import_preview'] ?? null;
-            if ($preview) {
-                unset($_SESSION['import_preview']);
-                $categoryId = (int)($_POST['category_id'] ?? 0);
-                $skipDups   = ($_POST['skip_duplicates'] ?? '1') === '1';
-                try {
-                    $batchId = $this->importModel->insertBatch($preview['rows'], [
-                        'account_id'      => $preview['account_id'],
-                        'account_type'    => $preview['account_type'],
-                        'category_id'     => $categoryId ?: null,
-                        'parser'          => $preview['parser'],
-                        'bank_name'       => $preview['bank_name'],
-                        'skip_duplicates' => $skipDups,
-                    ]);
-                    $imported = $preview['counts']['total'] - ($skipDups ? $preview['counts']['duplicates'] : 0);
-                    $_SESSION['import_msg'] = "Imported {$imported} transaction(s) as batch #{$batchId}.";
-                } catch (\Throwable $e) {
-                    $_SESSION['import_error'] = 'Import failed: ' . $e->getMessage();
-                }
-            }
-            header('Location: ?module=import');
-            exit;
-        }
-
-        // ── Cancel preview ───────────────────────────────────────────────────
-        if ($method === 'POST' && $form === 'cancel_preview') {
-            unset($_SESSION['import_preview']);
-            header('Location: ?module=import');
-            exit;
-        }
-
         // ── Upload & parse ───────────────────────────────────────────────────
         if ($method === 'POST' && $form === 'upload') {
-            $accountId   = (int)($_POST['account_id'] ?? 0);
-            $accountType = preg_replace('/[^a-z_]/', '', (string)($_POST['account_type'] ?? 'savings'));
+            $accountId   = (int) ($_POST['account_id'] ?? 0);
+            $accountType = preg_replace('/[^a-z_]/', '', (string) ($_POST['account_type'] ?? 'savings'));
             $file        = $_FILES['csv_file'] ?? null;
 
             if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
-                $_SESSION['import_error'] = 'Upload failed — please choose a CSV file.';
+                $_SESSION['import_error'] = 'Upload failed — please choose a CSV or XLSX file.';
                 header('Location: ?module=import');
                 exit;
             }
-            if (!preg_match('/\.csv$/i', $file['name'])) {
-                $_SESSION['import_error'] = 'Only .csv files are supported.';
+            if (!preg_match('/\.(csv|xlsx)$/i', $file['name'])) {
+                $_SESSION['import_error'] = 'Only .csv and .xlsx files are supported.';
                 header('Location: ?module=import');
                 exit;
             }
@@ -91,56 +94,56 @@ class ImportController extends BaseController
                 exit;
             }
 
-            // Detect bank format
-            $fh      = fopen($file['tmp_name'], 'r');
-            $bom     = fread($fh, 3);
-            if ($bom !== "\xEF\xBB\xBF") rewind($fh);
-            $headers = fgetcsv($fh) ?: [];
-            fclose($fh);
-            $headers = array_map('trim', $headers);
+            $allRows     = $this->importModel->readFile($file['tmp_name'], $file['name']);
+            $parserClass = $this->importModel->detectParser($allRows);
 
-            $parserClass = $this->importModel->detectParser($headers);
             if (!$parserClass) {
-                $available   = $this->importModel->getAvailableParsers();
-                $names       = array_map(fn($c) => $c::name(), $available);
-                $supported   = $names ? implode(', ', $names) : 'none added yet';
-                $_SESSION['import_error'] = "Bank format not recognised. Supported: {$supported}.";
+                $available = $this->importModel->getAvailableParsers();
+                $names     = $available ? implode(', ', array_map(fn($c) => $c::name(), $available)) : 'none added yet';
+                $_SESSION['import_error'] = "Bank format not recognised. Supported: {$names}.";
                 header('Location: ?module=import');
                 exit;
             }
 
-            $rows  = $this->importModel->parseCsvFile($file['tmp_name'], $parserClass);
-            $rows  = $this->importModel->flagDuplicates($rows, $accountId);
-            $dups  = count(array_filter($rows, fn($r) => $r['is_duplicate']));
+            $rows = $parserClass::parse($allRows);
+            if (empty($rows)) {
+                $_SESSION['import_error'] = 'No transactions found in the file.';
+                header('Location: ?module=import');
+                exit;
+            }
 
-            $_SESSION['import_preview'] = [
-                'parser'       => $parserClass,
-                'bank_name'    => $parserClass::name(),
-                'account_id'   => $accountId,
-                'account_type' => $accountType,
-                'rows'         => $rows,
-                'counts'       => ['total' => count($rows), 'duplicates' => $dups],
-            ];
-            header('Location: ?module=import&preview=1');
+            try {
+                $batchId = $this->importModel->insertToStaging($rows, [
+                    'account_id'   => $accountId,
+                    'account_type' => $accountType,
+                    'parser'       => $parserClass,
+                    'bank_name'    => $parserClass::name(),
+                ]);
+                $_SESSION['import_msg'] = count($rows) . ' transaction(s) staged for review — batch #' . $batchId . '.';
+                header('Location: ?module=import&batch=' . $batchId);
+            } catch (\Throwable $e) {
+                $_SESSION['import_error'] = 'Failed to stage import: ' . $e->getMessage();
+                header('Location: ?module=import');
+            }
             exit;
         }
 
-        // ── GET: clear stale preview if not in preview mode ──────────────────
-        if (empty($_GET['preview'])) {
-            unset($_SESSION['import_preview']);
-        }
-
-        $accounts   = $this->accountModel->getAllWithBalances();
-        $categories = $this->categoryModel->getAllWithSubcategories();
-        $batches    = $this->importModel->getBatches();
-        $parsers    = $this->importModel->getAvailableParsers();
-        $preview    = $_SESSION['import_preview'] ?? null;
-        $msg        = $_SESSION['import_msg']   ?? null;
-        $error      = $_SESSION['import_error'] ?? null;
+        // ── GET: build view data ─────────────────────────────────────────────
+        $selectedBatch  = (int) ($_GET['batch'] ?? 0);
+        $accounts       = $this->accountModel->getAllWithBalances();
+        $categories     = $this->categoryModel->getAllWithSubcategories();
+        $paymentMethods = $this->paymentMethodModel->getAll();
+        $contacts       = $this->contactModel->getAll();
+        $batches        = $this->importModel->getBatches();
+        $pendingRows    = $this->importModel->getPendingRows($selectedBatch);
+        $parsers        = $this->importModel->getAvailableParsers();
+        $msg            = $_SESSION['import_msg']   ?? null;
+        $error          = $_SESSION['import_error'] ?? null;
         unset($_SESSION['import_msg'], $_SESSION['import_error']);
 
         return $this->render('import/index.php', compact(
-            'accounts', 'categories', 'batches', 'parsers', 'preview', 'msg', 'error'
+            'accounts', 'categories', 'paymentMethods', 'contacts',
+            'batches', 'pendingRows', 'parsers', 'selectedBatch', 'msg', 'error'
         ));
     }
 }

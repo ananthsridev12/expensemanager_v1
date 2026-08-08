@@ -4,29 +4,32 @@ namespace Parsers;
 
 interface BankParserInterface
 {
-    /** Human-readable bank/format name shown in the UI */
+    /** Human-readable name shown in the UI, e.g. "Axis Bank Savings" */
     public static function name(): string;
 
     /**
-     * Return true if the given CSV header row (trimmed, as-read) belongs to this bank.
-     * @param string[] $headers
+     * Return true if the given raw rows (indexed string arrays, as read verbatim
+     * from CSV or XLSX before any processing) match this bank's layout.
+     * The parser must scan for its own header row — do NOT assume row 0 is a header.
+     *
+     * @param array<int, array<int, string>> $allRows
      */
-    public static function detect(array $headers): bool;
+    public static function detect(array $allRows): bool;
 
     /**
-     * Parse CSV data rows (each row is an assoc array keyed by header) and return
-     * normalised transaction rows.  Every returned row must contain:
+     * Parse all raw rows and return normalised transaction rows.
+     * Each returned element must have:
      *   date        string  YYYY-MM-DD
      *   description string  merchant / narration
      *   amount      float   always positive
      *   type        string  'debit' | 'credit'
-     *   reference   string  UTR / cheque / ref (may be empty)
-     *   balance     float   closing balance (0 if not available)
+     *   reference   string  UTR / ref (empty string if none)
+     *   balance     float   closing balance (0.0 if not available)
      *
-     * Skip rows that are not real transactions (opening balance, totals, blank, etc.).
+     * Skip junk rows (opening balance, totals, blank lines, footer text).
      *
-     * @param array<int, array<string, string>> $rows
+     * @param array<int, array<int, string>> $allRows
      * @return array<int, array<string, mixed>>
      */
-    public static function parse(array $rows): array;
+    public static function parse(array $allRows): array;
 }
