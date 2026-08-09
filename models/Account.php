@@ -275,6 +275,22 @@ SQL;
             ->execute([':id' => $accountId]);
     }
 
+    public function getDisplayName(int $id): string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT a.bank_name, a.account_name, cc.bank_name AS cc_bank_name, cc.card_name
+               FROM accounts a
+               LEFT JOIN credit_cards cc ON cc.account_id = a.id
+              WHERE a.id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch();
+        if (!$row) return 'Account #' . $id;
+        $bank = $row['cc_bank_name'] ?: $row['bank_name'];
+        $name = $row['card_name']    ?: $row['account_name'];
+        return trim(($bank ? $bank . ' — ' : '') . $name);
+    }
+
     public function getList(): array
     {
         $stmt = $this->db->query(

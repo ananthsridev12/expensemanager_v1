@@ -397,6 +397,10 @@ class TransactionController extends BaseController
             [$toType, $toId] = $this->parseAccountToken($input['transfer_to_account_id'] ?? '');
 
             if ($toId > 0 && !($fromType === $toType && $fromId === $toId)) {
+                $fromName = $this->accountModel->getDisplayName($fromId);
+                $toName   = $this->accountModel->getDisplayName($toId);
+
+                $userNotes = trim((string) ($input['notes'] ?? ''));
                 $baseData = [
                     'transaction_date' => $input['transaction_date'] ?? date('Y-m-d'),
                     'category_id' => !empty($input['category_id']) ? (int) $input['category_id'] : null,
@@ -404,7 +408,7 @@ class TransactionController extends BaseController
                     'payment_method_id' => $paymentMethodId,
                     'contact_id' => $contactId,
                     'purchase_source_id' => $purchaseSourceId,
-                    'notes' => $input['notes'] ?? 'Account transfer',
+                    'notes' => $userNotes !== '' ? $userNotes : 'Transfer to ' . $toName,
                     'reference_type' => 'transfer',
                 ];
 
@@ -425,7 +429,7 @@ class TransactionController extends BaseController
                     'amount' => $amount,
                     'reference_type' => $this->resolveReferenceType($toType, 'transfer'),
                     'reference_id' => $this->resolveReferenceId($toType, $toId, $fromId),
-                    'notes' => 'Transfer from account ' . $fromId,
+                    'notes' => $userNotes !== '' ? $userNotes : 'Transfer from ' . $fromName,
                 ]));
                 $this->applyDebtDelta($toType, $toId, 'income', $amount);
             }
