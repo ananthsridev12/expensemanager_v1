@@ -163,6 +163,7 @@ HTML;
 use Controllers\AccountController;
 use Controllers\AnalyticsController;
 use Controllers\ImportController;
+use Controllers\ReceiptController;
 use Controllers\BorrowingController;
 use Controllers\BudgetController;
 use Controllers\CategoryController;
@@ -265,6 +266,10 @@ switch ($module) {
         break;
     case 'import':
         $controller = new ImportController();
+        echo $controller->index();
+        break;
+    case 'receipt':
+        $controller = new ReceiptController();
         echo $controller->index();
         break;
     case 'dashboard':

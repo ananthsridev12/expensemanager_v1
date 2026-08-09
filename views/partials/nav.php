@@ -30,6 +30,7 @@
     <a href="?module=notes"    class="<?= $module === 'notes'    ? 'is-active' : '' ?>">Notes</a>
     <a href="?module=reports" class="<?= $module === 'reports' ? 'is-active' : '' ?>">Reports</a>
     <a href="?module=import" class="<?= $module === 'import' ? 'is-active' : '' ?>">Import</a>
+    <a href="?module=receipt" class="<?= $module === 'receipt' ? 'is-active' : '' ?>">Scan Receipt</a>
     <div class="font-size-btns">
         <span>Text</span>
         <button data-font="normal"    title="Normal size">A</button>
