@@ -72,24 +72,37 @@ include __DIR__ . '/../partials/nav.php';
 
     <?php if ($editTransaction): ?>
     <section class="module-panel">
-        <h2>Edit transaction</h2>
-        <form method="post" class="module-form">
+        <h2>Edit transaction <small class="muted" style="font-size:0.78rem;font-weight:400;">#<?= (int) $editTransaction['id'] ?></small></h2>
+        <form method="post" class="module-form" id="edit-tx-form">
             <input type="hidden" name="form" value="transaction_update">
             <input type="hidden" name="id" value="<?= (int) $editTransaction['id'] ?>">
             <label>
                 Date
-                <input type="date" name="transaction_date" value="<?= htmlspecialchars($editTransaction['transaction_date'] ?? '') ?>" required>
+                <input type="date" name="transaction_date" required
+                       value="<?= htmlspecialchars($editTransaction['transaction_date'] ?? '') ?>">
+            </label>
+            <label>
+                Type
+                <select name="transaction_type" id="edit-tx-type">
+                    <option value="income"   <?= ($editTransaction['transaction_type'] ?? '') === 'income'   ? 'selected' : '' ?>>Income</option>
+                    <option value="expense"  <?= ($editTransaction['transaction_type'] ?? '') === 'expense'  ? 'selected' : '' ?>>Expense</option>
+                    <option value="transfer" <?= ($editTransaction['transaction_type'] ?? '') === 'transfer' ? 'selected' : '' ?>>Transfer</option>
+                </select>
             </label>
             <label>
                 Amount
-                <input type="number" name="amount" step="0.01" min="0" required value="<?= htmlspecialchars($editTransaction['amount'] ?? '') ?>">
+                <input type="number" name="amount" step="0.01" min="0" required
+                       value="<?= htmlspecialchars($editTransaction['amount'] ?? '') ?>">
             </label>
             <label>
                 Category
                 <select name="category_id" id="edit-category-select">
                     <option value="">Uncategorized</option>
                     <?php foreach ($categories as $category): ?>
-                        <option value="<?= $category['id'] ?>" <?= ($editTransaction['category_id'] ?? null) == $category['id'] ? 'selected' : '' ?>><?= htmlspecialchars($category['name']) ?> (<?= $category['type'] ?>)</option>
+                        <option value="<?= (int) $category['id'] ?>"
+                            <?= ($editTransaction['category_id'] ?? null) == $category['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($category['name']) ?> (<?= $category['type'] ?>)
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -99,7 +112,11 @@ include __DIR__ . '/../partials/nav.php';
                     <option value="">None</option>
                     <?php foreach ($categories as $category): ?>
                         <?php foreach ($category['subcategories'] as $sub): ?>
-                            <option value="<?= $sub['id'] ?>" data-category="<?= $category['id'] ?>" <?= ($editTransaction['subcategory_id'] ?? null) == $sub['id'] ? 'selected' : '' ?>><?= htmlspecialchars($category['name'] . ' - ' . $sub['name']) ?></option>
+                            <option value="<?= (int) $sub['id'] ?>"
+                                data-category="<?= (int) $category['id'] ?>"
+                                <?= ($editTransaction['subcategory_id'] ?? null) == $sub['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($category['name'] . ' › ' . $sub['name']) ?>
+                            </option>
                         <?php endforeach; ?>
                     <?php endforeach; ?>
                 </select>
@@ -107,12 +124,52 @@ include __DIR__ . '/../partials/nav.php';
             <label>
                 Payment method
                 <select name="payment_method_id">
-                    <option value="">Select method</option>
+                    <option value="">— None —</option>
                     <?php foreach ($paymentMethods as $method): ?>
-                        <option value="<?= (int) $method['id'] ?>" <?= ($editTransaction['payment_method_id'] ?? null) == $method['id'] ? 'selected' : '' ?>><?= htmlspecialchars($method['name']) ?></option>
+                        <option value="<?= (int) $method['id'] ?>"
+                            <?= ($editTransaction['payment_method_id'] ?? null) == $method['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($method['name']) ?>
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </label>
+            <label>
+                Purchased from
+                <select name="purchase_source_id" id="edit-purchase-source-select">
+                    <option value="">— None —</option>
+                    <?php foreach ($purchaseChildren as $source): ?>
+                        <option value="<?= (int) $source['id'] ?>"
+                            <?= ($editTransaction['purchase_source_id'] ?? null) == $source['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($source['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>
+                To whom (Contact)
+                <span style="display:flex;align-items:center;gap:0.35rem;">
+                    <input type="text" id="edit-contact-search"
+                           placeholder="Type name / mobile / email"
+                           autocomplete="off" style="flex:1;min-width:0;"
+                           value="<?= htmlspecialchars(
+                               $editTransaction['contact_name']
+                                   ? ($editTransaction['contact_name'] ?? '')
+                                   : ''
+                           ) ?>">
+                    <button type="button" id="edit-contact-clear-btn"
+                        title="Clear contact"
+                        style="<?= !empty($editTransaction['contact_id']) ? '' : 'display:none;' ?>background:none;border:1px solid var(--line);border-radius:50%;width:1.5rem;height:1.5rem;line-height:1;cursor:pointer;color:var(--muted);font-size:0.75rem;flex-shrink:0;padding:0;">✕</button>
+                </span>
+                <input type="hidden" name="contact_id" id="edit-contact-id"
+                       value="<?= (int) ($editTransaction['contact_id'] ?? 0) ?: '' ?>">
+            </label>
+            <div id="edit-contact-results" style="margin-top:-0.5rem;margin-bottom:0.5rem;">
+                <?php if (!empty($editTransaction['contact_name'])): ?>
+                    <small class="muted">Selected: <?= htmlspecialchars($editTransaction['contact_name']) ?></small>
+                <?php else: ?>
+                    <small class="muted">Start typing to search contacts.</small>
+                <?php endif; ?>
+            </div>
             <label>
                 Notes
                 <textarea name="notes" rows="2"><?= htmlspecialchars($editTransaction['notes'] ?? '') ?></textarea>
@@ -121,6 +178,92 @@ include __DIR__ . '/../partials/nav.php';
             <a class="secondary" href="?module=transactions">Cancel</a>
         </form>
     </section>
+
+    <script>
+    (function () {
+        // ── Subcategory filter for edit form ──────────────────────────────────
+        var editCatSel = document.getElementById('edit-category-select');
+        var editSubSel = document.getElementById('edit-subcategory-select');
+        if (editCatSel && editSubSel) {
+            var editSubOptions = Array.from(editSubSel.querySelectorAll('option[data-category]')).map(function (o) {
+                return { value: o.value, label: o.innerHTML, category: o.dataset.category, selected: o.selected };
+            });
+            var preselectSub = <?= json_encode((string)($editTransaction['subcategory_id'] ?? '')) ?>;
+
+            function refreshEditSubcategories() {
+                var catId = editCatSel.value;
+                editSubSel.innerHTML = '<option value="">None</option>';
+                editSubOptions.forEach(function (item) {
+                    if (!catId || item.category === catId) {
+                        var opt = document.createElement('option');
+                        opt.value = item.value;
+                        opt.innerHTML = item.label;
+                        opt.dataset.category = item.category;
+                        if (item.value === preselectSub) opt.selected = true;
+                        editSubSel.appendChild(opt);
+                    }
+                });
+            }
+            editCatSel.addEventListener('change', function () {
+                preselectSub = ''; // clear preselect after first manual change
+                refreshEditSubcategories();
+            });
+            refreshEditSubcategories();
+        }
+
+        // ── Contact search for edit form ──────────────────────────────────────
+        var editContactSearch  = document.getElementById('edit-contact-search');
+        var editContactId      = document.getElementById('edit-contact-id');
+        var editContactResults = document.getElementById('edit-contact-results');
+        var editContactClear   = document.getElementById('edit-contact-clear-btn');
+
+        function renderEditContactResults(items) {
+            if (!items.length) {
+                editContactResults.innerHTML = '<small class="muted">No contacts found.</small>';
+                return;
+            }
+            editContactResults.innerHTML = '';
+            items.forEach(function (item) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'secondary';
+                btn.style.cssText = 'margin-right:0.5rem;margin-bottom:0.5rem;';
+                btn.textContent = item.name + (item.mobile ? ' — ' + item.mobile : '');
+                btn.addEventListener('click', function () {
+                    editContactId.value    = item.id;
+                    editContactSearch.value = item.name + (item.mobile ? ' — ' + item.mobile : '');
+                    editContactResults.innerHTML = '<small class="muted">Selected: ' + btn.textContent + '</small>';
+                    if (editContactClear) editContactClear.style.display = '';
+                });
+                editContactResults.appendChild(btn);
+            });
+        }
+
+        if (editContactSearch) {
+            editContactSearch.addEventListener('input', function () {
+                var q = editContactSearch.value.trim();
+                if (q.length < 2) {
+                    editContactId.value = '';
+                    editContactResults.innerHTML = '<small class="muted">Start typing to search contacts.</small>';
+                    if (editContactClear) editContactClear.style.display = 'none';
+                    return;
+                }
+                fetch('?module=transactions&action=contact_search&q=' + encodeURIComponent(q))
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) { renderEditContactResults(Array.isArray(data) ? data : []); });
+            });
+        }
+        if (editContactClear) {
+            editContactClear.addEventListener('click', function () {
+                editContactId.value     = '';
+                editContactSearch.value = '';
+                editContactResults.innerHTML = '<small class="muted">Start typing to search contacts.</small>';
+                editContactClear.style.display = 'none';
+                editContactSearch.focus();
+            });
+        }
+    })();
+    </script>
     <?php endif; ?>
 
     <section class="module-panel">

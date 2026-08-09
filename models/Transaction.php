@@ -263,11 +263,17 @@ SQL;
         $sql = <<<SQL
 SELECT
     t.*,
-    c.name AS category_name,
-    sc.name AS subcategory_name
+    c.name  AS category_name,
+    sc.name AS subcategory_name,
+    pm.name AS payment_method_name,
+    ct.name AS contact_name,
+    ps.name AS purchase_source_name
 FROM transactions t
-LEFT JOIN categories c ON c.id = t.category_id
-LEFT JOIN subcategories sc ON sc.id = t.subcategory_id
+LEFT JOIN categories      c  ON c.id  = t.category_id
+LEFT JOIN subcategories   sc ON sc.id = t.subcategory_id
+LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id
+LEFT JOIN contacts        ct ON ct.id = t.contact_id
+LEFT JOIN purchase_sources ps ON ps.id = t.purchase_source_id
 WHERE t.id = :id
 LIMIT 1
 SQL;
@@ -281,18 +287,36 @@ SQL;
     {
         $id = (int) ($input['id'] ?? 0);
         if ($id <= 0) return false;
+
+        $allowedTypes = ['income', 'expense', 'transfer'];
+        $txType = in_array($input['transaction_type'] ?? '', $allowedTypes, true)
+                  ? $input['transaction_type']
+                  : null;
+
         $stmt = $this->db->prepare(
-            'UPDATE transactions SET transaction_date=:transaction_date, amount=:amount, category_id=:category_id, subcategory_id=:subcategory_id, payment_method_id=:payment_method_id, contact_id=:contact_id, notes=:notes WHERE id=:id'
+            'UPDATE transactions
+                SET transaction_date     = :transaction_date,
+                    transaction_type     = COALESCE(:transaction_type, transaction_type),
+                    amount               = :amount,
+                    category_id          = :category_id,
+                    subcategory_id       = :subcategory_id,
+                    payment_method_id    = :payment_method_id,
+                    contact_id           = :contact_id,
+                    purchase_source_id   = :purchase_source_id,
+                    notes                = :notes
+              WHERE id = :id'
         );
         return $stmt->execute([
-            ':transaction_date' => $input['transaction_date'] ?? date('Y-m-d'),
-            ':amount' => is_numeric($input['amount'] ?? null) ? (float) $input['amount'] : 0.00,
-            ':category_id' => !empty($input['category_id']) ? (int) $input['category_id'] : null,
-            ':subcategory_id' => !empty($input['subcategory_id']) ? (int) $input['subcategory_id'] : null,
-            ':payment_method_id' => !empty($input['payment_method_id']) ? (int) $input['payment_method_id'] : null,
-            ':contact_id' => !empty($input['contact_id']) ? (int) $input['contact_id'] : null,
-            ':notes' => $input['notes'] ?? null,
-            ':id' => $id,
+            ':transaction_date'   => $input['transaction_date'] ?? date('Y-m-d'),
+            ':transaction_type'   => $txType,
+            ':amount'             => is_numeric($input['amount'] ?? null) ? (float) $input['amount'] : 0.00,
+            ':category_id'        => !empty($input['category_id'])       ? (int) $input['category_id']       : null,
+            ':subcategory_id'     => !empty($input['subcategory_id'])     ? (int) $input['subcategory_id']     : null,
+            ':payment_method_id'  => !empty($input['payment_method_id'])  ? (int) $input['payment_method_id']  : null,
+            ':contact_id'         => !empty($input['contact_id'])         ? (int) $input['contact_id']         : null,
+            ':purchase_source_id' => !empty($input['purchase_source_id']) ? (int) $input['purchase_source_id'] : null,
+            ':notes'              => $input['notes'] ?? null,
+            ':id'                 => $id,
         ]);
     }
 }
