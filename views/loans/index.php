@@ -250,10 +250,14 @@ include __DIR__ . '/../partials/nav.php';
                 Disburse funds to account
                 <select name="disbursement_account">
                     <option value="">Select account (optional)</option>
-                    <?php foreach ($accounts as $account): ?>
-                        <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
-                            <?= htmlspecialchars(($account['bank_name'] ?? '') . ' - ' . ($account['account_name'] ?? '')) ?>
-                        </option>
+                    <?php foreach (groupAccountsForSelect($accounts) as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
+                                    <?= htmlspecialchars(($account['bank_name'] ?? '') . ' — ' . ($account['account_name'] ?? '')) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -388,10 +392,14 @@ include __DIR__ . '/../partials/nav.php';
                     Pay from account
                     <select name="payment_account" required>
                         <option value="">Select account</option>
-                        <?php foreach ($accounts as $account): ?>
-                            <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
-                                <?= htmlspecialchars(($account['bank_name'] ?? '') . ' — ' . ($account['account_name'] ?? '')) ?>
-                            </option>
+                        <?php foreach (groupAccountsForSelect($accounts) as $grp): ?>
+                            <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                                <?php foreach ($grp['accounts'] as $account): ?>
+                                    <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
+                                        <?= htmlspecialchars(($account['bank_name'] ?? '') . ' — ' . ($account['account_name'] ?? '')) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
                         <?php endforeach; ?>
                     </select>
                 </label>

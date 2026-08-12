@@ -203,14 +203,22 @@ foreach ($acctGrouped as $gKey => $accts) {
                 To account
                 <select name="transfer_to_account_id">
                     <option value="">Select target account</option>
-                    <?php foreach ($accounts as $account): ?>
-                        <option value="<?= htmlspecialchars($account['account_type'] . ':' . $account['id']) ?>">
-                            <?= htmlspecialchars($account['bank_name'] . ' – ' . $account['account_name']) ?>
-                        </option>
+                    <?php foreach ($acctGroups as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <option value="<?= htmlspecialchars($account['account_type'] . ':' . $account['id']) ?>">
+                                    <?= htmlspecialchars($account['bank_name'] . ' – ' . $account['account_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
-                    <?php foreach ($loans as $loan): ?>
-                        <option value="loan:<?= (int) $loan['id'] ?>">Loan: <?= htmlspecialchars($loan['loan_name'] ?? 'Loan #' . $loan['id']) ?></option>
-                    <?php endforeach; ?>
+                    <?php if (!empty($loans)): ?>
+                        <optgroup label="Loans">
+                            <?php foreach ($loans as $loan): ?>
+                                <option value="loan:<?= (int) $loan['id'] ?>">Loan: <?= htmlspecialchars($loan['loan_name'] ?? 'Loan #' . $loan['id']) ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endif; ?>
                 </select>
             </label>
         </div>

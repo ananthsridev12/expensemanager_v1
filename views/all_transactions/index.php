@@ -42,11 +42,14 @@ $exportQuery = http_build_query(array_merge($filterQuery, ['action' => 'export']
                 Account
                 <select name="account_id">
                     <option value="">All accounts</option>
-                    <?php foreach ($accounts as $account): ?>
-                        <?php $accountType = $account['account_type'] ?? 'bank'; ?>
-                        <option value="<?= (int) $account['id'] ?>" <?= ($filters['account_id'] ?? null) == $account['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name'] . ' (' . $accountType . ')') ?>
-                        </option>
+                    <?php foreach (groupAccountsForSelect($accounts) as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <option value="<?= (int) $account['id'] ?>" <?= ($filters['account_id'] ?? null) == $account['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($account['bank_name'] . ' — ' . $account['account_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
             </label>

@@ -168,10 +168,14 @@ include __DIR__ . '/../partials/nav.php';
                 Funding account
                 <select name="funding_account">
                     <option value="">Select account (optional)</option>
-                    <?php foreach ($accounts as $account): ?>
-                        <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
-                            <?= htmlspecialchars(($account['bank_name'] ?? '') . ' - ' . ($account['account_name'] ?? '')) ?>
-                        </option>
+                    <?php foreach (groupAccountsForSelect($accounts) as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
+                                    <?= htmlspecialchars(($account['bank_name'] ?? '') . ' — ' . ($account['account_name'] ?? '')) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -218,10 +222,14 @@ include __DIR__ . '/../partials/nav.php';
                 Deposit to account
                 <select name="deposit_account">
                     <option value="">Select account (optional)</option>
-                    <?php foreach ($accounts as $account): ?>
-                        <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
-                            <?= htmlspecialchars(($account['bank_name'] ?? '') . ' - ' . ($account['account_name'] ?? '')) ?>
-                        </option>
+                    <?php foreach (groupAccountsForSelect($accounts) as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
+                                    <?= htmlspecialchars(($account['bank_name'] ?? '') . ' — ' . ($account['account_name'] ?? '')) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -268,10 +276,14 @@ include __DIR__ . '/../partials/nav.php';
                 Funding account
                 <select name="funding_account">
                     <option value="">Select account (optional)</option>
-                    <?php foreach ($accounts as $account): ?>
-                        <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
-                            <?= htmlspecialchars(($account['bank_name'] ?? '') . ' - ' . ($account['account_name'] ?? '')) ?>
-                        </option>
+                    <?php foreach (groupAccountsForSelect($accounts) as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
+                                    <?= htmlspecialchars(($account['bank_name'] ?? '') . ' — ' . ($account['account_name'] ?? '')) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
             </label>

@@ -296,14 +296,26 @@ include __DIR__ . '/partials/nav.php';
             <label>
                 From account
                 <select name="account_id" id="from-account" required>
-                    <?php foreach ($accounts as $account): ?>
-                        <?php if (($account['account_type'] ?? '') === 'credit_card') { continue; } ?>
-                        <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>" data-type="<?= htmlspecialchars($account['account_type'] ?? 'savings') ?>"><?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?></option>
+                    <?php $nonCcAccts = array_values(array_filter($accounts, fn($a) => ($a['account_type'] ?? '') !== 'credit_card')); ?>
+                    <?php foreach (groupAccountsForSelect($nonCcAccts) as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $account): ?>
+                                <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>" data-type="<?= htmlspecialchars($account['account_type'] ?? 'savings') ?>">
+                                    <?= htmlspecialchars($account['bank_name'] . ' — ' . $account['account_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
-                    <?php foreach ($creditCards as $card): ?>
-                        <?php if (empty($card['account_id'])) { continue; } ?>
-                        <option value="credit_card:<?= (int) $card['account_id'] ?>" data-type="credit_card"><?= htmlspecialchars($card['bank_name'] . ' - ' . $card['card_name'] . ' (Card)') ?></option>
-                    <?php endforeach; ?>
+                    <?php if (!empty($creditCards)): ?>
+                        <optgroup label="Credit Cards">
+                            <?php foreach ($creditCards as $card): ?>
+                                <?php if (empty($card['account_id'])) { continue; } ?>
+                                <option value="credit_card:<?= (int) $card['account_id'] ?>" data-type="credit_card">
+                                    <?= htmlspecialchars($card['bank_name'] . ' — ' . $card['card_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endif; ?>
                 </select>
             </label>
             <label>
@@ -343,14 +355,25 @@ include __DIR__ . '/partials/nav.php';
                     To account
                     <select name="transfer_account_id">
                         <option value="">Select account</option>
-                        <?php foreach ($accounts as $account): ?>
-                            <?php if (($account['account_type'] ?? '') === 'credit_card') { continue; } ?>
-                            <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>"><?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?></option>
+                        <?php foreach (groupAccountsForSelect($nonCcAccts) as $grp): ?>
+                            <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                                <?php foreach ($grp['accounts'] as $account): ?>
+                                    <option value="<?= htmlspecialchars(($account['account_type'] ?? 'savings') . ':' . $account['id']) ?>">
+                                        <?= htmlspecialchars($account['bank_name'] . ' — ' . $account['account_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
                         <?php endforeach; ?>
-                        <?php foreach ($creditCards as $card): ?>
-                            <?php if (empty($card['account_id'])) { continue; } ?>
-                            <option value="credit_card:<?= (int) $card['account_id'] ?>"><?= htmlspecialchars($card['bank_name'] . ' - ' . $card['card_name'] . ' (Card)') ?></option>
-                        <?php endforeach; ?>
+                        <?php if (!empty($creditCards)): ?>
+                            <optgroup label="Credit Cards">
+                                <?php foreach ($creditCards as $card): ?>
+                                    <?php if (empty($card['account_id'])) { continue; } ?>
+                                    <option value="credit_card:<?= (int) $card['account_id'] ?>">
+                                        <?= htmlspecialchars($card['bank_name'] . ' — ' . $card['card_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endif; ?>
                     </select>
                 </label>
             </div>

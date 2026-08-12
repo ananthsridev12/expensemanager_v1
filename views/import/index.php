@@ -11,17 +11,7 @@ $selectedBatch  = (int) ($selectedBatch ?? 0);
 $msg            = $msg   ?? null;
 $error          = $error ?? null;
 
-// Pre-build account options with data-type attribute
-$accountOptions = [];
-foreach ($accounts as $acct) {
-    $label = ($acct['bank_name'] ?? '') . ' — ' . ($acct['account_name'] ?? '') .
-             ' (' . ($acct['account_type'] ?? '') . ')';
-    $accountOptions[] = [
-        'id'    => (int) $acct['id'],
-        'label' => $label,
-        'type'  => $acct['account_type'] ?? 'savings',
-    ];
-}
+$acctGroups = groupAccountsForSelect($accounts);
 
 // Category data for JS subcategory filtering
 $catForJs = [];
@@ -73,10 +63,14 @@ include __DIR__ . '/../partials/nav.php';
                 Account
                 <select name="account_id" id="account-select" required>
                     <option value="">— Select account —</option>
-                    <?php foreach ($accountOptions as $opt): ?>
-                        <option value="<?= $opt['id'] ?>" data-type="<?= htmlspecialchars($opt['type']) ?>">
-                            <?= htmlspecialchars($opt['label']) ?>
-                        </option>
+                    <?php foreach ($acctGroups as $grp): ?>
+                        <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                            <?php foreach ($grp['accounts'] as $acct): ?>
+                                <option value="<?= (int) $acct['id'] ?>" data-type="<?= htmlspecialchars($acct['account_type'] ?? 'savings') ?>">
+                                    <?= htmlspecialchars(($acct['bank_name'] ?? '') . ' — ' . ($acct['account_name'] ?? '')) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
             </label>

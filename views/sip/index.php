@@ -35,8 +35,14 @@ include __DIR__ . '/../partials/nav.php';
                 <label>
                     Account
                     <select name="account_id" required>
-                        <?php foreach ($accounts as $account): ?>
-                            <option value="<?= $account['id'] ?>"><?= htmlspecialchars($account['bank_name'] . ' - ' . $account['account_name']) ?></option>
+                        <?php foreach (groupAccountsForSelect($accounts) as $grp): ?>
+                            <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                                <?php foreach ($grp['accounts'] as $account): ?>
+                                    <option value="<?= (int) $account['id'] ?>">
+                                        <?= htmlspecialchars($account['bank_name'] . ' — ' . $account['account_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
                         <?php endforeach; ?>
                     </select>
                 </label>

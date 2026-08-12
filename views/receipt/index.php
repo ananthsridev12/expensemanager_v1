@@ -171,10 +171,14 @@
             <label>Account <span style="color:#f43f5e">*</span></label>
             <select name="account_id" required>
                 <option value="">— select account —</option>
-                <?php foreach ($accounts as $acc): ?>
-                <option value="<?= htmlspecialchars($acc['account_type'] . ':' . $acc['id']) ?>">
-                    <?= htmlspecialchars($acc['bank_name'] . ' — ' . $acc['account_name']) ?>
-                </option>
+                <?php foreach (groupAccountsForSelect($accounts) as $grp): ?>
+                <optgroup label="<?= htmlspecialchars($grp['label']) ?>">
+                    <?php foreach ($grp['accounts'] as $acc): ?>
+                    <option value="<?= htmlspecialchars($acc['account_type'] . ':' . $acc['id']) ?>">
+                        <?= htmlspecialchars($acc['bank_name'] . ' — ' . $acc['account_name']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </optgroup>
                 <?php endforeach; ?>
             </select>
         </div>
