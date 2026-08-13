@@ -181,6 +181,7 @@ use Controllers\AllTransactionsController;
 use Controllers\CalendarController;
 use Controllers\NotesController;
 use Controllers\ReportsController;
+use Controllers\RecurringController;
 use Controllers\TransactionController;
 
 $moduleInput = filter_input(INPUT_GET, 'module', FILTER_DEFAULT);
@@ -266,6 +267,10 @@ switch ($module) {
         break;
     case 'import':
         $controller = new ImportController();
+        echo $controller->index();
+        break;
+    case 'recurring':
+        $controller = new RecurringController();
         echo $controller->index();
         break;
     case 'receipt':
