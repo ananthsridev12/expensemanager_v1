@@ -7,7 +7,7 @@ spl_autoload_register(function (string $class): void {
         'Config\\'      => 'config/',
         'Models\\'      => 'models/',
         'Controllers\\' => 'controllers/',
-        'Mcp\\'         => 'mcp/',
+        'Mcp\\'         => '_mcp/',
     ];
 
     foreach ($prefixes as $prefix => $dir) {

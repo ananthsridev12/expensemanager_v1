@@ -4,12 +4,6 @@ DirectoryIndex index.php
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
-# Block direct URL access to PHP files inside mcp/ (they are server-side libs only)
-RewriteRule ^mcp/.+$ - [F,L]
-
-# Route /mcp endpoint to front controller (takes priority over the mcp/ directory)
-RewriteRule ^mcp/?$ index.php [QSA,L]
-
 # Let API requests stay inside /api/.htaccess
 RewriteCond %{REQUEST_URI} !^/api/ [NC]
 
