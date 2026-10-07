@@ -2,6 +2,19 @@
 
 require_once __DIR__ . '/autoload.php';
 
+// ── Path-based routing: MCP and OAuth bypass PIN/session ──────────────────
+(static function (): void {
+    $path = '/' . trim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/', '/');
+    if ($path === '/mcp') {
+        (new Controllers\McpController())->handle();
+        exit;
+    }
+    if ($path === '/oauth' || str_starts_with($path, '/oauth/') || $path === '/.well-known/oauth-authorization-server') {
+        (new Controllers\OAuthController())->handle($path);
+        exit;
+    }
+})();
+
 session_start();
 
 $pinConfig = require __DIR__ . '/config/pin.php';

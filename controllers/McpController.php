@@ -1,0 +1,114 @@
+<?php
+
+namespace Controllers;
+
+use Mcp\Server;
+use Models\OAuthToken;
+
+class McpController extends BaseController
+{
+    public function handle(): void
+    {
+        // CORS
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        if ($origin !== '') {
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Vary: Origin');
+        }
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, Mcp-Session-Id');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Expose-Headers: Mcp-Session-Id');
+
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+        if ($method === 'OPTIONS') {
+            http_response_code(204);
+            return;
+        }
+
+        if ($method === 'GET') {
+            $this->infoPage();
+            return;
+        }
+
+        if ($method !== 'POST') {
+            header('Allow: POST, GET, OPTIONS');
+            http_response_code(405);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'method_not_allowed']);
+            return;
+        }
+
+        // ── Bearer token auth ─────────────────────────────────────────────────
+        $token = $this->extractBearer();
+        if ($token === null || !(new OAuthToken($this->database))->verify($token)) {
+            $this->unauthorized();
+            return;
+        }
+
+        // ── Dispatch to MCP server ────────────────────────────────────────────
+        header('Content-Type: application/json');
+        $body   = (string) file_get_contents('php://input');
+        $server = new Server($this->database);
+        echo json_encode($server->handle($body), JSON_UNESCAPED_UNICODE);
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function extractBearer(): ?string
+    {
+        $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (str_starts_with($auth, 'Bearer ')) {
+            $t = trim(substr($auth, 7));
+            return $t !== '' ? $t : null;
+        }
+        return null;
+    }
+
+    private function unauthorized(): void
+    {
+        $base = $this->baseUrl();
+        header('WWW-Authenticate: Bearer realm="Easi7 Finance", resource_metadata="' . $base . '/oauth/protected-resource"');
+        header('Content-Type: application/json');
+        http_response_code(401);
+        echo json_encode(['error' => 'unauthorized', 'error_description' => 'Bearer token required. Connect via OAuth first.']);
+    }
+
+    private function infoPage(): void
+    {
+        $base   = $this->baseUrl();
+        $checks = [];
+
+        // Check DB tables exist
+        try {
+            $pdo = $this->database->connect();
+            foreach (['oauth_clients', 'oauth_codes', 'api_tokens'] as $tbl) {
+                $exists = $pdo->query("SHOW TABLES LIKE '{$tbl}'")->fetchColumn();
+                $checks[] = [
+                    'status' => $exists ? 'ok'   : 'fail',
+                    'label'  => "Table `{$tbl}`",
+                    'detail' => $exists ? '' : 'Run migration 023_oauth_mcp.sql',
+                ];
+            }
+        } catch (\Throwable $e) {
+            $checks[] = ['status' => 'fail', 'label' => 'Database connection', 'detail' => $e->getMessage()];
+        }
+
+        // Well-known path (may be blocked by host firewall — warn only)
+        $checks[] = [
+            'status' => 'warn',
+            'label'  => '/.well-known/oauth-authorization-server',
+            'detail' => 'May be blocked by host firewall — OK, clients fall back to /oauth/.well-known/openid-configuration',
+        ];
+
+        $checks[] = ['status' => 'ok', 'label' => 'MCP endpoint /mcp is reachable', 'detail' => ''];
+
+        echo $this->render('mcp_info.php', compact('checks', 'base', 'baseUrl'));
+    }
+
+    private function baseUrl(): string
+    {
+        $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    }
+}

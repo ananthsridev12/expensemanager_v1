@@ -4,9 +4,10 @@ require_once __DIR__ . '/helpers.php';
 
 spl_autoload_register(function (string $class): void {
     $prefixes = [
-        'Config\\' => 'config/',
-        'Models\\' => 'models/',
+        'Config\\'      => 'config/',
+        'Models\\'      => 'models/',
         'Controllers\\' => 'controllers/',
+        'Mcp\\'         => 'mcp/',
     ];
 
     foreach ($prefixes as $prefix => $dir) {
