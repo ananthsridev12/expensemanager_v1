@@ -4,10 +4,15 @@ DirectoryIndex index.php
 # Pass Authorization header through FastCGI / PHP-FPM (problem #4)
 CGIPassAuth On
 
+# Fallback 1: mod_setenvif (works on some cPanel hosts where RewriteRule env does not)
+<IfModule mod_setenvif.c>
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+</IfModule>
+
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
-# Pass Authorization header through when CGIPassAuth is insufficient (Problem #4)
+# Fallback 2: mod_rewrite env var passthrough
 RewriteCond %{HTTP:Authorization} ^(.+)$
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
 

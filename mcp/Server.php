@@ -50,6 +50,11 @@ class Server
         return $result['body'] ?? [];
     }
 
+    public function getToolCount(): array
+    {
+        return $this->tools->getDefinitions();
+    }
+
     private function dispatch(array $req): array
     {
         $id     = $req['id']     ?? null;

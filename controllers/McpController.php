@@ -135,6 +135,28 @@ class McpController extends BaseController
             $checks[] = ['status' => 'fail', 'label' => 'Database connection', 'detail' => $e->getMessage()];
         }
 
+        // Check MCP Server can be instantiated (catches class-not-found / PHP errors)
+        try {
+            $server = new Server($this->database);
+            $count  = count($server->getToolCount());
+            $checks[] = ['status' => 'ok', 'label' => "MCP tools loaded ({$count})", 'detail' => ''];
+        } catch (\Throwable $e) {
+            $checks[] = ['status' => 'fail', 'label' => 'MCP Server init', 'detail' => $e->getMessage()];
+        }
+
+        // Check Authorization header passthrough
+        $authSeen = $this->extractBearer() !== null;
+        $authSrc  = $this->authHeaderSource();
+        if ($authSeen) {
+            $checks[] = ['status' => 'ok', 'label' => 'Authorization header visible to PHP', 'detail' => "via {$authSrc}"];
+        } else {
+            $checks[] = [
+                'status' => 'warn',
+                'label'  => 'Authorization header not sent (expected for ?setup)',
+                'detail' => "Send with: curl -s '{$base}/mcp?setup' -H 'Authorization: Bearer test'",
+            ];
+        }
+
         // Well-known path (may be blocked by host firewall — warn only)
         $checks[] = [
             'status' => 'warn',
@@ -142,9 +164,20 @@ class McpController extends BaseController
             'detail' => 'May be blocked by host firewall — OK, clients fall back to /oauth/.well-known/openid-configuration',
         ];
 
-        $checks[] = ['status' => 'ok', 'label' => 'MCP endpoint /mcp is reachable', 'detail' => ''];
+        $checks[] = ['status' => 'ok', 'label' => 'MCP endpoint /mcp is reachable', 'detail' => 'PHP ' . PHP_VERSION . ' / ' . PHP_SAPI];
 
         echo $this->renderPartial('mcp_info.php', compact('checks', 'base'));
+    }
+
+    private function authHeaderSource(): string
+    {
+        if (!empty($_SERVER['HTTP_AUTHORIZATION']))          return '$_SERVER[HTTP_AUTHORIZATION]';
+        if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) return '$_SERVER[REDIRECT_HTTP_AUTHORIZATION]';
+        if (function_exists('getallheaders')) {
+            $h = getallheaders();
+            if (!empty($h['Authorization'] ?? $h['authorization'] ?? '')) return 'getallheaders()';
+        }
+        return 'none';
     }
 
     private function baseUrl(): string
