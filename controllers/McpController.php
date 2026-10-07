@@ -26,12 +26,7 @@ class McpController extends BaseController
             return;
         }
 
-        if ($method === 'GET') {
-            $this->infoPage();
-            return;
-        }
-
-        if ($method !== 'POST') {
+        if ($method !== 'GET' && $method !== 'POST') {
             header('Allow: POST, GET, OPTIONS');
             http_response_code(405);
             header('Content-Type: application/json');
@@ -39,10 +34,23 @@ class McpController extends BaseController
             return;
         }
 
-        // ── Bearer token auth ─────────────────────────────────────────────────
+        // ── Bearer token auth (required for both GET and POST) ────────────────
         $token = $this->extractBearer();
-        if ($token === null || !(new OAuthToken($this->database))->verify($token)) {
+        $authed = $token !== null && (new OAuthToken($this->database))->verify($token);
+
+        if (!$authed) {
+            // GET with ?setup shows the human-readable info page unauthenticated
+            if ($method === 'GET' && isset($_GET['setup'])) {
+                $this->infoPage();
+                return;
+            }
             $this->unauthorized();
+            return;
+        }
+
+        // ── Authenticated GET → setup info page ───────────────────────────────
+        if ($method === 'GET') {
+            $this->infoPage();
             return;
         }
 
