@@ -9,7 +9,9 @@ class McpController extends BaseController
 {
     public function handle(): void
     {
-        // CORS
+        ob_start(); // capture any stray PHP output for the whole handler
+
+        // CORS — must be set before any exit path
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
         if ($origin !== '') {
             header('Access-Control-Allow-Origin: ' . $origin);
@@ -19,14 +21,32 @@ class McpController extends BaseController
         header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
         header('Access-Control-Expose-Headers: Mcp-Session-Id');
 
+        try {
+            $this->dispatch();
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'jsonrpc' => '2.0',
+                'id'      => null,
+                'error'   => ['code' => -32603, 'message' => $e->getMessage()],
+            ], JSON_UNESCAPED_UNICODE);
+        }
+    }
+
+    private function dispatch(): void
+    {
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
         if ($method === 'OPTIONS') {
+            ob_end_clean();
             http_response_code(204);
             return;
         }
 
         if ($method !== 'GET' && $method !== 'POST') {
+            ob_end_clean();
             header('Allow: POST, GET, OPTIONS');
             http_response_code(405);
             header('Content-Type: application/json');
@@ -35,11 +55,11 @@ class McpController extends BaseController
         }
 
         // ── Bearer token auth (required for both GET and POST) ────────────────
-        $token = $this->extractBearer();
+        $token  = $this->extractBearer();
         $authed = $token !== null && (new OAuthToken($this->database))->verify($token);
 
         if (!$authed) {
-            // GET with ?setup shows the human-readable info page unauthenticated
+            ob_end_clean();
             if ($method === 'GET' && isset($_GET['setup'])) {
                 $this->infoPage();
                 return;
@@ -50,31 +70,20 @@ class McpController extends BaseController
 
         // ── Authenticated GET → setup info page ───────────────────────────────
         if ($method === 'GET') {
+            ob_end_clean();
             $this->infoPage();
             return;
         }
 
-        // ── Dispatch to MCP server ────────────────────────────────────────────
-        ob_start();
-        $body = (string) file_get_contents('php://input');
-        try {
-            $server = new Server($this->database);
-            $result = $server->handleHttp($body);
-            ob_end_clean();
-            http_response_code($result['status']);
-            if ($result['body'] !== null) {
-                header('Content-Type: application/json');
-                echo json_encode($result['body'], JSON_UNESCAPED_UNICODE);
-            }
-        } catch (\Throwable $e) {
-            ob_end_clean();
-            http_response_code(500);
+        // ── Dispatch POST to MCP server ───────────────────────────────────────
+        $body   = (string) file_get_contents('php://input');
+        $server = new Server($this->database);
+        $result = $server->handleHttp($body);
+        ob_end_clean();
+        http_response_code($result['status']);
+        if ($result['body'] !== null) {
             header('Content-Type: application/json');
-            echo json_encode([
-                'jsonrpc' => '2.0',
-                'id'      => null,
-                'error'   => ['code' => -32603, 'message' => 'Internal error: ' . $e->getMessage()],
-            ], JSON_UNESCAPED_UNICODE);
+            echo json_encode($result['body'], JSON_UNESCAPED_UNICODE);
         }
     }
 
@@ -144,3 +153,4 @@ class McpController extends BaseController
         return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
     }
 }
+// MCP server version marker — used to confirm deployment: v4
