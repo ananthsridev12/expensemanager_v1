@@ -47,13 +47,26 @@ class McpController extends BaseController
         }
 
         // ── Dispatch to MCP server ────────────────────────────────────────────
-        $body   = (string) file_get_contents('php://input');
-        $server = new Server($this->database);
-        $result = $server->handleHttp($body);
-        http_response_code($result['status']);
-        if ($result['body'] !== null) {
+        ob_start();
+        $body = (string) file_get_contents('php://input');
+        try {
+            $server = new Server($this->database);
+            $result = $server->handleHttp($body);
+            ob_end_clean();
+            http_response_code($result['status']);
+            if ($result['body'] !== null) {
+                header('Content-Type: application/json');
+                echo json_encode($result['body'], JSON_UNESCAPED_UNICODE);
+            }
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            http_response_code(500);
             header('Content-Type: application/json');
-            echo json_encode($result['body'], JSON_UNESCAPED_UNICODE);
+            echo json_encode([
+                'jsonrpc' => '2.0',
+                'id'      => null,
+                'error'   => ['code' => -32603, 'message' => 'Internal error: ' . $e->getMessage()],
+            ], JSON_UNESCAPED_UNICODE);
         }
     }
 
