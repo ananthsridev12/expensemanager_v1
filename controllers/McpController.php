@@ -76,14 +76,27 @@ class McpController extends BaseController
         }
 
         // ── Dispatch POST to MCP server ───────────────────────────────────────
+        $accept    = strtolower($_SERVER['HTTP_ACCEPT'] ?? '');
+        $wantsSSE  = str_contains($accept, 'text/event-stream');
+        $wantsJSON = str_contains($accept, 'application/json') || str_contains($accept, '*/*') || $accept === '';
+
         $body   = (string) file_get_contents('php://input');
         $server = new Server($this->database);
         $result = $server->handleHttp($body);
         ob_end_clean();
         http_response_code($result['status']);
         if ($result['body'] !== null) {
-            header('Content-Type: application/json');
-            echo json_encode($result['body'], JSON_UNESCAPED_UNICODE);
+            $json = json_encode($result['body'], JSON_UNESCAPED_UNICODE);
+            if ($wantsSSE && !$wantsJSON) {
+                // ChatGPT and some MCP clients request SSE-wrapped responses
+                header('Content-Type: text/event-stream');
+                header('Cache-Control: no-cache');
+                header('X-Accel-Buffering: no');
+                echo "data: {$json}\n\n";
+            } else {
+                header('Content-Type: application/json');
+                echo $json;
+            }
         }
     }
 
