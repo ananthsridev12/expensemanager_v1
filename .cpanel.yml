@@ -13,6 +13,7 @@ deployment:
     - /bin/cp -R api/ $DEPLOYPATH
     - /bin/cp -R migrations/ $DEPLOYPATH
     - /bin/cp -R cron/ $DEPLOYPATH
+    - /bin/cp -R mcp/ $DEPLOYPATH
 
     # Config — deploy only the repo templates, never touch server-only credential files.
     # Files intentionally NOT deployed (managed manually on server):
