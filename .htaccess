@@ -4,6 +4,9 @@ DirectoryIndex index.php
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
+# Route /mcp to front controller unconditionally (mcp/ dir may still exist on server)
+RewriteRule ^mcp/?$ index.php [QSA,L]
+
 # Let API requests stay inside /api/.htaccess
 RewriteCond %{REQUEST_URI} !^/api/ [NC]
 
