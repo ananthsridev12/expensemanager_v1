@@ -114,7 +114,7 @@ class McpController extends BaseController
 
         $checks[] = ['status' => 'ok', 'label' => 'MCP endpoint /mcp is reachable', 'detail' => ''];
 
-        echo $this->render('mcp_info.php', compact('checks', 'base', 'baseUrl'));
+        echo $this->renderPartial('mcp_info.php', compact('checks', 'base'));
     }
 
     private function baseUrl(): string

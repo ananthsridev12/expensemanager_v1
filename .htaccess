@@ -7,6 +7,10 @@ CGIPassAuth On
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
+# Pass Authorization header through when CGIPassAuth is insufficient (Problem #4)
+RewriteCond %{HTTP:Authorization} ^(.+)$
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%1,L]
+
 # Let API requests stay inside /api/.htaccess
 RewriteCond %{REQUEST_URI} !^/api/ [NC]
 

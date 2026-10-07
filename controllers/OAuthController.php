@@ -312,12 +312,13 @@ class OAuthController extends BaseController
             ? '<label>PIN <input type="password" name="pin" inputmode="numeric" autocomplete="off" required autofocus></label>' . $pinError
             : '';
 
-        echo $this->render('oauth/authorize.php', compact('clientName', 'csrf', 'pinField', 'needsPin', 'pinError'));
+        // renderPartial — OAuth pages are standalone HTML, must NOT be wrapped in the app layout
+        echo $this->renderPartial('oauth/authorize.php', compact('clientName', 'csrf', 'pinField', 'needsPin', 'pinError'));
     }
 
     private function showError(string $msg): void
     {
-        echo $this->render('oauth/error.php', ['message' => $msg]);
+        echo $this->renderPartial('oauth/error.php', ['message' => $msg]);
     }
 
     private function oauthRedirect(string $redirectUri, string $state, ?string $code, ?string $error): void

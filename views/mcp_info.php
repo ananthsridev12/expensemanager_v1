@@ -46,7 +46,7 @@ ol{padding-left:1.2rem;font-size:.88rem;color:#94a3b8;line-height:1.8}
     <h2>Connect Claude</h2>
     <ol>
         <li>Claude.ai → Settings → Connectors → <strong>Add custom connector</strong></li>
-        <li>URL: <code><?= htmlspecialchars($baseUrl) ?>/mcp</code></li>
+        <li>URL: <code><?= htmlspecialchars($base) ?>/mcp</code></li>
         <li>Authentication: <strong>Sign in now</strong> → Register automatically</li>
         <li>Click Connect, sign in with your PIN</li>
         <li>Enable the connector from the tools menu in a chat</li>
