@@ -9,7 +9,17 @@ require_once __DIR__ . '/autoload.php';
         (new Controllers\McpController())->handle();
         exit;
     }
-    if ($path === '/oauth' || str_starts_with($path, '/oauth/') || $path === '/.well-known/oauth-authorization-server') {
+    // OAuth paths (all /oauth/* and well-known discovery + root fallbacks)
+    $oauthPaths = [
+        '/.well-known/oauth-authorization-server',
+        '/.well-known/openid-configuration',
+        '/.well-known/oauth-protected-resource',
+        '/.well-known/oauth-protected-resource/mcp',
+        '/register',
+        '/authorize',
+        '/token',
+    ];
+    if ($path === '/oauth' || str_starts_with($path, '/oauth/') || in_array($path, $oauthPaths, true)) {
         (new Controllers\OAuthController())->handle($path);
         exit;
     }

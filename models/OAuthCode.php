@@ -39,12 +39,14 @@ class OAuthCode extends BaseModel
     ): bool {
         $stmt = $this->db->prepare(
             "SELECT * FROM oauth_codes
-              WHERE code = :code AND client_id = :cid AND used = 0 AND expires_at > NOW()
+              WHERE code = :code AND client_id = :cid AND used = 0
               LIMIT 1"
         );
         $stmt->execute([':code' => $code, ':cid' => $clientId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        // Check expiry in PHP to avoid MySQL timezone mismatch (Problem #7)
         if (!$row || $row['redirect_uri'] !== $redirectUri) return false;
+        if (strtotime((string) $row['expires_at']) < time()) return false;
 
         if ($row['code_challenge'] !== null) {
             if ($verifier === null) return false;

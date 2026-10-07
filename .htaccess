@@ -1,6 +1,9 @@
 Options -Indexes
 DirectoryIndex index.php
 
+# Pass Authorization header through FastCGI / PHP-FPM (problem #4)
+CGIPassAuth On
+
 <IfModule mod_rewrite.c>
 RewriteEngine On
 

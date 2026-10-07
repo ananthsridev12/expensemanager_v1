@@ -47,17 +47,28 @@ class McpController extends BaseController
         }
 
         // ── Dispatch to MCP server ────────────────────────────────────────────
-        header('Content-Type: application/json');
         $body   = (string) file_get_contents('php://input');
         $server = new Server($this->database);
-        echo json_encode($server->handle($body), JSON_UNESCAPED_UNICODE);
+        $result = $server->handleHttp($body);
+        http_response_code($result['status']);
+        if ($result['body'] !== null) {
+            header('Content-Type: application/json');
+            echo json_encode($result['body'], JSON_UNESCAPED_UNICODE);
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private function extractBearer(): ?string
     {
-        $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        // Apache/PHP-FPM can strip Authorization; try multiple sources
+        $auth = $_SERVER['HTTP_AUTHORIZATION']
+             ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+             ?? '';
+        if ($auth === '' && function_exists('getallheaders')) {
+            $headers = getallheaders();
+            $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        }
         if (str_starts_with($auth, 'Bearer ')) {
             $t = trim(substr($auth, 7));
             return $t !== '' ? $t : null;
@@ -68,7 +79,7 @@ class McpController extends BaseController
     private function unauthorized(): void
     {
         $base = $this->baseUrl();
-        header('WWW-Authenticate: Bearer realm="Easi7 Finance", resource_metadata="' . $base . '/oauth/protected-resource"');
+        header('WWW-Authenticate: Bearer resource_metadata="' . $base . '/oauth/protected-resource"');
         header('Content-Type: application/json');
         http_response_code(401);
         echo json_encode(['error' => 'unauthorized', 'error_description' => 'Bearer token required. Connect via OAuth first.']);

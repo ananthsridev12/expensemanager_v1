@@ -13,25 +13,59 @@ class Server
         $this->tools = new Tools($database);
     }
 
-    public function handle(string $body): array
+    // Returns the response body string and sets HTTP status via callback.
+    public function handleHttp(string $body): array
     {
-        $req = json_decode($body, true);
-        if (!is_array($req)) {
-            return $this->rpcError(null, -32700, 'Parse error');
+        $decoded = json_decode($body, true);
+        if ($decoded === null && trim($body) !== '') {
+            return ['status' => 400, 'body' => $this->rpcError(null, -32700, 'Parse error')];
         }
 
+        // Batch request (JSON array)
+        if (is_array($decoded) && isset($decoded[0])) {
+            $responses = [];
+            foreach ($decoded as $req) {
+                if (!is_array($req)) continue;
+                if (!array_key_exists('id', $req)) continue; // notifications → no response
+                $responses[] = $this->dispatch($req);
+            }
+            if (empty($responses)) {
+                return ['status' => 202, 'body' => null];
+            }
+            return ['status' => 200, 'body' => $responses];
+        }
+
+        // Single request
+        $req = is_array($decoded) ? $decoded : [];
+        if (!array_key_exists('id', $req)) {
+            // Notification — no response
+            return ['status' => 202, 'body' => null];
+        }
+        return ['status' => 200, 'body' => $this->dispatch($req)];
+    }
+
+    public function handle(string $body): array
+    {
+        $result = $this->handleHttp($body);
+        return $result['body'] ?? [];
+    }
+
+    private function dispatch(array $req): array
+    {
         $id     = $req['id']     ?? null;
         $method = (string) ($req['method'] ?? '');
         $params = (array)  ($req['params'] ?? []);
 
         try {
             $result = match ($method) {
-                'initialize'        => $this->initialize(),
-                'notifications/initialized' => [], // client ACK, no response needed… but we respond OK
-                'ping'              => [],
-                'tools/list'        => ['tools' => $this->tools->getDefinitions()],
-                'tools/call'        => $this->toolsCall($params),
-                default             => throw new \RuntimeException('Method not found', -32601),
+                'initialize'                  => $this->initialize($params),
+                'notifications/initialized'   => [],
+                'ping'                        => [],
+                'tools/list'                  => ['tools' => $this->tools->getDefinitions()],
+                'tools/call'                  => $this->toolsCall($params),
+                'resources/list'              => ['resources' => []],
+                'prompts/list'                => ['prompts' => []],
+                default                       => throw new \RuntimeException('Method not found', -32601),
             };
             return ['jsonrpc' => '2.0', 'id' => $id, 'result' => $result];
         } catch (\RuntimeException $e) {
@@ -40,10 +74,14 @@ class Server
         }
     }
 
-    private function initialize(): array
+    private function initialize(array $params): array
     {
+        // Echo back the client's protocol version if we support it
+        $supported = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
+        $requested = (string) ($params['protocolVersion'] ?? '2024-11-05');
+        $version   = in_array($requested, $supported, true) ? $requested : '2025-11-25';
         return [
-            'protocolVersion' => '2024-11-05',
+            'protocolVersion' => $version,
             'capabilities'    => ['tools' => ['listChanged' => false]],
             'serverInfo'      => ['name' => 'Easi7 Finance', 'version' => '1.0'],
             'instructions'    => implode(' ', [
@@ -62,10 +100,12 @@ class Server
         $args = (array)  ($params['arguments'] ?? []);
 
         try {
-            $data = $this->tools->call($name, $args);
+            $data    = $this->tools->call($name, $args);
+            $jsonStr = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             return [
-                'content'  => [['type' => 'text', 'text' => json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)]],
-                'isError'  => false,
+                'content'           => [['type' => 'text', 'text' => $jsonStr]],
+                'structuredContent' => $data,
+                'isError'           => false,
             ];
         } catch (ToolError $e) {
             return [

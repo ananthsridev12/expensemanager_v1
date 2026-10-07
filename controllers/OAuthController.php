@@ -22,17 +22,23 @@ class OAuthController extends BaseController
         }
 
         match (true) {
-            $path === '/oauth/register'
+            in_array($path, ['/oauth/register', '/register'], true)
                 => $this->register(),
-            ($path === '/oauth/authorize' || $path === '/oauth/authorize/')
+            in_array($path, ['/oauth/authorize', '/oauth/authorize/', '/authorize'], true)
                 => $this->authorize($method),
-            $path === '/oauth/token'
+            in_array($path, ['/oauth/token', '/token'], true)
                 => $this->token(),
-            $path === '/oauth/protected-resource'
+            in_array($path, ['/oauth/protected-resource',
+                              '/.well-known/oauth-protected-resource',
+                              '/.well-known/oauth-protected-resource/mcp'], true)
                 => $this->protectedResource(),
-            ($path === '/oauth/.well-known/openid-configuration'
-                || $path === '/.well-known/oauth-authorization-server')
+            in_array($path, ['/oauth/.well-known/openid-configuration',
+                              '/oauth/.well-known/oauth-authorization-server',
+                              '/.well-known/oauth-authorization-server',
+                              '/.well-known/openid-configuration'], true)
                 => $this->authServerMetadata(),
+            $path === '/oauth/jwks'
+                => $this->jwks(),
             default => $this->notFound($path),
         };
     }
@@ -41,7 +47,9 @@ class OAuthController extends BaseController
 
     private function register(): void
     {
+        $this->ensureTables();
         header('Content-Type: application/json');
+        header('Cache-Control: no-store');
         header('Access-Control-Allow-Origin: *');
 
         $body    = (string) file_get_contents('php://input');
@@ -49,6 +57,7 @@ class OAuthController extends BaseController
 
         $name         = trim((string) ($payload['client_name']    ?? 'MCP Client'));
         $redirectUris = (array) ($payload['redirect_uris'] ?? []);
+        $authMethod   = (string) ($payload['token_endpoint_auth_method'] ?? 'client_secret_basic');
 
         if (empty($redirectUris)) {
             http_response_code(400);
@@ -56,20 +65,34 @@ class OAuthController extends BaseController
             return;
         }
 
+        $allowed = ['none', 'client_secret_post', 'client_secret_basic'];
+        if (!in_array($authMethod, $allowed, true)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'invalid_client_metadata', 'error_description' => "token_endpoint_auth_method must be one of: none, client_secret_post, client_secret_basic."]);
+            return;
+        }
+
         $clientModel = new OAuthClient($this->database);
         $clientId    = $clientModel->register($name, $redirectUris);
+        $secret      = $this->hmacClientSecret($clientId);
 
         http_response_code(201);
-        echo json_encode([
-            'client_id'              => $clientId,
-            'client_id_issued_at'    => time(),
-            'client_name'            => $name,
-            'redirect_uris'          => $redirectUris,
-            'token_endpoint_auth_method' => 'none',
-            'grant_types'            => ['authorization_code'],
-            'response_types'         => ['code'],
-            'code_challenge_methods' => ['S256'],
-        ]);
+        $resp = [
+            'client_id'                  => $clientId,
+            'client_id_issued_at'        => time(),
+            'client_name'                => $name,
+            'redirect_uris'              => $redirectUris,
+            'token_endpoint_auth_method' => $authMethod,
+            'grant_types'                => ['authorization_code'],
+            'response_types'             => ['code'],
+            'code_challenge_methods_supported' => ['S256'],
+            'scope'                      => 'app',
+        ];
+        if ($authMethod !== 'none') {
+            $resp['client_secret']            = $secret;
+            $resp['client_secret_expires_at'] = 0;
+        }
+        echo json_encode($resp);
     }
 
     // ── Authorization endpoint ────────────────────────────────────────────────
@@ -153,17 +176,39 @@ class OAuthController extends BaseController
     private function token(): void
     {
         header('Content-Type: application/json');
+        header('Cache-Control: no-store');
         header('Access-Control-Allow-Origin: *');
 
-        parse_str((string) file_get_contents('php://input'), $body);
-        if (empty($body)) {
-            $body = $_POST;
+        $raw  = (string) file_get_contents('php://input');
+        $body = [];
+        $ct   = $_SERVER['CONTENT_TYPE'] ?? '';
+        if (str_contains($ct, 'application/json')) {
+            $body = json_decode($raw, true) ?? [];
+        } else {
+            parse_str($raw, $body);
+            if (empty($body)) $body = $_POST;
         }
 
-        $grantType   = (string) ($body['grant_type']    ?? '');
-        $code        = (string) ($body['code']          ?? '');
-        $redirectUri = (string) ($body['redirect_uri']  ?? '');
-        $clientId    = (string) ($body['client_id']     ?? '');
+        // Extract client credentials from Basic header if present
+        $clientId = (string) ($body['client_id'] ?? '');
+        $clientSecret = (string) ($body['client_secret'] ?? '');
+        $auth = $_SERVER['HTTP_AUTHORIZATION']
+             ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+             ?? '';
+        if ($auth === '' && function_exists('getallheaders')) {
+            $headers = getallheaders();
+            $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        }
+        if (str_starts_with($auth, 'Basic ')) {
+            $decoded = base64_decode(substr($auth, 6));
+            if (str_contains($decoded, ':')) {
+                [$clientId, $clientSecret] = explode(':', $decoded, 2);
+            }
+        }
+
+        $grantType   = (string) ($body['grant_type']   ?? '');
+        $code        = (string) ($body['code']         ?? '');
+        $redirectUri = (string) ($body['redirect_uri'] ?? '');
         $verifier    = ($body['code_verifier'] ?? '') !== '' ? (string) $body['code_verifier'] : null;
 
         if ($grantType !== 'authorization_code' || $code === '' || $clientId === '') {
@@ -180,6 +225,16 @@ class OAuthController extends BaseController
             return;
         }
 
+        // Verify secret when provided
+        if ($clientSecret !== '') {
+            $expected = $this->hmacClientSecret($clientId);
+            if (!hash_equals($expected, $clientSecret)) {
+                http_response_code(401);
+                echo json_encode(['error' => 'invalid_client', 'error_description' => 'Invalid client secret.']);
+                return;
+            }
+        }
+
         $codeModel = new OAuthCode($this->database);
         if (!$codeModel->consume($code, $clientId, $redirectUri, $verifier)) {
             http_response_code(400);
@@ -193,6 +248,7 @@ class OAuthController extends BaseController
         echo json_encode([
             'access_token' => $token,
             'token_type'   => 'Bearer',
+            'scope'        => 'app',
         ]);
     }
 
@@ -204,10 +260,10 @@ class OAuthController extends BaseController
         header('Access-Control-Allow-Origin: *');
         $base = $this->baseUrl();
         echo json_encode([
-            'resource'                    => $base . '/mcp',
-            'authorization_servers'       => [$base . '/oauth'],
-            'bearer_methods_supported'    => ['header'],
-            'resource_documentation'      => $base . '/mcp',
+            'resource'                 => $base . '/mcp',
+            'authorization_servers'    => [$base . '/oauth'],
+            'bearer_methods_supported' => ['header'],
+            'scopes_supported'         => ['app'],
         ]);
     }
 
@@ -219,15 +275,28 @@ class OAuthController extends BaseController
         header('Access-Control-Allow-Origin: *');
         $base = $this->baseUrl();
         echo json_encode([
-            'issuer'                                  => $base . '/oauth',
-            'authorization_endpoint'                  => $base . '/oauth/authorize',
-            'token_endpoint'                          => $base . '/oauth/token',
-            'registration_endpoint'                   => $base . '/oauth/register',
-            'response_types_supported'                => ['code'],
-            'grant_types_supported'                   => ['authorization_code'],
-            'code_challenge_methods_supported'        => ['S256'],
-            'token_endpoint_auth_methods_supported'   => ['none'],
+            'issuer'                                => $base . '/oauth',
+            'authorization_endpoint'                => $base . '/oauth/authorize',
+            'token_endpoint'                        => $base . '/oauth/token',
+            'registration_endpoint'                 => $base . '/oauth/register',
+            'response_types_supported'              => ['code'],
+            'grant_types_supported'                 => ['authorization_code'],
+            'code_challenge_methods_supported'      => ['S256'],
+            'token_endpoint_auth_methods_supported' => ['none', 'client_secret_post', 'client_secret_basic'],
+            'scopes_supported'                      => ['app'],
+            'jwks_uri'                              => $base . '/oauth/jwks',
+            'subject_types_supported'               => ['public'],
+            'id_token_signing_alg_values_supported' => ['RS256'],
         ]);
+    }
+
+    // ── JWKS (no ID tokens, but OpenID parsers require the endpoint) ──────────
+
+    private function jwks(): void
+    {
+        header('Content-Type: application/json');
+        header('Access-Control-Allow-Origin: *');
+        echo json_encode(['keys' => []]);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -253,11 +322,70 @@ class OAuthController extends BaseController
 
     private function oauthRedirect(string $redirectUri, string $state, ?string $code, ?string $error): void
     {
-        $params = [];
+        $params = ['iss' => $this->baseUrl() . '/oauth'];
         if ($code  !== null) $params['code']  = $code;
         if ($error !== null) $params['error'] = $error;
         if ($state !== '')   $params['state'] = $state;
         header('Location: ' . $redirectUri . (str_contains($redirectUri, '?') ? '&' : '?') . http_build_query($params));
+    }
+
+    private function hmacClientSecret(string $clientId): string
+    {
+        $key = $this->appKey();
+        return hash_hmac('sha256', 'oauth-client:' . $clientId, $key);
+    }
+
+    private function appKey(): string
+    {
+        // Use a stable secret from config if available, fall back to a host-derived constant.
+        // On first deploy, generate: php -r "echo bin2hex(random_bytes(32));" and put in config/app_key.php
+        $f = __DIR__ . '/../config/app_key.php';
+        if (file_exists($f)) {
+            $cfg = require $f;
+            $k   = (string) ($cfg['key'] ?? '');
+            if ($k !== '') return $k;
+        }
+        return hash('sha256', ($_SERVER['HTTP_HOST'] ?? 'localhost') . __FILE__);
+    }
+
+    private function ensureTables(): void
+    {
+        try {
+            $pdo = $this->database->connect();
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS oauth_clients (
+                    id VARCHAR(80) NOT NULL PRIMARY KEY,
+                    name VARCHAR(200) NOT NULL DEFAULT 'MCP Client',
+                    redirect_uris TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+                CREATE TABLE IF NOT EXISTS oauth_codes (
+                    code VARCHAR(128) NOT NULL PRIMARY KEY,
+                    client_id VARCHAR(80) NOT NULL,
+                    redirect_uri VARCHAR(2000) NOT NULL,
+                    code_challenge VARCHAR(128) DEFAULT NULL,
+                    code_challenge_method VARCHAR(10) DEFAULT 'S256',
+                    expires_at DATETIME NOT NULL,
+                    used TINYINT(1) NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_client_id (client_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+                CREATE TABLE IF NOT EXISTS api_tokens (
+                    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    token_hash VARCHAR(64) NOT NULL,
+                    client_id VARCHAR(80) NOT NULL,
+                    label VARCHAR(200) DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_used_at TIMESTAMP NULL DEFAULT NULL,
+                    UNIQUE KEY unique_token (token_hash),
+                    INDEX idx_client (client_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ");
+        } catch (\Throwable) {
+            // Best-effort; will surface naturally if tables really don't exist
+        }
     }
 
     private function notFound(string $path): void
