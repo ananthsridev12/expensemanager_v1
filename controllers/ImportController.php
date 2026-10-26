@@ -83,8 +83,8 @@ class ImportController extends BaseController
                 header('Location: ?module=import');
                 exit;
             }
-            if (!preg_match('/\.(csv|xlsx)$/i', $file['name'])) {
-                $_SESSION['import_error'] = 'Only .csv and .xlsx files are supported.';
+            if (!preg_match('/\.(csv|xlsx|xls)$/i', $file['name'])) {
+                $_SESSION['import_error'] = 'Only .csv, .xlsx, and .xls files are supported.';
                 header('Location: ?module=import');
                 exit;
             }

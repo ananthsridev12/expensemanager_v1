@@ -53,7 +53,9 @@ class Import extends BaseModel
     public function readFile(string $path, string $filename): array
     {
         $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        return $ext === 'xlsx' ? $this->readXlsxFile($path) : $this->readCsvFile($path);
+        if ($ext === 'xlsx') return $this->readXlsxFile($path);
+        if ($ext === 'xls')  return $this->readXlsFile($path);
+        return $this->readCsvFile($path);
     }
 
     private function readCsvFile(string $path): array
@@ -72,6 +74,51 @@ class Import extends BaseModel
             }
         }
         fclose($fh);
+        return $rows;
+    }
+
+    private function readXlsFile(string $path): array
+    {
+        $header = (string) file_get_contents($path, false, null, 0, 8);
+
+        // PK signature → it is actually an XLSX file saved with .xls extension
+        if (str_starts_with($header, 'PK')) {
+            return $this->readXlsxFile($path);
+        }
+
+        // HTML-masked XLS: many Indian banks (HDFC, ICICI, SBI) export HTML tables as .xls
+        $start = ltrim($header);
+        if (str_starts_with($start, '<') || str_starts_with($start, "\xEF\xBB\xBF<")) {
+            return $this->readHtmlTableFile($path);
+        }
+
+        // Fall back to CSV (tab-separated or comma-separated disguised as .xls)
+        return $this->readCsvFile($path);
+    }
+
+    private function readHtmlTableFile(string $path): array
+    {
+        $html = file_get_contents($path);
+        if (!$html) return [];
+
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        libxml_clear_errors();
+
+        $rows = [];
+        foreach ($dom->getElementsByTagName('tr') as $tr) {
+            $cells = [];
+            // <th> headers first, then <td> data cells
+            foreach ($tr->childNodes as $node) {
+                if ($node instanceof \DOMElement && in_array(strtolower($node->nodeName), ['td', 'th'], true)) {
+                    $cells[] = trim($node->textContent);
+                }
+            }
+            if (!empty(array_filter($cells))) {
+                $rows[] = $cells;
+            }
+        }
         return $rows;
     }
 
